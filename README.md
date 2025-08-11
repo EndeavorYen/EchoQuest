@@ -56,6 +56,23 @@ Two options:
 2. Enable GitHub Pages → Deploy from branch → select `/ (root)` or move to `docs/` and deploy from there.
 3. GitHub Pages serves over HTTPS, so microphone works where supported.
 
+## React + TypeScript Edition (auto-deploy)
+- Location: `web/` (Vite + React + TS)
+- Local dev:
+  ```bash
+  cd web
+  npm i
+  npm run dev
+  ```
+- Build:
+  ```bash
+  npm run build
+  ```
+- Auto deploy to GitHub Pages:
+  - A workflow is added at `.github/workflows/deploy-pages.yml`.
+  - On every push to `main`, it builds `web/` and deploys `web/dist` to Pages.
+  - Ensure GitHub Pages is configured to source from “GitHub Actions”.
+
 ## Managing Vocabulary
 - Place images under `EchoQuest/pics/` with optional level subfolders: `001-basic/`, `002-animals/`, ...
 - The level number is extracted from the folder prefix: `001-...` => level 1, `010-...` => level 10. Fallback is level 1.
