@@ -1,0 +1,14 @@
+{
+  "name": "echoquest-root",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Root helpers for web workspace",
+  "scripts": {
+    "preinstall": "npm --prefix web ci || npm --prefix web install",
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "preview": "npm --prefix web run preview"
+  }
+}
+
+
