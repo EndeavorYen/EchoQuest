@@ -54,6 +54,8 @@ function fuzzyEquals(a: string, b: string) {
   return ratio >= 0.7
 }
 
+type LevelFactory = () => { view: React.ReactNode; onAnswer: (t: string) => void }
+
 export function App() {
   const vocab = useInlineOrFetchVocab()
   const [levelIdx, setLevelIdx] = useState(0)
@@ -66,7 +68,7 @@ export function App() {
   const inputRef = useRef<HTMLInputElement>(null)
   const toast = useToast()
 
-  const levels = useMemo(() => [
+  const levels = useMemo<LevelFactory[]>(() => [
     // Boss level
     () => {
       let hp = 5
@@ -154,7 +156,9 @@ export function App() {
       levelRef.current = null
       return
     }
-    const l = levels[levelIdx]()
+    const factory = levels[levelIdx]
+    if (!factory) return
+    const l = factory()
     setRender(l.view)
     levelRef.current = l
   }, [levelIdx, levels, vocab])
@@ -196,10 +200,20 @@ export function App() {
   )
 }
 
-function pickRandom<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)] }
+function pickRandom<T>(arr: T[]): T {
+  if (arr.length === 0) throw new Error('pickRandom received an empty array')
+  const index = Math.floor(Math.random() * arr.length)
+  const item = arr[index]
+  if (item === undefined) throw new Error('pickRandom computed an out-of-range index')
+  return item
+}
 function pickN<T>(arr: T[], n: number): T[] {
   const pool = [...arr]; const out: T[] = []
-  while (out.length < n && pool.length) { const i = Math.floor(Math.random() * pool.length); out.push(pool.splice(i, 1)[0]) }
+  while (out.length < n && pool.length) {
+    const i = Math.floor(Math.random() * pool.length)
+    const [item] = pool.splice(i, 1)
+    if (item !== undefined) out.push(item)
+  }
   return out
 }
 
