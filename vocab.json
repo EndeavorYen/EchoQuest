@@ -1,8 +1,0 @@
-[
-  { "id": "001-basic/apple", "word": "apple", "image": "pics/001-basic/apple.svg", "level": 1 },
-  { "id": "001-basic/cat", "word": "cat", "image": "pics/001-basic/cat.svg", "level": 1 },
-  { "id": "002-animals/elephant", "word": "elephant", "image": "pics/002-animals/elephant.svg", "level": 2 },
-  { "id": "003-objects/umbrella", "word": "umbrella", "image": "pics/003-objects/umbrella.svg", "level": 3 }
-]
-
-
