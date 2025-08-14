@@ -4,20 +4,23 @@ import TextInput from './TextInput'
 
 const SpeechInput = () => {
   const { setAnswer } = useVocabAnswer()
-  const recognitionRef = useRef<any>(null)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
   const [supported, setSupported] = useState(true)
 
   useEffect(() => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition
+    const speechWindow = window as typeof window & {
+      webkitSpeechRecognition?: typeof SpeechRecognition
+    }
 
-    if (!SpeechRecognition) {
+    const SpeechRecognitionClass =
+      speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition
+
+    if (!SpeechRecognitionClass) {
       setSupported(false)
       return
     }
 
-    const recognition = new SpeechRecognition()
+    const recognition = new SpeechRecognitionClass()
     recognition.lang = 'en-US'
     recognition.interimResults = false
     recognition.maxAlternatives = 1
