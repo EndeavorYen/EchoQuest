@@ -1,18 +1,18 @@
 import { create } from 'zustand'
 
-type VocabState = {
+type VocabAnswerState = {
   answer: string
   setAnswer: (answer: string) => void
 }
 
-const useVocabStore = create<VocabState>((set) => ({
+const useVocabAnswerStore = create<VocabAnswerState>((set) => ({
   answer: '',
   setAnswer: (answer) => set({ answer }),
 }))
 
 const useVocabAnswer = () => {
-  const answer = useVocabStore((s) => s.answer)
-  const setAnswer = useVocabStore((s) => s.setAnswer)
+  const answer = useVocabAnswerStore((s) => s.answer)
+  const setAnswer = useVocabAnswerStore((s) => s.setAnswer)
 
   const isCorrect = (expected: string) => {
     return answer.trim().toLowerCase() === expected.trim().toLowerCase()
@@ -22,4 +22,4 @@ const useVocabAnswer = () => {
 }
 
 export default useVocabAnswer
-export { useVocabStore }
+export { useVocabAnswerStore }
