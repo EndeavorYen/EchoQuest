@@ -2,15 +2,28 @@ import { useEffect, useRef, useState } from 'react'
 import useVocabAnswer from './useVocabAnswer'
 import TextInput from './TextInput'
 
+type RecognitionEvent = {
+  results: Array<Array<{ transcript: string }>>
+}
+
+type Recognition = {
+  lang: string
+  interimResults: boolean
+  maxAlternatives: number
+  onresult: ((event: RecognitionEvent) => void) | null
+  start: () => void
+  stop: () => void
+}
+
 const SpeechInput = () => {
   const { setAnswer } = useVocabAnswer()
-  const recognitionRef = useRef<any>(null)
+  const recognitionRef = useRef<Recognition | null>(null)
   const [supported, setSupported] = useState(true)
 
   useEffect(() => {
     const speechWindow = window as typeof window & {
-      SpeechRecognition?: any
-      webkitSpeechRecognition?: any
+      SpeechRecognition?: new () => Recognition
+      webkitSpeechRecognition?: new () => Recognition
     }
 
     const SpeechRecognitionClass =
@@ -21,12 +34,12 @@ const SpeechInput = () => {
       return
     }
 
-    const recognition: any = new SpeechRecognitionClass()
+    const recognition: Recognition = new SpeechRecognitionClass()
     recognition.lang = 'en-US'
     recognition.interimResults = false
     recognition.maxAlternatives = 1
 
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: RecognitionEvent) => {
       const transcript = event.results[0][0].transcript
       setAnswer(transcript)
     }
