@@ -5,9 +5,13 @@ import BossLevel from './levels/BossLevel'
 
 interface GameProps {
   onWin?: () => void
+  onLose?: () => void
 }
 
-const Game = ({ onWin = () => {} }: GameProps) => {
+const Game = ({ onWin = () => {}, onLose = () => {} }: GameProps) => {
+  // `onLose` is accepted for future game scenarios where a player may fail a level.
+  // It is intentionally unused at the moment.
+  void onLose
   const levels: LevelComponent[] = [DoorPuzzleLevel, BossLevel]
 
   return (
