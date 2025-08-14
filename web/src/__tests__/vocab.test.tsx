@@ -1,5 +1,5 @@
 import { render, fireEvent, renderHook, cleanup } from '@testing-library/react'
-import { describe, expect, it, vi, afterEach } from 'vitest'
+import { describe, expect, it, afterEach } from 'vitest'
 import TextInput from '../vocab/TextInput'
 import SpeechInput from '../vocab/SpeechInput'
 import useVocabAnswer, { useVocabAnswerStore } from '../vocab/useVocabAnswer'

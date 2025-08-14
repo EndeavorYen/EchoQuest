@@ -1,9 +1,9 @@
 export type VocabMap = Record<string, Record<string, string>>
 
-const files = import.meta.glob<{ default: string }>('/public/vocab/*/*.{png,jpg,webp}', {
+const files = import.meta.glob('/public/vocab/*/*.{png,jpg,webp}', {
   eager: true,
   import: 'default',
-})
+}) as Record<string, string>
 
 export function loadVocab(fileMap: Record<string, string> = files): VocabMap {
   const vocab: VocabMap = {}

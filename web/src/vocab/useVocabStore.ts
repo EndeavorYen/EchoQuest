@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import loadVocab, { VocabMap } from './vocabLoader'
+import loadVocab, { type VocabMap } from './vocabLoader'
 
 const allVocab: VocabMap = loadVocab()
 const defaultLevel = Object.keys(allVocab)[0] || ''

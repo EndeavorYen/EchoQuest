@@ -4,13 +4,20 @@
 
 @layer base {
   body {
-    @apply m-0 bg-pastelYellow text-gray-800 font-playful;
+    margin: 0;
+    background-color: #fff5ba;
+    color: #1f2937;
+    font-family: 'Comic Neue', cursive;
   }
 }
 
 @layer components {
   .sprite {
-    @apply w-8 h-8 border border-pastelPurple bg-no-repeat animate-spriteWalk;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid #e4c1f9;
+    background-repeat: no-repeat;
+    animation: spriteWalk 1s steps(3) infinite;
     background-size: 96px 32px;
   }
   .sprite-hero {
