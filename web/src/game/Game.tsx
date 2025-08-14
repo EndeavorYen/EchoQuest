@@ -12,7 +12,7 @@ const Game = ({ onWin = () => {}, onLose = () => {} }: GameProps) => {
   // `onLose` is accepted for future game scenarios where a player may fail a level.
   // It is intentionally unused at the moment.
   void onLose
-  const levels: LevelComponent[] = [DoorPuzzleLevel, BossLevel]
+  const levels: LevelComponent[] = [BossLevel, DoorPuzzleLevel]
 
   return (
     <div className="flex flex-col items-center gap-4">
