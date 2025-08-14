@@ -10,12 +10,19 @@ const useVocabAnswerStore = create<VocabAnswerState>((set) => ({
   setAnswer: (answer) => set({ answer }),
 }))
 
+function normalizeWord(word: string): string {
+  return word
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z]/g, '')
+}
+
 const useVocabAnswer = () => {
   const answer = useVocabAnswerStore((s) => s.answer)
   const setAnswer = useVocabAnswerStore((s) => s.setAnswer)
 
   const isCorrect = (expected: string) => {
-    return answer.trim().toLowerCase() === expected.trim().toLowerCase()
+    return normalizeWord(answer) === normalizeWord(expected)
   }
 
   return { answer, setAnswer, isCorrect }

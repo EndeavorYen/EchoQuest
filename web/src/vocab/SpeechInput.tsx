@@ -60,8 +60,13 @@ const SpeechInput = () => {
   }
 
   return (
-    <button type="button" onClick={start}>
-      Speak
+    <button
+      type="button"
+      onClick={start}
+      aria-label="Speak"
+      className="px-3 py-2 rounded-lg bg-pastelPurple text-gray-800 shadow hover:brightness-105 active:brightness-95 transition"
+    >
+      🎤 Speak
     </button>
   )
 }

@@ -40,40 +40,42 @@ const BossLevel = ({ onComplete }: BossLevelProps) => {
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 p-4">
-      <p className="text-lg">A cute boss appears! Say or type the word to deal damage.</p>
-      <p>Boss HP: {bossHp}</p>
-      <div className="flex gap-1" aria-label="boss hp">
-        {Array.from({ length: Math.max(0, bossHp) }).map((_, i) => (
-          <span key={i} role="img" aria-label="heart">❤️</span>
-        ))}
-      </div>
-      {currentWord && (
-        <img
-          src={images[currentWord]}
-          alt={currentWord}
-          width={180}
-          height={180}
-          className="rounded shadow"
-        />
-      )}
-      <div className="flex items-center gap-3">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={silentMode}
-            onChange={(e) => setSilentMode(e.target.checked)}
+    <div className="flex flex-col items-center gap-4 p-6">
+      <div className="bg-white/70 backdrop-blur rounded-2xl shadow-xl p-6 max-w-md w-full text-center">
+        <p className="text-xl font-playful text-gray-800 mb-2">A cute boss appears! Say or type the word to deal damage.</p>
+        <p className="mb-2">Boss HP: {bossHp}</p>
+        <div className="flex justify-center gap-1 mb-4" aria-label="boss hp">
+          {Array.from({ length: Math.max(0, bossHp) }).map((_, i) => (
+            <span key={i} role="img" aria-label="heart" className="text-2xl">❤️</span>
+          ))}
+        </div>
+        {currentWord && (
+          <img
+            src={images[currentWord]}
+            alt={currentWord}
+            width={240}
+            height={240}
+            className="rounded-xl shadow-md mx-auto mb-4 bg-white object-contain"
           />
-          Silent Mode (keyboard only)
-        </label>
+        )}
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={silentMode}
+              onChange={(e) => setSilentMode(e.target.checked)}
+            />
+            Silent Mode (keyboard only)
+          </label>
+        </div>
+        <form onSubmit={handleSubmit} className="flex gap-2 items-center justify-center">
+          {!silentMode && <SpeechInput />}
+          <TextInput />
+          <button type="submit" className="px-4 py-2 rounded-lg bg-rose-300 text-gray-800 shadow hover:brightness-105 active:brightness-95 transition">
+            Attack
+          </button>
+        </form>
       </div>
-      <form onSubmit={handleSubmit} className="flex gap-2 items-center">
-        {!silentMode && <SpeechInput />}
-        <TextInput />
-        <button type="submit" className="px-3 py-1 bg-rose-200 rounded">
-          Attack
-        </button>
-      </form>
     </div>
   )
 }
