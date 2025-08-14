@@ -1,6 +1,38 @@
 # React + TypeScript + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules. It also includes [Tailwind CSS](https://tailwindcss.com/) for utility‑first styling and [Zustand](https://github.com/pmndrs/zustand) for state management.
+
+## Tailwind CSS
+
+Tailwind is preconfigured via `tailwind.config.js` and `postcss.config.js`. Start using utility classes in your components:
+
+```tsx
+<div className="p-4 text-center text-blue-500">Hello Tailwind</div>
+```
+
+## Zustand
+
+Zustand provides a small, fast state management solution. A simple store looks like this:
+
+```ts
+import { create } from 'zustand'
+
+interface BearState {
+  bears: number
+  increase: (by: number) => void
+}
+
+export const useBearStore = create<BearState>()((set) => ({
+  bears: 0,
+  increase: (by) => set((state) => ({ bears: state.bears + by })),
+}))
+```
+
+Use the store in a component:
+
+```tsx
+const bears = useBearStore((state) => state.bears)
+```
 
 Currently, two official plugins are available:
 
