@@ -48,9 +48,10 @@ describe('SpeechInput', () => {
 describe('vocabLoader', () => {
   it('parses images from file map', () => {
     const files = {
-      '/public/vocab/easy/apple.png': '/public/vocab/easy/apple.png',
+      '/public/vocab/001-tools/apple.svg': '/public/vocab/001-tools/apple.svg',
     }
     const vocab = loadVocab(files)
-    expect(vocab.easy.apple).toMatch(/apple\.png$/)
+    expect(vocab.levels['001-tools'].words.apple).toMatch(/apple\.svg$/)
+    expect(vocab.levels['001-tools'].damage).toBe(1)
   })
 })

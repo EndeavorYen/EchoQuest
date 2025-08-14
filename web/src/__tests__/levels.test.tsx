@@ -8,13 +8,13 @@ import useVocabStore from '../vocab/useVocabStore'
 
 afterEach(() => {
   useVocabAnswerStore.setState({ answer: '' })
-  useVocabStore.setState({ images: {} })
+  useVocabStore.setState({ images: {}, damage: 1, setLevel: () => {} })
 })
 
 describe('BossLevel', () => {
   it('reduces HP and triggers completion', () => {
     const onComplete = vi.fn()
-    useVocabStore.setState({ images: { apple: '/apple.png' } })
+    useVocabStore.setState({ images: { apple: '/apple.svg' }, damage: 2, setLevel: () => {} })
     render(<BossLevel onComplete={onComplete} />)
 
     const input = screen.getAllByRole('textbox')[0]
@@ -22,7 +22,7 @@ describe('BossLevel', () => {
 
     fireEvent.change(input, { target: { value: 'apple' } })
     fireEvent.click(attack)
-    expect(screen.getByText(/Boss HP: 2/)).toBeInTheDocument()
+    expect(screen.getByText(/Boss HP: 3/)).toBeInTheDocument()
 
     fireEvent.change(input, { target: { value: 'apple' } })
     fireEvent.click(attack)
@@ -37,11 +37,26 @@ describe('BossLevel', () => {
 describe('DoorPuzzleLevel', () => {
   it('unlocks when tools match words', () => {
     const onComplete = vi.fn()
+    useVocabStore.setState({
+      images: {
+        key: '/key.svg',
+        hammer: '/hammer.svg',
+        rope: '/rope.svg',
+      },
+      damage: 1,
+      setLevel: () => {},
+    })
     render(<DoorPuzzleLevel onComplete={onComplete} />)
 
-    fireEvent.change(screen.getByLabelText('lock'), { target: { value: 'key' } })
-    expect(onComplete).not.toHaveBeenCalled()
-    fireEvent.change(screen.getByLabelText('nail'), { target: { value: 'hammer' } })
+    const input = screen.getAllByRole('textbox')[0]
+    const button = screen.getByRole('button', { name: /unlock/i })
+
+    fireEvent.change(input, { target: { value: 'key' } })
+    fireEvent.click(button)
+    fireEvent.change(input, { target: { value: 'hammer' } })
+    fireEvent.click(button)
+    fireEvent.change(input, { target: { value: 'rope' } })
+    fireEvent.click(button)
     expect(onComplete).toHaveBeenCalled()
   })
 })

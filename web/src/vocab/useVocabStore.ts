@@ -1,19 +1,26 @@
 import { create } from 'zustand'
-import loadVocab, { type VocabMap } from './vocabLoader'
+import loadVocab, { type VocabData, type LevelData } from './vocabLoader'
 
-const allVocab: VocabMap = loadVocab()
-const defaultLevel = Object.keys(allVocab)[0] || ''
+const allVocab: VocabData = loadVocab()
+const levelNames = Object.keys(allVocab.levels)
+const defaultLevel = levelNames[0] || ''
+const defaultData: LevelData = allVocab.levels[defaultLevel] || { words: {}, damage: 1 }
 
 export type VocabState = {
   level: string
   images: Record<string, string>
+  damage: number
   setLevel: (level: string) => void
 }
 
 const useVocabStore = create<VocabState>((set) => ({
   level: defaultLevel,
-  images: allVocab[defaultLevel] || {},
-  setLevel: (level) => set({ level, images: allVocab[level] || {} }),
+  images: defaultData.words,
+  damage: defaultData.damage,
+  setLevel: (level) => {
+    const data = allVocab.levels[level] || { words: {}, damage: 1 }
+    set({ level, images: data.words, damage: data.damage })
+  },
 }))
 
 export default useVocabStore
