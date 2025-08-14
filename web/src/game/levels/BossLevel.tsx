@@ -1,32 +1,52 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import SpeechInput from '../../vocab/SpeechInput'
+import TextInput from '../../vocab/TextInput'
+import useVocabAnswer from '../../vocab/useVocabAnswer'
+import useVocabStore from '../../vocab/useVocabStore'
 
 interface BossLevelProps {
   onComplete: () => void
 }
 
 const BossLevel = ({ onComplete }: BossLevelProps) => {
+  const { images } = useVocabStore()
+  const words = Object.keys(images)
   const [bossHp, setBossHp] = useState(3)
-  const [answer, setAnswer] = useState('')
+  const [index, setIndex] = useState(0)
+  const { setAnswer, isCorrect } = useVocabAnswer()
+
+  useEffect(() => {
+    setIndex(0)
+    setAnswer('')
+  }, [images, setAnswer])
+
+  const currentWord = words[index] || ''
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (answer.trim().toLowerCase() === 'correct') {
+    if (!currentWord) return
+    if (isCorrect(currentWord)) {
       const next = bossHp - 1
       setBossHp(next)
-      if (next <= 0) onComplete()
+      if (next <= 0) {
+        onComplete()
+        return
+      }
+      setIndex((i) => (i + 1) % words.length)
     }
     setAnswer('')
   }
 
   return (
-    <div>
+    <div className="flex flex-col items-center gap-2">
+      <p>The boss blocks your path! Say the word to attack.</p>
       <p>Boss HP: {bossHp}</p>
-      <form onSubmit={handleSubmit}>
-        <input
-          aria-label="answer"
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-        />
+      {currentWord && (
+        <img src={images[currentWord]} alt={currentWord} width={100} height={100} />
+      )}
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <SpeechInput />
+        <TextInput />
         <button type="submit">Attack</button>
       </form>
     </div>
@@ -34,4 +54,3 @@ const BossLevel = ({ onComplete }: BossLevelProps) => {
 }
 
 export default BossLevel
-

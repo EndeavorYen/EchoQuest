@@ -22,7 +22,7 @@ describe('TextInput', () => {
 describe('SpeechInput', () => {
   it('stores transcript when speech recognized', () => {
     class MockSpeechRecognition {
-      public onresult: ((event: any) => void) | null = null
+      public onresult: ((event: { results: Array<Array<{ transcript: string }>> }) => void) | null = null
       lang = ''
       interimResults = false
       maxAlternatives = 1
@@ -31,9 +31,9 @@ describe('SpeechInput', () => {
       }
       stop() {}
     }
-    const speechWindow = window as any
+    const speechWindow = window as Window & { SpeechRecognition?: unknown }
     const original = speechWindow.SpeechRecognition
-    speechWindow.SpeechRecognition = MockSpeechRecognition
+    speechWindow.SpeechRecognition = MockSpeechRecognition as unknown
 
     const { getByRole } = render(<SpeechInput />)
     fireEvent.click(getByRole('button', { name: /speak/i }))
