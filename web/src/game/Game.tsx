@@ -1,6 +1,11 @@
 import { useRef, useEffect } from 'react'
 
-const Game = () => {
+interface GameProps {
+  onWin?: () => void
+  onLose?: () => void
+}
+
+const Game = ({ onWin = () => {}, onLose = () => {} }: GameProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -27,7 +32,34 @@ const Game = () => {
     return () => cancelAnimationFrame(frameId)
   }, [])
 
-  return <canvas ref={canvasRef} width={800} height={600} />
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="flex gap-4">
+        <div className="sprite sprite-hero" />
+        <div className="sprite sprite-monster" />
+      </div>
+      <canvas
+        ref={canvasRef}
+        width={800}
+        height={600}
+        className="border border-pastelPurple"
+      />
+      <div className="flex gap-2">
+        <button
+          className="px-2 py-1 rounded bg-pastelGreen text-gray-700"
+          onClick={onWin}
+        >
+          Win
+        </button>
+        <button
+          className="px-2 py-1 rounded bg-pastelYellow text-gray-700"
+          onClick={onLose}
+        >
+          Lose
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export default Game

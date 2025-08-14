@@ -58,13 +58,16 @@ describe('useVocabAnswer', () => {
 
 describe('SpeechInput', () => {
   it('falls back to TextInput when unsupported', () => {
-    const original = (window as any).SpeechRecognition
-    ;(window as any).SpeechRecognition = undefined
+    const speechWindow = window as typeof window & {
+      SpeechRecognition?: unknown
+    }
+    const original = speechWindow.SpeechRecognition
+    speechWindow.SpeechRecognition = undefined
 
     const { container } = render(<SpeechInput />)
     expect(container.querySelector('input')).not.toBeNull()
 
-    ;(window as any).SpeechRecognition = original
+    speechWindow.SpeechRecognition = original
   })
 })
 
