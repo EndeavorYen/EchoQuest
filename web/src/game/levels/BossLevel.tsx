@@ -9,16 +9,17 @@ interface BossLevelProps {
 }
 
 const BossLevel = ({ onComplete }: BossLevelProps) => {
-  const { images } = useVocabStore()
+  const { images, damage, setLevel } = useVocabStore()
   const words = Object.keys(images)
-  const [bossHp, setBossHp] = useState(3)
+  const [bossHp, setBossHp] = useState(5)
   const [index, setIndex] = useState(0)
   const { setAnswer, isCorrect } = useVocabAnswer()
 
   useEffect(() => {
+    setLevel('002-fruits')
     setIndex(0)
     setAnswer('')
-  }, [images, setAnswer])
+  }, [setLevel, setAnswer])
 
   const currentWord = words[index] || ''
 
@@ -26,7 +27,7 @@ const BossLevel = ({ onComplete }: BossLevelProps) => {
     e.preventDefault()
     if (!currentWord) return
     if (isCorrect(currentWord)) {
-      const next = bossHp - 1
+      const next = bossHp - damage
       setBossHp(next)
       if (next <= 0) {
         onComplete()

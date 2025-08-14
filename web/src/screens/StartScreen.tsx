@@ -6,7 +6,7 @@ interface StartScreenProps {
 
 const StartScreen = ({ onStart }: StartScreenProps) => {
   const { level, setLevel } = useVocabStore()
-  const levels = Object.keys(allVocab)
+  const levels = Object.keys(allVocab.levels)
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-pastelBlue text-center">
