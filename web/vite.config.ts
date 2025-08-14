@@ -5,4 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   base: '/EchoQuest/',
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+  },
 })
