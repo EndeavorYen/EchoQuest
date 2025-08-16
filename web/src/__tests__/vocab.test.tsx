@@ -36,7 +36,7 @@ describe('SpeechInput', () => {
     speechWindow.SpeechRecognition = MockSpeechRecognition as unknown
 
     const { getByRole } = render(<SpeechInput />)
-    fireEvent.click(getByRole('button', { name: /speak/i }))
+    fireEvent.click(getByRole('button', { name: /listen/i }))
 
     const { result } = renderHook(() => useVocabAnswer())
     expect(result.current.answer).toBe('dog')
