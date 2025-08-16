@@ -1,73 +1,36 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect } from 'react'
 import useVocabAnswer from './useVocabAnswer'
 import TextInput from './TextInput'
-
-type RecognitionEvent = {
-  results: Array<Array<{ transcript: string }>>
-}
-
-type Recognition = {
-  lang: string
-  interimResults: boolean
-  maxAlternatives: number
-  onresult: ((event: RecognitionEvent) => void) | null
-  start: () => void
-  stop: () => void
-}
+import useSpeechRecognition from './useSpeechRecognition'
 
 const SpeechInput = () => {
   const { setAnswer } = useVocabAnswer()
-  const recognitionRef = useRef<Recognition | null>(null)
-  const [supported, setSupported] = useState(true)
+  const speech = useSpeechRecognition()
 
   useEffect(() => {
-    const speechWindow = window as typeof window & {
-      SpeechRecognition?: new () => Recognition
-      webkitSpeechRecognition?: new () => Recognition
+    if (speech.transcript) {
+      setAnswer(speech.transcript)
     }
+  }, [speech.transcript, setAnswer])
 
-    const SpeechRecognitionClass =
-      speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition
-
-    if (!SpeechRecognitionClass) {
-      setSupported(false)
-      return
-    }
-
-    const recognition: Recognition = new SpeechRecognitionClass()
-    recognition.lang = 'en-US'
-    recognition.interimResults = false
-    recognition.maxAlternatives = 1
-
-    recognition.onresult = (event: RecognitionEvent) => {
-      const transcript = event.results[0][0].transcript
-      setAnswer(transcript)
-    }
-
-    recognitionRef.current = recognition
-
-    return () => {
-      recognition.stop()
-    }
-  }, [setAnswer])
-
-  const start = () => {
-    recognitionRef.current?.start()
-  }
-
-  if (!supported) {
+  if (!speech.supported) {
     return <TextInput />
   }
 
   return (
-    <button
-      type="button"
-      onClick={start}
-      aria-label="Speak"
-      className="px-3 py-2 rounded-lg bg-pastelPurple text-gray-800 shadow hover:brightness-105 active:brightness-95 transition"
-    >
-      🎤 Speak
-    </button>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={speech.listening ? speech.stop : speech.start}
+        aria-label={speech.listening ? 'Stop listening' : 'Start listening'}
+        className="px-3 py-2 rounded-lg bg-pastelPurple text-gray-800 shadow hover:brightness-105 active:brightness-95 transition"
+      >
+        {speech.listening ? 'Stop' : 'Listen'}
+      </button>
+      {speech.listening && (
+        <span className="text-sm text-rose-600">Listening...</span>
+      )}
+    </div>
   )
 }
 
