@@ -3,7 +3,7 @@ import { describe, expect, it, afterEach } from 'vitest'
 import TextInput from '../vocab/TextInput'
 import SpeechInput from '../vocab/SpeechInput'
 import useVocabAnswer, { useVocabAnswerStore } from '../vocab/useVocabAnswer'
-import loadVocab from '../vocab/vocabLoader'
+import loadVocab, { loadVocabItems } from '../vocab/vocabLoader'
 
 afterEach(() => {
   cleanup()
@@ -53,5 +53,14 @@ describe('vocabLoader', () => {
     const vocab = loadVocab(files)
     expect(vocab.levels['001-tools'].words.apple).toMatch(/apple\.svg$/)
     expect(vocab.levels['001-tools'].damage).toBe(1)
+  })
+
+  it('creates vocab items with difficulty', () => {
+    const files = {
+      '/public/vocab/002-fruits/banana.png': '/public/vocab/002-fruits/banana.png',
+    }
+    const items = loadVocabItems(files)
+    expect(items[0].word).toBe('banana')
+    expect(items[0].difficulty).toBe(2)
   })
 })

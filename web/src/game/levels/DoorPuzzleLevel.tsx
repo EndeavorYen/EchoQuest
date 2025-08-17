@@ -3,14 +3,16 @@ import SpeechInput from '../../vocab/SpeechInput'
 import TextInput from '../../vocab/TextInput'
 import useVocabAnswer from '../../vocab/useVocabAnswer'
 import useVocabStore from '../../vocab/useVocabStore'
+import useGameStats from '../useGameStats'
 
 interface DoorPuzzleLevelProps {
   onComplete: () => void
 }
 
 const DoorPuzzleLevel = ({ onComplete }: DoorPuzzleLevelProps) => {
-  const { images, setLevel } = useVocabStore()
+  const { images, damage, setLevel } = useVocabStore()
   const { setAnswer, isCorrect } = useVocabAnswer()
+  const { addCorrect, resetCombo } = useGameStats()
   const [index, setIndex] = useState(0)
   const [silentMode, setSilentMode] = useState(false)
 
@@ -27,12 +29,15 @@ const DoorPuzzleLevel = ({ onComplete }: DoorPuzzleLevelProps) => {
     e.preventDefault()
     if (!current) return
     if (isCorrect(current)) {
+      addCorrect(damage)
       const next = index + 1
       if (next >= tools.length) {
         onComplete()
       } else {
         setIndex(next)
       }
+    } else {
+      resetCombo()
     }
     setAnswer('')
   }
