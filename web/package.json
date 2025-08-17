@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "start": "echo 'no start script'",
+    "start": "esbuild index.tsx --bundle --sourcemap --outfile=dist/index.js --servedir=dist --watch",
     "test": "echo 'no tests specified'",
     "build": "tsc --noEmit && esbuild index.tsx --bundle --minify --sourcemap --outfile=dist/index.js"
   },
