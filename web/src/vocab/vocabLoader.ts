@@ -10,6 +10,15 @@ const files = import.meta.glob('/src/assets/vocab/*/*.{svg,webp,png,jpg}', {
 
 const EXT_PRIORITY = ['svg', 'webp', 'png', 'jpg'] as const
 
+function normalizeWord(word: string): string {
+  return word.toLowerCase().replace(/[^a-z]/g, '')
+}
+
+function fileNameToWord(name: string): string {
+  const base = name.replace(/\.[^.]+$/, '')
+  return normalizeWord(base)
+}
+
 export function loadVocab(fileMap: Record<string, string> = files): VocabData {
   const byFolderWord: Record<string, Record<string, Record<string, string>>> = {}
 
@@ -17,7 +26,8 @@ export function loadVocab(fileMap: Record<string, string> = files): VocabData {
     const match = path.match(/\/vocab\/([^/]+)\/([^/.]+)\.(svg|webp|png|jpg)$/)
     if (!match) continue
     const folder = match[1]
-    const word = match[2]
+    const fileName = match[2]
+    const word = fileNameToWord(fileName)
     const ext = match[3]
     byFolderWord[folder] ||= {}
     byFolderWord[folder][word] ||= {}
@@ -26,8 +36,8 @@ export function loadVocab(fileMap: Record<string, string> = files): VocabData {
 
   const levels: Record<string, LevelData> = {}
   for (const [folder, wordsMap] of Object.entries(byFolderWord)) {
-    const levelMatch = folder.match(/^(\d+)-(.+)$/)
-    const difficulty = levelMatch ? parseInt(levelMatch[1], 10) : 1
+    const levelMatch = folder.match(/^(\d+)-/)
+    const difficulty = levelMatch ? Math.max(1, Math.min(5, parseInt(levelMatch[1], 10))) : 1
     const words: Record<string, string> = {}
 
     for (const [word, extMap] of Object.entries(wordsMap)) {
