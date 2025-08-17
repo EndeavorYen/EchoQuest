@@ -5,10 +5,12 @@ import BossLevel from '../game/levels/BossLevel'
 import DoorPuzzleLevel from '../game/levels/DoorPuzzleLevel'
 import { useVocabAnswerStore } from '../vocab/useVocabAnswer'
 import useVocabStore from '../vocab/useVocabStore'
+import { useGameStatsStore } from '../game/useGameStats'
 
 afterEach(() => {
   useVocabAnswerStore.setState({ answer: '' })
   useVocabStore.setState({ images: {}, damage: 1, setLevel: () => {} })
+  useGameStatsStore.setState({ score: 0, combo: 0, correct: 0 })
 })
 
 describe('BossLevel', () => {

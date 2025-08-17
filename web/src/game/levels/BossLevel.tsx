@@ -3,6 +3,7 @@ import SpeechInput from '../../vocab/SpeechInput'
 import TextInput from '../../vocab/TextInput'
 import useVocabAnswer from '../../vocab/useVocabAnswer'
 import useVocabStore from '../../vocab/useVocabStore'
+import useGameStats from '../useGameStats'
 
 interface BossLevelProps {
   onComplete: () => void
@@ -10,6 +11,7 @@ interface BossLevelProps {
 
 const BossLevel = ({ onComplete }: BossLevelProps) => {
   const { images, damage, setLevel } = useVocabStore()
+  const { addCorrect, resetCombo } = useGameStats()
   const words = useMemo(() => Object.keys(images), [images])
   const [bossHp, setBossHp] = useState(5)
   const [index, setIndex] = useState(0)
@@ -28,6 +30,7 @@ const BossLevel = ({ onComplete }: BossLevelProps) => {
     e.preventDefault()
     if (!currentWord) return
     if (isCorrect(currentWord)) {
+      addCorrect(damage)
       const next = bossHp - damage
       setBossHp(next)
       if (next <= 0) {
@@ -35,6 +38,8 @@ const BossLevel = ({ onComplete }: BossLevelProps) => {
         return
       }
       setIndex((i) => (i + 1) % words.length)
+    } else {
+      resetCombo()
     }
     setAnswer('')
   }
