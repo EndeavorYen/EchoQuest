@@ -118,9 +118,35 @@ const App: React.FC = () => {
   useEffect(() => {
     const storedVocab = loadVocabFromStorage();
     const initialVocab = storedVocab.length > 0 ? storedVocab : [
-        { id: '1', word: 'apple', difficulty: 1, imageName: '🍎', enabled: true, size:0, type:'' },
-        { id: '2', word: 'banana', difficulty: 1, imageName: '🍌', enabled: true, size:0, type:'' },
-        { id: '3', word: 'cat', difficulty: 1, imageName: '🐱', enabled: true, size:0, type:'' },
+        // Difficulty 1
+        { id: 'd1-1', word: 'apple', difficulty: 1, imageName: '🍎', enabled: true, size:0, type:'' },
+        { id: 'd1-2', word: 'ball', difficulty: 1, imageName: '⚽', enabled: true, size:0, type:'' },
+        { id: 'd1-3', word: 'cat', difficulty: 1, imageName: '🐱', enabled: true, size:0, type:'' },
+        { id: 'd1-4', word: 'dog', difficulty: 1, imageName: '🐶', enabled: true, size:0, type:'' },
+        { id: 'd1-5', word: 'egg', difficulty: 1, imageName: '🥚', enabled: true, size:0, type:'' },
+        { id: 'd1-6', word: 'fish', difficulty: 1, imageName: '🐟', enabled: true, size:0, type:'' },
+        { id: 'd1-7', word: 'key', difficulty: 1, imageName: '🔑', enabled: true, size:0, type:'' },
+        { id: 'd1-8', word: 'sun', difficulty: 1, imageName: '☀️', enabled: true, size:0, type:'' },
+
+        // Difficulty 2
+        { id: 'd2-1', word: 'banana', difficulty: 2, imageName: '🍌', enabled: true, size:0, type:'' },
+        { id: 'd2-2', word: 'car', difficulty: 2, imageName: '🚗', enabled: true, size:0, type:'' },
+        { id: 'd2-3', word: 'flower', difficulty: 2, imageName: '🌸', enabled: true, size:0, type:'' },
+        { id: 'd2-4', word: 'guitar', difficulty: 2, imageName: '🎸', enabled: true, size:0, type:'' },
+        { id: 'd2-5', word: 'hammer', difficulty: 2, imageName: '🔨', enabled: true, size:0, type:'' },
+        { id: 'd2-6', word: 'lion', difficulty: 2, imageName: '🦁', enabled: true, size:0, type:'' },
+        { id: 'd2-7', word: 'pizza', difficulty: 2, imageName: '🍕', enabled: true, size:0, type:'' },
+        { id: 'd2-8', word: 'train', difficulty: 2, imageName: '🚆', enabled: true, size:0, type:'' },
+
+        // Difficulty 3
+        { id: 'd3-1', word: 'bicycle', difficulty: 3, imageName: '🚲', enabled: true, size:0, type:'' },
+        { id: 'd3-2', word: 'camera', difficulty: 3, imageName: '📷', enabled: true, size:0, type:'' },
+        { id: 'd3-3', word: 'computer', difficulty: 3, imageName: '💻', enabled: true, size:0, type:'' },
+        { id: 'd3-4', word: 'elephant', difficulty: 3, imageName: '🐘', enabled: true, size:0, type:'' },
+        { id: 'd3-5', word: 'house', difficulty: 3, imageName: '🏠', enabled: true, size:0, type:'' },
+        { id: 'd3-6', word: 'magic', difficulty: 3, imageName: '✨', enabled: true, size:0, type:'' },
+        { id: 'd3-7', word: 'strawberry', difficulty: 3, imageName: '🍓', enabled: true, size:0, type:'' },
+        { id: 'd3-8', word: 'telescope', difficulty: 3, imageName: '🔭', enabled: true, size:0, type:'' },
     ];
     setVocab(initialVocab);
   }, []);
