@@ -41,6 +41,8 @@ jobs:
         run: npm install --prefix web
       - name: Build
         run: npm run build --prefix web
+      - name: Copy index.html
+        run: cp web/public/index.html web/dist/index.html
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
