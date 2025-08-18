@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Sword, Shield, Heart, Lock, Key, Mic, MicOff, Volume2, Star, Zap, Trophy, Skull, Sparkles, Settings } from 'lucide-react';
+import { Sword, Shield, Heart, Lock, Key, Mic, MicOff, Volume2, Star, Zap, Trophy, Skull, Sparkles, Settings, HelpCircle, SkipForward } from 'lucide-react';
 import { VocabManager, VocabItem } from './components/VocabManager';
 
 // Speech Recognition Hook
@@ -111,6 +111,7 @@ const App: React.FC = () => {
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [showEffect, setShowEffect] = useState(false);
   const [combo, setCombo] = useState(0);
+  const [showHint, setShowHint] = useState(false);
 
   const speech = useSpeechRecognition();
 
@@ -283,6 +284,11 @@ const App: React.FC = () => {
       }
   }
 
+  const handleSkip = () => {
+    setCombo(0);
+    selectNewWord();
+  };
+
   const renderGame = () => {
     const level = levels[currentLevel];
     
@@ -342,7 +348,7 @@ const App: React.FC = () => {
 
           {currentWord && (
             <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-              <div className={`text-center mb-6 transition-all ${showEffect ? 'scale-110' : 'scale-100'}`}>
+              <div className={`text-center mb-6 transition-all relative ${showEffect ? 'scale-110' : 'scale-100'}`}>
                 {currentWord.imageDataUrl ? 
                     <img src={currentWord.imageDataUrl} alt={currentWord.word} className="w-40 h-40 object-cover rounded-xl border inline-block"/> :
                     <div className="text-8xl mb-4">{currentWord.imageName}</div>
@@ -353,6 +359,11 @@ const App: React.FC = () => {
                   ))}
                 </div>
                 <p className="text-sm text-gray-500">難度等級</p>
+                {showHint && (
+                    <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center rounded-xl">
+                        <span className="text-white text-4xl font-bold">{currentWord.word}</span>
+                    </div>
+                )}
               </div>
               
               <div className="flex flex-col items-center gap-4">
@@ -395,6 +406,21 @@ const App: React.FC = () => {
                     攻擊!
                   </button>
                 )}
+
+                <div className="flex gap-4 items-center mt-4">
+                    <button 
+                        className="p-3 rounded-lg bg-yellow-400 text-white hover:bg-yellow-500"
+                        onMouseDown={() => setShowHint(true)}
+                        onMouseUp={() => setShowHint(false)}
+                        onTouchStart={() => setShowHint(true)}
+                        onTouchEnd={() => setShowHint(false)}
+                    >
+                        <HelpCircle className="w-6 h-6" />
+                    </button>
+                    <button onClick={handleSkip} className="p-3 rounded-lg bg-gray-400 text-white hover:bg-gray-500">
+                        <SkipForward className="w-6 h-6" />
+                    </button>
+                </div>
               </div>
               
               {message && (
