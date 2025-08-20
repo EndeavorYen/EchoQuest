@@ -73,6 +73,7 @@ interface Level {
   name: string;
   type: 'boss' | 'puzzle';
   description: string;
+  imageUrl: string;
   requiredWords: number;
   enemyLives?: number;
   tools?: string[];
@@ -86,6 +87,7 @@ const App: React.FC = () => {
       name: '巨龍巢穴',
       type: 'boss',
       description: '打敗守護寶藏的巨龍！',
+      imageUrl: 'https://img.freepik.com/free-vector/gradient-illustration-of-a-red-dragon_23-2151274331.jpg',
       requiredWords: 5,
       enemyLives: 5
     },
@@ -94,6 +96,7 @@ const App: React.FC = () => {
       name: '魔法之門',
       type: 'puzzle',
       description: '收集三個魔法工具來開啟大門！',
+      imageUrl: 'https://st4.depositphotos.com/20792394/23559/v/450/depositphotos_235593194-stock-illustration-magic-gate-vector-fantasy-portal.jpg',
       requiredWords: 3,
       tools: ['key', 'hammer', 'magic'] // These should map to words in vocab
     }
@@ -112,6 +115,7 @@ const App: React.FC = () => {
   const [showEffect, setShowEffect] = useState(false);
   const [combo, setCombo] = useState(0);
   const [showHint, setShowHint] = useState(false);
+  const [isBossShaking, setIsBossShaking] = useState(false);
 
   const speech = useSpeechRecognition();
 
@@ -232,6 +236,8 @@ const App: React.FC = () => {
         const damage = currentWord.difficulty;
         setEnemyLives(enemyLives - damage);
         setMessage(`太棒了! 對怪物造成 ${damage} 點傷害!`);
+        setIsBossShaking(true);
+        setTimeout(() => setIsBossShaking(false), 500);
         
         if (enemyLives - damage <= 0) {
           if (currentLevel < levels.length - 1) {
@@ -308,6 +314,10 @@ const App: React.FC = () => {
             <h2 className="text-3xl font-bold text-center mb-2 text-purple-600">{level.name}</h2>
             <p className="text-center text-gray-600 mb-4">{level.description}</p>
             
+            <div className="my-4">
+              <img src={level.imageUrl} alt={level.name} className={`w-full h-64 object-cover rounded-xl shadow-md transition-transform ${isBossShaking ? 'shake' : ''}`} />
+            </div>
+
             {level.type === 'boss' && (
               <div className="flex justify-center items-center gap-2">
                 <Skull className="w-8 h-8 text-red-500" />
