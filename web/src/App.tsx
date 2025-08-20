@@ -32,6 +32,7 @@ function useSpeechRecognition() {
 
     recognition.onstart = () => setListening(true);
     recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
 
     recognitionRef.current = recognition;
 
