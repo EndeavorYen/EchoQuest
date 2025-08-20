@@ -401,7 +401,7 @@ const App: React.FC = () => {
                       className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
                     >
                       <Volume2 className="w-5 h-5" />
-                      {isRecording ? '放開結束' : '按住說話'}
+                      {isProcessing ? '處理中...' : isRecording ? (speech.listening ? '聆聽中...' : '請稍候...') : '按住說話'}
                     </button>
                   ) : (
                     <input
