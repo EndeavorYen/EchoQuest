@@ -174,6 +174,7 @@ const App: React.FC = () => {
   // Handle speech recognition result
   useEffect(() => {
     if (speech.transcript && currentWord) {
+      setIsProcessing(true);
       handleSubmit(speech.transcript);
       speech.resetTranscript();
     }
@@ -395,9 +396,8 @@ const App: React.FC = () => {
                       onMouseUp={() => {
                         setIsRecording(false);
                         speech.stop();
-                        setIsProcessing(true);
                       }}
-                      disabled={isProcessing || (isRecording && !speech.listening)}
+                      disabled={speech.listening || isProcessing}
                       className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
                     >
                       <Volume2 className="w-5 h-5" />
