@@ -276,14 +276,6 @@ const App: React.FC = () => {
     setTimeout(() => setMessage(''), 2000);
   };
 
-  const handleVoiceInput = () => {
-      if(speech.listening) {
-          speech.stop();
-      } else {
-          speech.start();
-      }
-  }
-
   const handleSkip = () => {
     setCombo(0);
     selectNewWord();
@@ -378,7 +370,8 @@ const App: React.FC = () => {
                   
                   {isVoiceMode ? (
                     <button
-                      onClick={handleVoiceInput}
+                      onMouseDown={speech.start}
+                      onMouseUp={speech.stop}
                       disabled={speech.listening}
                       className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
                     >
