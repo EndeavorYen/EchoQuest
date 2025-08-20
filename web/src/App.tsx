@@ -218,8 +218,7 @@ const App: React.FC = () => {
   };
 
   const handleSubmit = (submittedText: string) => {
-    if (!currentWord || isProcessing) return;
-    setIsProcessing(true);
+    if (!currentWord) return;
     
     const isCorrect = submittedText.toLowerCase().trim().replace(/[^a-z]/g, '') === currentWord.word;
     
@@ -396,12 +395,13 @@ const App: React.FC = () => {
                       onMouseUp={() => {
                         setIsRecording(false);
                         speech.stop();
+                        setIsProcessing(true);
                       }}
-                      disabled={speech.listening || isProcessing}
+                      disabled={isProcessing || (isRecording && !speech.listening)}
                       className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
                     >
                       <Volume2 className="w-5 h-5" />
-                      {isProcessing ? '處理中...' : isRecording ? (speech.listening ? '聆聽中...' : '請稍候...') : '按住說話'}
+                      {isRecording ? (speech.listening ? '聆聽中...' : '請稍候...') : (isProcessing ? '處理中...' : '按住說話')}
                     </button>
                   ) : (
                     <input
