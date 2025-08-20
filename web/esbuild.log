@@ -1,4 +1,6 @@
 
- > Local:   http://127.0.0.1:8001/
- > Network: http://192.168.0.2:8001/
- > Network: http://172.17.0.1:8001/
+ > Local:   http://127.0.0.1:8002/
+ > Network: http://192.168.0.2:8002/
+ > Network: http://172.17.0.1:8002/
+
+[watch] build finished, watching for changes...
