@@ -73,6 +73,7 @@ interface Level {
   name: string;
   type: 'boss' | 'puzzle';
   description: string;
+  imageEmoji: string;
   requiredWords: number;
   enemyLives?: number;
   tools?: string[];
@@ -86,6 +87,7 @@ const App: React.FC = () => {
       name: '巨龍巢穴',
       type: 'boss',
       description: '打敗守護寶藏的巨龍！',
+      imageEmoji: '🐉',
       requiredWords: 5,
       enemyLives: 5
     },
@@ -94,6 +96,7 @@ const App: React.FC = () => {
       name: '魔法之門',
       type: 'puzzle',
       description: '收集三個魔法工具來開啟大門！',
+      imageEmoji: '🚪✨',
       requiredWords: 3,
       tools: ['key', 'hammer', 'magic'] // These should map to words in vocab
     }
@@ -112,6 +115,7 @@ const App: React.FC = () => {
   const [showEffect, setShowEffect] = useState(false);
   const [combo, setCombo] = useState(0);
   const [showHint, setShowHint] = useState(false);
+  const [isBossShaking, setIsBossShaking] = useState(false);
 
   const speech = useSpeechRecognition();
 
@@ -232,6 +236,8 @@ const App: React.FC = () => {
         const damage = currentWord.difficulty;
         setEnemyLives(enemyLives - damage);
         setMessage(`太棒了! 對怪物造成 ${damage} 點傷害!`);
+        setIsBossShaking(true);
+        setTimeout(() => setIsBossShaking(false), 500);
         
         if (enemyLives - damage <= 0) {
           if (currentLevel < levels.length - 1) {
@@ -304,42 +310,44 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-            <h2 className="text-3xl font-bold text-center mb-2 text-purple-600">{level.name}</h2>
-            <p className="text-center text-gray-600 mb-4">{level.description}</p>
-            
-            {level.type === 'boss' && (
-              <div className="flex justify-center items-center gap-2">
-                <Skull className="w-8 h-8 text-red-500" />
-                <div className="flex gap-1">
-                  {[...Array(level.enemyLives)].map((_, i) => (
-                    <Heart
-                      key={i}
-                      className={`w-8 h-8 ${i < enemyLives ? 'text-red-500' : 'text-gray-300'}`}
-                      fill={i < enemyLives ? 'currentColor' : 'none'}
-                    />
+          <div className="flex flex-col md:flex-row gap-8">
+            <div className="bg-white rounded-2xl shadow-xl p-6 md:w-1/2">
+              <h2 className="text-3xl font-bold text-center mb-2 text-purple-600">{level.name}</h2>
+              <p className="text-center text-gray-600 mb-4">{level.description}</p>
+
+              <div className={`my-4 text-center text-9xl ${isBossShaking ? 'shake' : ''}`}>
+                {level.imageEmoji}
+              </div>
+
+              {level.type === 'boss' && (
+                <div className="flex justify-center items-center gap-2">
+                  <Skull className="w-8 h-8 text-red-500" />
+                  <div className="flex gap-1">
+                    {[...Array(level.enemyLives)].map((_, i) => (
+                      <Heart
+                        key={i}
+                        className={`w-8 h-8 ${i < enemyLives ? 'text-red-500' : 'text-gray-300'}`}
+                        fill={i < enemyLives ? 'currentColor' : 'none'}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {level.type === 'puzzle' && (
+                <div className="flex justify-center items-center gap-2 text-4xl">
+                  {[...Array(level.tools ? level.tools.length - collectedTools.length : 0)].map((_, i) => (
+                    <span key={i}>🚪</span>
+                  ))}
+                  {[...Array(collectedTools.length)].map((_, i) => (
+                    <span key={i} className="opacity-50">🔑</span>
                   ))}
                 </div>
-              </div>
-            )}
-            
-            {level.type === 'puzzle' && (
-              <div className="flex justify-center items-center gap-4">
-                <Lock className="w-8 h-8 text-gray-600" />
-                {level.tools?.map((tool, i) => (
-                  <div
-                    key={i}
-                    className={`p-3 rounded-lg ${collectedTools.includes(tool) ? 'bg-green-100' : 'bg-gray-100'}`}
-                  >
-                    {collectedTools.includes(tool) ? '✓' : '?'}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          {currentWord && (
-            <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+            {currentWord && (
+              <div className="bg-white rounded-2xl shadow-xl p-8 md:w-1/2">
               <div className={`text-center mb-6 transition-all relative ${showEffect ? 'scale-110' : 'scale-100'}`}>
                 {currentWord.imageDataUrl ? 
                     <img src={currentWord.imageDataUrl} alt={currentWord.word} className="w-40 h-40 object-cover rounded-xl border inline-block"/> :
@@ -425,6 +433,7 @@ const App: React.FC = () => {
               )}
             </div>
           )}
+        </div>
         </div>
       </div>
     );
