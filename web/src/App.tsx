@@ -315,7 +315,7 @@ const App: React.FC = () => {
               <h2 className="text-3xl font-bold text-center mb-2 text-purple-600">{level.name}</h2>
               <p className="text-center text-gray-600 mb-4">{level.description}</p>
 
-              <div className={`my-4 text-center text-8xl ${isBossShaking ? 'shake' : ''}`}>
+              <div className={`my-4 text-center text-9xl ${isBossShaking ? 'shake' : ''}`}>
                 {level.imageEmoji}
               </div>
 
