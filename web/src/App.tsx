@@ -15,38 +15,55 @@ function useSpeechRecognition() {
   const [transcript, setTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
 
-  useEffect(() => {
+  const stop = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+  };
+
+  const start = () => {
+    if (listening) {
+      stop();
+      return;
+    }
+
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition) {
+      console.error("Speech Recognition not supported.");
+      return;
+    }
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
+    const newRecognition = new SpeechRecognition();
+    newRecognition.continuous = false;
+    newRecognition.lang = 'en-US';
+    newRecognition.interimResults = false;
 
-    recognition.onresult = (event: any) => {
-      const last = event.results.length - 1;
-      const text = event.results[last][0].transcript;
+    newRecognition.onstart = () => {
+      setListening(true);
+    };
+    newRecognition.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+    newRecognition.onerror = (event: any) => {
+      console.error(`Speech recognition error: ${event.error}`);
+      setListening(false);
+      recognitionRef.current = null;
+    };
+    newRecognition.onresult = (event: any) => {
+      const text = event.results[0][0].transcript;
       setTranscript(text);
     };
 
-    recognition.onstart = () => setListening(true);
-    recognition.onend = () => setListening(false);
-
-    recognitionRef.current = recognition;
-
-    return () => {
-      recognition.stop();
-    };
-  }, []);
-
-  return {
-    listening,
-    transcript,
-    start: () => recognitionRef.current?.start(),
-    stop: () => recognitionRef.current?.stop(),
-    resetTranscript: () => setTranscript(''),
+    newRecognition.start();
+    recognitionRef.current = newRecognition;
   };
+
+  const resetTranscript = () => {
+    setTranscript('');
+  };
+
+  return { listening, transcript, start, stop, resetTranscript };
 }
 
 
@@ -116,6 +133,7 @@ const App: React.FC = () => {
   const [combo, setCombo] = useState(0);
   const [showHint, setShowHint] = useState(false);
   const [isBossShaking, setIsBossShaking] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   const speech = useSpeechRecognition();
 
@@ -172,10 +190,7 @@ const App: React.FC = () => {
   // Handle speech recognition result
   useEffect(() => {
     if (speech.transcript && currentWord) {
-      if (speech.transcript.toLowerCase().trim() === currentWord.word.toLowerCase()) {
-        setUserInput(speech.transcript);
-        handleSubmit();
-      }
+      handleSubmit(speech.transcript);
       speech.resetTranscript();
     }
   }, [speech.transcript]);
@@ -218,10 +233,10 @@ const App: React.FC = () => {
     selectNewWord();
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (submittedText: string) => {
     if (!currentWord) return;
     
-    const isCorrect = userInput.toLowerCase().trim() === currentWord.word.toLowerCase();
+    const isCorrect = submittedText.toLowerCase().trim().replace(/[^a-z]/g, '') === currentWord.word;
     
     if (isCorrect) {
       const points = currentWord.difficulty * 10 * (combo + 1);
@@ -251,7 +266,9 @@ const App: React.FC = () => {
             setGameState('victory');
           }
         } else {
-          setTimeout(() => selectNewWord(), 1500);
+          setTimeout(() => {
+            selectNewWord();
+          }, 1500);
         }
       } else if (level.type === 'puzzle') {
         setCollectedTools([...collectedTools, currentWord.word]);
@@ -268,7 +285,9 @@ const App: React.FC = () => {
                 setGameState('victory');
               }
         } else {
-          setTimeout(() => selectNewWord(), 1500);
+          setTimeout(() => {
+            selectNewWord();
+          }, 1500);
         }
       }
       
@@ -378,20 +397,26 @@ const App: React.FC = () => {
                   
                   {isVoiceMode ? (
                     <button
-                      onMouseDown={speech.start}
-                      onMouseUp={speech.stop}
+                      onMouseDown={() => {
+                        setIsRecording(true);
+                        speech.start();
+                      }}
+                      onMouseUp={() => {
+                        setIsRecording(false);
+                        speech.stop();
+                      }}
                       disabled={speech.listening}
                       className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
                     >
                       <Volume2 className="w-5 h-5" />
-                      {speech.listening ? '聆聽中...' : '按住說話'}
+                      {isRecording ? (speech.listening ? '聆聽中...' : '請稍候...') : (speech.listening ? '處理中...' : '按住說話')}
                     </button>
                   ) : (
                     <input
                       type="text"
                       value={userInput}
                       onChange={(e) => setUserInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSubmit(userInput)}
                       placeholder="輸入英文單字"
                       className="px-4 py-3 border-2 border-purple-300 rounded-lg text-lg focus:outline-none focus:border-purple-500"
                     />
@@ -400,7 +425,7 @@ const App: React.FC = () => {
                 
                 {!isVoiceMode && (
                   <button
-                    onClick={handleSubmit}
+                    onClick={() => handleSubmit(userInput)}
                     className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-bold text-lg hover:from-purple-600 hover:to-pink-600 transform hover:scale-105 transition-all"
                   >
                     <Sword className="inline w-5 h-5 mr-2" />
