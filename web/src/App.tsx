@@ -110,6 +110,33 @@ const App: React.FC = () => {
     },
     {
       id: 2,
+      name: '哥布林洞穴',
+      type: 'boss',
+      description: '一隻討厭的哥布林擋住了去路！',
+      imageEmoji: '👺',
+      requiredWords: 5,
+      enemyLives: 3
+    },
+    {
+      id: 3,
+      name: '石像巨人山脈',
+      type: 'boss',
+      description: '巨大的石像巨人覺醒了！',
+      imageEmoji: '🗿',
+      requiredWords: 5,
+      enemyLives: 8
+    },
+    {
+      id: 4,
+      name: '魔王城堡',
+      type: 'boss',
+      description: '最終挑戰：擊敗魔王！',
+      imageEmoji: '👿',
+      requiredWords: 5,
+      enemyLives: 12
+    },
+    {
+      id: 5,
       name: '魔法之門',
       type: 'puzzle',
       description: '收集三個魔法工具來開啟大門！',
