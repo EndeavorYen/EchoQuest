@@ -117,6 +117,7 @@ const App: React.FC = () => {
   const [showHint, setShowHint] = useState(false);
   const [isBossShaking, setIsBossShaking] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const speech = useSpeechRecognition();
 
@@ -217,9 +218,10 @@ const App: React.FC = () => {
   };
 
   const handleSubmit = (submittedText: string) => {
-    if (!currentWord) return;
+    if (!currentWord || isProcessing) return;
+    setIsProcessing(true);
     
-    const isCorrect = submittedText.toLowerCase().trim() === currentWord.word.toLowerCase();
+    const isCorrect = submittedText.toLowerCase().trim().replace(/[^a-z]/g, '') === currentWord.word;
     
     if (isCorrect) {
       const points = currentWord.difficulty * 10 * (combo + 1);
@@ -244,12 +246,17 @@ const App: React.FC = () => {
               setEnemyLives(levels[currentLevel + 1].enemyLives || 5);
               setMessage('關卡完成! 進入下一關!');
               selectNewWord();
+              setIsProcessing(false);
             }, 1500);
           } else {
             setGameState('victory');
+            setIsProcessing(false);
           }
         } else {
-          setTimeout(() => selectNewWord(), 1500);
+          setTimeout(() => {
+            selectNewWord();
+            setIsProcessing(false);
+          }, 1500);
         }
       } else if (level.type === 'puzzle') {
         setCollectedTools([...collectedTools, currentWord.word]);
@@ -261,12 +268,17 @@ const App: React.FC = () => {
                   setCurrentLevel(currentLevel + 1);
                   setMessage('謎題解開! 進入下一關!');
                   selectNewWord();
+                  setIsProcessing(false);
                 }, 1500);
               } else {
                 setGameState('victory');
+                setIsProcessing(false);
               }
         } else {
-          setTimeout(() => selectNewWord(), 1500);
+          setTimeout(() => {
+            selectNewWord();
+            setIsProcessing(false);
+          }, 1500);
         }
       }
       
@@ -274,6 +286,7 @@ const App: React.FC = () => {
     } else {
       setMessage('再試一次!');
       setCombo(0);
+      setIsProcessing(false);
     }
     
     setUserInput('');
@@ -384,11 +397,11 @@ const App: React.FC = () => {
                         setIsRecording(false);
                         speech.stop();
                       }}
-                      disabled={speech.listening}
+                      disabled={speech.listening || isProcessing}
                       className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
                     >
                       <Volume2 className="w-5 h-5" />
-                      {isRecording ? '放開結束' : (speech.listening ? '聆聽中...' : '按住說話')}
+                      {isRecording ? '放開結束' : '按住說話'}
                     </button>
                   ) : (
                     <input
