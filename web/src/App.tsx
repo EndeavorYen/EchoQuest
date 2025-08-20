@@ -73,7 +73,7 @@ interface Level {
   name: string;
   type: 'boss' | 'puzzle';
   description: string;
-  imageUrl: string;
+  imageEmoji: string;
   requiredWords: number;
   enemyLives?: number;
   tools?: string[];
@@ -87,7 +87,7 @@ const App: React.FC = () => {
       name: '巨龍巢穴',
       type: 'boss',
       description: '打敗守護寶藏的巨龍！',
-      imageUrl: 'https://img.freepik.com/free-vector/gradient-illustration-of-a-red-dragon_23-2151274331.jpg',
+      imageEmoji: '🐉',
       requiredWords: 5,
       enemyLives: 5
     },
@@ -96,7 +96,7 @@ const App: React.FC = () => {
       name: '魔法之門',
       type: 'puzzle',
       description: '收集三個魔法工具來開啟大門！',
-      imageUrl: 'https://st4.depositphotos.com/20792394/23559/v/450/depositphotos_235593194-stock-illustration-magic-gate-vector-fantasy-portal.jpg',
+      imageEmoji: '🚪✨',
       requiredWords: 3,
       tools: ['key', 'hammer', 'magic'] // These should map to words in vocab
     }
@@ -314,8 +314,8 @@ const App: React.FC = () => {
             <h2 className="text-3xl font-bold text-center mb-2 text-purple-600">{level.name}</h2>
             <p className="text-center text-gray-600 mb-4">{level.description}</p>
             
-            <div className="my-4">
-              <img src={level.imageUrl} alt={level.name} className={`w-full h-64 object-cover rounded-xl shadow-md transition-transform ${isBossShaking ? 'shake' : ''}`} />
+            <div className={`my-4 text-center text-8xl ${isBossShaking ? 'shake' : ''}`}>
+              {level.imageEmoji}
             </div>
 
             {level.type === 'boss' && (
