@@ -117,7 +117,6 @@ const App: React.FC = () => {
   const [showHint, setShowHint] = useState(false);
   const [isBossShaking, setIsBossShaking] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
 
   const speech = useSpeechRecognition();
 
@@ -174,7 +173,6 @@ const App: React.FC = () => {
   // Handle speech recognition result
   useEffect(() => {
     if (speech.transcript && currentWord) {
-      setIsProcessing(true);
       handleSubmit(speech.transcript);
       speech.resetTranscript();
     }
@@ -246,16 +244,13 @@ const App: React.FC = () => {
               setEnemyLives(levels[currentLevel + 1].enemyLives || 5);
               setMessage('關卡完成! 進入下一關!');
               selectNewWord();
-              setIsProcessing(false);
             }, 1500);
           } else {
             setGameState('victory');
-            setIsProcessing(false);
           }
         } else {
           setTimeout(() => {
             selectNewWord();
-            setIsProcessing(false);
           }, 1500);
         }
       } else if (level.type === 'puzzle') {
@@ -268,16 +263,13 @@ const App: React.FC = () => {
                   setCurrentLevel(currentLevel + 1);
                   setMessage('謎題解開! 進入下一關!');
                   selectNewWord();
-                  setIsProcessing(false);
                 }, 1500);
               } else {
                 setGameState('victory');
-                setIsProcessing(false);
               }
         } else {
           setTimeout(() => {
             selectNewWord();
-            setIsProcessing(false);
           }, 1500);
         }
       }
@@ -286,7 +278,6 @@ const App: React.FC = () => {
     } else {
       setMessage('再試一次!');
       setCombo(0);
-      setIsProcessing(false);
     }
     
     setUserInput('');
@@ -397,11 +388,11 @@ const App: React.FC = () => {
                         setIsRecording(false);
                         speech.stop();
                       }}
-                      disabled={speech.listening || isProcessing}
+                      disabled={speech.listening}
                       className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
                     >
                       <Volume2 className="w-5 h-5" />
-                      {isRecording ? (speech.listening ? '聆聽中...' : '請稍候...') : (isProcessing ? '處理中...' : '按住說話')}
+                      {isRecording ? (speech.listening ? '聆聽中...' : '請稍候...') : (speech.listening ? '處理中...' : '按住說話')}
                     </button>
                   ) : (
                     <input
