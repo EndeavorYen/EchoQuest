@@ -116,6 +116,7 @@ const App: React.FC = () => {
   const [combo, setCombo] = useState(0);
   const [showHint, setShowHint] = useState(false);
   const [isBossShaking, setIsBossShaking] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   const speech = useSpeechRecognition();
 
@@ -172,10 +173,7 @@ const App: React.FC = () => {
   // Handle speech recognition result
   useEffect(() => {
     if (speech.transcript && currentWord) {
-      if (speech.transcript.toLowerCase().trim() === currentWord.word.toLowerCase()) {
-        setUserInput(speech.transcript);
-        handleSubmit();
-      }
+      handleSubmit(speech.transcript);
       speech.resetTranscript();
     }
   }, [speech.transcript]);
@@ -218,10 +216,10 @@ const App: React.FC = () => {
     selectNewWord();
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (submittedText: string) => {
     if (!currentWord) return;
     
-    const isCorrect = userInput.toLowerCase().trim() === currentWord.word.toLowerCase();
+    const isCorrect = submittedText.toLowerCase().trim() === currentWord.word.toLowerCase();
     
     if (isCorrect) {
       const points = currentWord.difficulty * 10 * (combo + 1);
@@ -378,20 +376,26 @@ const App: React.FC = () => {
                   
                   {isVoiceMode ? (
                     <button
-                      onMouseDown={speech.start}
-                      onMouseUp={speech.stop}
+                      onMouseDown={() => {
+                        setIsRecording(true);
+                        speech.start();
+                      }}
+                      onMouseUp={() => {
+                        setIsRecording(false);
+                        speech.stop();
+                      }}
                       disabled={speech.listening}
                       className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
                     >
                       <Volume2 className="w-5 h-5" />
-                      {speech.listening ? '聆聽中...' : '按住說話'}
+                      {isRecording ? '放開結束' : (speech.listening ? '聆聽中...' : '按住說話')}
                     </button>
                   ) : (
                     <input
                       type="text"
                       value={userInput}
                       onChange={(e) => setUserInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSubmit()}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSubmit(userInput)}
                       placeholder="輸入英文單字"
                       className="px-4 py-3 border-2 border-purple-300 rounded-lg text-lg focus:outline-none focus:border-purple-500"
                     />
@@ -400,7 +404,7 @@ const App: React.FC = () => {
                 
                 {!isVoiceMode && (
                   <button
-                    onClick={handleSubmit}
+                    onClick={() => handleSubmit(userInput)}
                     className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-bold text-lg hover:from-purple-600 hover:to-pink-600 transform hover:scale-105 transition-all"
                   >
                     <Sword className="inline w-5 h-5 mr-2" />
