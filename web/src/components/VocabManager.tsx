@@ -16,6 +16,26 @@ export interface VocabItem {
 
 const MAX_IMAGE_BYTES = 1024 * 1024; // 1MB
 
+// Exported for testing
+export function fileNameToWord(name: string): string {
+  const base = name.replace(/\.[^.]+$/, "");
+  return base.toLowerCase().replace(/[^a-z]/g, "");
+}
+
+// Exported for testing
+export function parseDifficultyFromPath(path?: string): number | null {
+  if (!path) return null;
+  const segments = path.split("/");
+  for (const seg of segments) {
+    const m = seg.match(/^(\d{3})-/);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (!isNaN(n)) return Math.max(1, Math.min(5, n));
+    }
+  }
+  return null;
+}
+
 function DifficultyPips({ level }: { level: number }) {
   return (
     <div className="flex items-center gap-1" title={`Difficulty ${level}`}>
@@ -68,24 +88,6 @@ export const VocabManager: React.FC<VocabManagerProps> = ({ vocab, onVocabChange
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-  }
-
-  function fileNameToWord(name: string): string {
-    const base = name.replace(/\.[^.]+$/, "");
-    return base.toLowerCase().replace(/[^a-z]/g, "");
-  }
-
-  function parseDifficultyFromPath(path?: string): number | null {
-    if (!path) return null;
-    const segments = path.split("/");
-    for (const seg of segments) {
-      const m = seg.match(/^(\d{3})-/);
-      if (m) {
-        const n = parseInt(m[1], 10);
-        if (!isNaN(n)) return Math.max(1, Math.min(5, n));
-      }
-    }
-    return null;
   }
 
   function uid(): string {

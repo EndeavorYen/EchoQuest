@@ -86,7 +86,7 @@ function saveVocabToStorage(items: VocabItem[]) {
 }
 
 
-interface Level {
+export interface Level { // Export for use in tests
   id: number;
   name: string;
   type: 'boss' | 'puzzle';
@@ -97,9 +97,8 @@ interface Level {
   tools?: string[];
 }
 
-const App: React.FC = () => {
-  const [vocab, setVocab] = useState<VocabItem[]>([]);
-  const [levels, setLevels] = useState<Level[]>([
+// Define default levels so they can be exported or used as a default prop
+const defaultLevels: Level[] = [
     {
       id: 1,
       name: '巨龍巢穴',
@@ -145,7 +144,16 @@ const App: React.FC = () => {
       requiredWords: 3,
       tools: ['key', 'hammer', 'magic'] // These should map to words in vocab
     }
-  ]);
+];
+
+interface AppProps {
+    initialVocab?: VocabItem[];
+    initialLevels?: Level[];
+}
+
+const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels = defaultLevels }) => {
+  const [vocab, setVocab] = useState<VocabItem[]>([]);
+  const [levels, setLevels] = useState<Level[]>(initialLevels);
 
   const [currentLevel, setCurrentLevel] = useState(0);
   const [currentWord, setCurrentWord] = useState<VocabItem | null>(null);
@@ -165,17 +173,23 @@ const App: React.FC = () => {
 
   const speech = useSpeechRecognition();
 
-  // Load vocab on mount
+  // Load vocab on mount or when prop changes
   useEffect(() => {
-    const storedVocab = loadVocabFromStorage();
-    const initialVocab = storedVocab.length > 0 ? storedVocab : defaultInitialVocab;
-    setVocab(initialVocab);
-  }, []);
+    if (initialVocabProp) {
+        setVocab(initialVocabProp);
+    } else {
+        const storedVocab = loadVocabFromStorage();
+        const initialVocab = storedVocab.length > 0 ? storedVocab : defaultInitialVocab;
+        setVocab(initialVocab);
+    }
+  }, [initialVocabProp]);
 
-  // Persist vocab changes
+  // Persist vocab changes, but only if not using props
   useEffect(() => {
-    saveVocabToStorage(vocab);
-  }, [vocab]);
+    if (!initialVocabProp) {
+        saveVocabToStorage(vocab);
+    }
+  }, [vocab, initialVocabProp]);
 
   const enabledVocab = useMemo(() => vocab.filter(v => v.enabled), [vocab]);
 
@@ -269,13 +283,15 @@ const App: React.FC = () => {
           }, 1500);
         }
       } else if (level.type === 'puzzle') {
-        setCollectedTools([...collectedTools, currentWord.word]);
+        const newCollectedTools = [...collectedTools, currentWord.word];
+        setCollectedTools(newCollectedTools);
         setMessage(`獲得了 ${currentWord.word}!`);
         
-        if (collectedTools.length + 1 >= (level.tools?.length || 0)) {
+        if (newCollectedTools.length >= (level.tools?.length || 0)) {
             if (currentLevel < levels.length - 1) {
                 setTimeout(() => {
                   setCurrentLevel(currentLevel + 1);
+                  setEnemyLives(levels[currentLevel + 1].enemyLives || 5); // Set lives for next level if it's a boss
                   setMessage('謎題解開! 進入下一關!');
                   selectNewWord();
                 }, 1500);
@@ -387,6 +403,7 @@ const App: React.FC = () => {
                 <div className="flex gap-2 items-center">
                   <button
                     onClick={() => setIsVoiceMode(!isVoiceMode)}
+                    aria-label={isVoiceMode ? 'Switch to text input' : 'Switch to voice input'}
                     className={`p-3 rounded-lg transition-colors ${
                       isVoiceMode ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}
                   >
@@ -432,7 +449,8 @@ const App: React.FC = () => {
                 )}
 
                 <div className="flex gap-4 items-center mt-4">
-                    <button 
+                    <button
+                        aria-label="Show hint"
                         className="p-3 rounded-lg bg-yellow-400 text-white hover:bg-yellow-500"
                         onMouseDown={() => setShowHint(true)}
                         onMouseUp={() => setShowHint(false)}
@@ -441,7 +459,7 @@ const App: React.FC = () => {
                     >
                         <HelpCircle className="w-6 h-6" />
                     </button>
-                    <button onClick={handleSkip} className="p-3 rounded-lg bg-gray-400 text-white hover:bg-gray-500">
+                    <button aria-label="Skip word" onClick={handleSkip} className="p-3 rounded-lg bg-gray-400 text-white hover:bg-gray-500">
                         <SkipForward className="w-6 h-6" />
                     </button>
                 </div>
@@ -483,6 +501,11 @@ const App: React.FC = () => {
           <Settings className="w-5 h-5"/>
           字彙管理
         </button>
+        {message && (
+          <p className="mt-4 text-center text-red-500 font-bold animate-bounce">
+            {message}
+          </p>
+        )}
       </div>
     </div>
   );
