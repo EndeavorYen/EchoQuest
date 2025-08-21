@@ -350,15 +350,16 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                   {isVoiceMode ? (
                     <button
                       onMouseDown={() => {
+                        if (speech.listening) return;
                         setIsRecording(true);
                         speech.start();
                       }}
                       onMouseUp={() => {
+                        if (!isRecording) return;
                         setIsRecording(false);
                         speech.stop();
                       }}
-                      disabled={speech.listening}
-                      className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
+                      className={`px-6 py-3 bg-blue-500 text-white rounded-lg font-bold flex items-center gap-2 ${speech.listening ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
                     >
                       <Volume2 className="w-5 h-5" />
                       {isRecording ? (speech.listening ? '聆聽中...' : '請稍候...') : (speech.listening ? '處理中...' : '按住說話')}
