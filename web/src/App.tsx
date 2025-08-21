@@ -15,14 +15,23 @@ function useSpeechRecognition() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
+  const listeningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stop = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
+      // Failsafe in case onend doesn't fire
+      listeningTimeoutRef.current = setTimeout(() => {
+        console.warn("Speech recognition 'onend' timed out. Forcing state update.");
+        setListening(false);
+      }, 5000);
     }
   };
 
   const start = () => {
+    if (listeningTimeoutRef.current) {
+      clearTimeout(listeningTimeoutRef.current);
+    }
     if (listening) {
       stop();
       return;
@@ -43,10 +52,16 @@ function useSpeechRecognition() {
       setListening(true);
     };
     newRecognition.onend = () => {
+      if (listeningTimeoutRef.current) {
+        clearTimeout(listeningTimeoutRef.current);
+      }
       setListening(false);
       recognitionRef.current = null;
     };
     newRecognition.onerror = (event: any) => {
+      if (listeningTimeoutRef.current) {
+        clearTimeout(listeningTimeoutRef.current);
+      }
       console.error(`Speech recognition error: ${event.error}`);
       setListening(false);
       recognitionRef.current = null;
