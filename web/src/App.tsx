@@ -2,70 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Sword, Shield, Heart, Lock, Key, Mic, MicOff, Volume2, Star, Zap, Trophy, Skull, Sparkles, Settings, HelpCircle, SkipForward } from 'lucide-react';
 import { VocabManager, VocabItem } from './components/VocabManager';
 import { initialVocab as defaultInitialVocab } from './data/vocab';
-
-// Speech Recognition Hook
-declare global {
-  interface Window {
-    webkitSpeechRecognition?: any;
-    SpeechRecognition?: any;
-  }
-}
-
-function useSpeechRecognition() {
-  const [listening, setListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const recognitionRef = useRef<any>(null);
-
-  const stop = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-  };
-
-  const start = () => {
-    if (listening) {
-      stop();
-      return;
-    }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      console.error("Speech Recognition not supported.");
-      return;
-    }
-
-    const newRecognition = new SpeechRecognition();
-    newRecognition.continuous = false;
-    newRecognition.lang = 'en-US';
-    newRecognition.interimResults = false;
-
-    newRecognition.onstart = () => {
-      setListening(true);
-    };
-    newRecognition.onend = () => {
-      setListening(false);
-      recognitionRef.current = null;
-    };
-    newRecognition.onerror = (event: any) => {
-      console.error(`Speech recognition error: ${event.error}`);
-      setListening(false);
-      recognitionRef.current = null;
-    };
-    newRecognition.onresult = (event: any) => {
-      const text = event.results[0][0].transcript;
-      setTranscript(text);
-    };
-
-    newRecognition.start();
-    recognitionRef.current = newRecognition;
-  };
-
-  const resetTranscript = () => {
-    setTranscript('');
-  };
-
-  return { listening, transcript, start, stop, resetTranscript };
-}
+import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 
 
 // LocalStorage Utilities
@@ -413,15 +350,16 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                   {isVoiceMode ? (
                     <button
                       onMouseDown={() => {
+                        if (speech.listening) return;
                         setIsRecording(true);
                         speech.start();
                       }}
                       onMouseUp={() => {
+                        if (!isRecording) return;
                         setIsRecording(false);
                         speech.stop();
                       }}
-                      disabled={speech.listening}
-                      className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
+                      className={`px-6 py-3 bg-blue-500 text-white rounded-lg font-bold flex items-center gap-2 ${speech.listening ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
                     >
                       <Volume2 className="w-5 h-5" />
                       {isRecording ? (speech.listening ? '聆聽中...' : '請稍候...') : (speech.listening ? '處理中...' : '按住說話')}
