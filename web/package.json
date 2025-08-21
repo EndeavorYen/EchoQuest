@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node copy-html.js && esbuild index.tsx --bundle --sourcemap --outfile=dist/index.js --servedir=dist --watch",
     "test": "echo 'no tests specified'",
-    "build": "tsc --noEmit && node copy-html.js && esbuild index.tsx --bundle --minify --sourcemap --outfile=dist/index.js"
+    "build": "tsc --noEmit && node copy-html.js && esbuild index.tsx --bundle --minify --sourcemap --outfile=dist/index.js",
+    "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
     "lucide-react": "^0.294.0",
