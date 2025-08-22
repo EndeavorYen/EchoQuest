@@ -11,26 +11,21 @@ declare global {
 export function useSpeechRecognition() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
-  const listeningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stop = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
-      // Failsafe in case onend doesn't fire
-      listeningTimeoutRef.current = setTimeout(() => {
-        console.warn("Speech recognition 'onend' timed out. Forcing state update.");
-        setListening(false);
-      }, 5000);
+      // No need for a timeout failsafe here, onend should be reliable enough
+      // for the purpose of stopping. The App's state handles the rest.
     }
   };
 
-  const start = () => {
-    if (listeningTimeoutRef.current) {
-      clearTimeout(listeningTimeoutRef.current);
-    }
+  const start = (lang: string = 'en-US') => {
     if (listening) {
-      stop();
+      // If already listening, calling start again does nothing.
+      // Use stop() to explicitly stop.
       return;
     }
 
@@ -41,31 +36,43 @@ export function useSpeechRecognition() {
     }
 
     const newRecognition = new SpeechRecognition();
-    newRecognition.continuous = false;
-    newRecognition.lang = 'en-US';
-    newRecognition.interimResults = false;
+    newRecognition.continuous = true; // Process multiple results
+    newRecognition.lang = lang;
+    newRecognition.interimResults = true; // Get results as the user speaks
 
     newRecognition.onstart = () => {
       setListening(true);
+      setTranscript('');
+      setInterimTranscript('');
     };
+
     newRecognition.onend = () => {
-      if (listeningTimeoutRef.current) {
-        clearTimeout(listeningTimeoutRef.current);
-      }
       setListening(false);
+      setInterimTranscript('');
       recognitionRef.current = null;
     };
+
     newRecognition.onerror = (event: any) => {
-      if (listeningTimeoutRef.current) {
-        clearTimeout(listeningTimeoutRef.current);
-      }
       console.error(`Speech recognition error: ${event.error}`);
       setListening(false);
+      setInterimTranscript('');
       recognitionRef.current = null;
     };
+
     newRecognition.onresult = (event: any) => {
-      const text = event.results[0][0].transcript;
-      setTranscript(text);
+      let final_transcript = '';
+      let interim_transcript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          final_transcript += event.results[i][0].transcript;
+        } else {
+          interim_transcript += event.results[i][0].transcript;
+        }
+      }
+
+      setTranscript(prev => prev + final_transcript);
+      setInterimTranscript(interim_transcript);
     };
 
     newRecognition.start();
@@ -74,7 +81,8 @@ export function useSpeechRecognition() {
 
   const resetTranscript = () => {
     setTranscript('');
+    setInterimTranscript('');
   };
 
-  return { listening, transcript, start, stop, resetTranscript };
+  return { listening, transcript, interimTranscript, start, stop, resetTranscript };
 }
