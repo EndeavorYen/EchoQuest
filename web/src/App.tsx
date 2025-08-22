@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Sword, Shield, Heart, Lock, Key, Mic, MicOff, Volume2, Star, Zap, Trophy, Skull, Sparkles, Settings, HelpCircle, SkipForward } from 'lucide-react';
+import { Sword, Shield, Heart, Lock, Key, Mic, MicOff, Volume2, Star, Zap, Trophy, Skull, Sparkles, Settings, HelpCircle, SkipForward, Globe } from 'lucide-react';
 import { VocabManager, VocabItem } from './components/VocabManager';
 import { initialVocab as defaultInitialVocab } from './data/vocab';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 
 
 // LocalStorage Utilities
-const STORAGE_KEY = "echoquest_vocab_v1";
+const STORAGE_KEY_VOCAB = "echoquest_vocab_v1";
+const STORAGE_KEY_LANG = "echoquest_lang_v1";
 
 function loadVocabFromStorage(): VocabItem[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY_VOCAB);
     if (!raw) return [];
     return JSON.parse(raw);
   } catch {
@@ -19,7 +20,15 @@ function loadVocabFromStorage(): VocabItem[] {
 }
 
 function saveVocabToStorage(items: VocabItem[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  localStorage.setItem(STORAGE_KEY_VOCAB, JSON.stringify(items));
+}
+
+function loadLangFromStorage(): string {
+    return localStorage.getItem(STORAGE_KEY_LANG) || 'en-US';
+}
+
+function saveLangToStorage(lang: string) {
+    localStorage.setItem(STORAGE_KEY_LANG, lang);
 }
 
 
@@ -106,9 +115,10 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   const [combo, setCombo] = useState(0);
   const [showHint, setShowHint] = useState(false);
   const [isBossShaking, setIsBossShaking] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [recognitionLang, setRecognitionLang] = useState(loadLangFromStorage());
 
   const speech = useSpeechRecognition();
+  const wasListeningRef = useRef(false);
 
   // Load vocab on mount or when prop changes
   useEffect(() => {
@@ -138,11 +148,18 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
 
   // Handle speech recognition result
   useEffect(() => {
-    if (speech.transcript && currentWord) {
+    // When listening stops, and we have a transcript, submit it.
+    if (!speech.listening && wasListeningRef.current && speech.transcript) {
       handleSubmit(speech.transcript);
       speech.resetTranscript();
     }
-  }, [speech.transcript]);
+    wasListeningRef.current = speech.listening;
+  }, [speech.listening]);
+
+  // Persist language selection
+  useEffect(() => {
+    saveLangToStorage(recognitionLang);
+  }, [recognitionLang]);
 
   const selectNewWord = () => {
     if (enabledVocab.length === 0) {
@@ -337,6 +354,12 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
               </div>
               
               <div className="flex flex-col items-center gap-4">
+                <div className="relative w-full text-center h-12 mb-2">
+                    <p className="text-xl text-gray-500 h-full flex items-center justify-center">
+                        <span className="text-purple-500 font-semibold">{speech.transcript}</span>
+                        <span className="text-gray-400">{speech.interimTranscript}</span>
+                    </p>
+                </div>
                 <div className="flex gap-2 items-center">
                   <button
                     onClick={() => setIsVoiceMode(!isVoiceMode)}
@@ -349,20 +372,21 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                   
                   {isVoiceMode ? (
                     <button
-                      onMouseDown={() => {
-                        if (speech.listening) return;
-                        setIsRecording(true);
-                        speech.start();
+                      onClick={() => {
+                        if (speech.listening) {
+                          speech.stop();
+                        } else {
+                          speech.start(recognitionLang);
+                        }
                       }}
-                      onMouseUp={() => {
-                        if (!isRecording) return;
-                        setIsRecording(false);
-                        speech.stop();
-                      }}
-                      className={`px-6 py-3 bg-blue-500 text-white rounded-lg font-bold flex items-center gap-2 ${speech.listening ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
+                      className={`px-6 py-3 text-white rounded-lg font-bold flex items-center gap-2 transition-colors ${
+                        speech.listening
+                          ? 'bg-red-500 hover:bg-red-600'
+                          : 'bg-blue-500 hover:bg-blue-600'
+                      }`}
                     >
                       <Volume2 className="w-5 h-5" />
-                      {isRecording ? (speech.listening ? '聆聽中...' : '請稍候...') : (speech.listening ? '處理中...' : '按住說話')}
+                      {speech.listening ? '聆聽中...' : '點擊說話'}
                     </button>
                   ) : (
                     <input
@@ -374,6 +398,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                       className="px-4 py-3 border-2 border-purple-300 rounded-lg text-lg focus:outline-none focus:border-purple-500"
                     />
                   )}
+                   <LanguageSelector selectedLang={recognitionLang} onLangChange={setRecognitionLang} />
                 </div>
                 
                 {!isVoiceMode && (
@@ -426,6 +451,9 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
           <h1 className="text-4xl font-bold text-gray-800 mb-2">EchoQuest</h1>
           <p className="text-gray-600">學習英文，打敗怪物！</p>
         </div>
+        <div className="mb-6 flex justify-center">
+            <LanguageSelector selectedLang={recognitionLang} onLangChange={setRecognitionLang} isMenu={true} />
+        </div>
         <button
           onClick={startGame}
           className="w-full mb-4 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-bold text-xl hover:from-purple-600 hover:to-pink-600 transform hover:scale-105 transition-all"
@@ -477,6 +505,41 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     default:
       return renderMenu();
   }
+};
+
+const LanguageSelector: React.FC<{selectedLang: string, onLangChange: (lang: string) => void, isMenu?: boolean}> = ({ selectedLang, onLangChange, isMenu = false }) => {
+    const languages = [
+        { code: 'en-US', name: 'English (US)' },
+        { code: 'en-GB', name: 'English (UK)' },
+        { code: 'zh-TW', name: '中文 (繁體)' },
+        { code: 'zh-CN', name: '中文 (简体)' },
+    ];
+
+    if (isMenu) {
+        return (
+            <div className="flex items-center gap-2">
+                <Globe className="w-6 h-6 text-gray-600" />
+                <select
+                    value={selectedLang}
+                    onChange={(e) => onLangChange(e.target.value)}
+                    className="bg-gray-200 border-none rounded-lg text-gray-800 font-semibold py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                    {languages.map(lang => <option key={lang.code} value={lang.code}>{lang.name}</option>)}
+                </select>
+            </div>
+        );
+    }
+
+    return (
+        <select
+            value={selectedLang}
+            onChange={(e) => onLangChange(e.target.value)}
+            className="p-3 rounded-lg bg-gray-200 text-gray-600"
+            aria-label="Select recognition language"
+        >
+            {languages.map(lang => <option key={lang.code} value={lang.code}>{lang.name}</option>)}
+        </select>
+    );
 };
 
 export default App;
