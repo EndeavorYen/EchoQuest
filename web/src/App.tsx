@@ -46,7 +46,7 @@ interface AppState {
   enemyLives: number;
   collectedTools: string[];
   message: string;
-  isVoiceMode: boolean;
+  practiceMode: 'voice' | 'spelling';
   gameState: GameState;
   correctAnswers: number;
   showEffect: boolean;
@@ -69,7 +69,7 @@ type AppAction =
   | { type: 'NEXT_LEVEL'; payload?: { from: 'puzzle' | 'boss' } }
   | { type: 'SET_USER_INPUT'; payload: string }
   | { type: 'SET_MESSAGE'; payload: string }
-  | { type: 'TOGGLE_VOICE_MODE' }
+  | { type: 'TOGGLE_PRACTICE_MODE' }
   | { type: 'SET_SHOW_HINT'; payload: boolean }
   | { type: 'SET_RECOGNITION_LANG'; payload: string }
   | { type: 'SKIP_WORD' }
@@ -88,7 +88,7 @@ const initialState: AppState = {
     enemyLives: 5,
     collectedTools: [],
     message: '',
-    isVoiceMode: true,
+    practiceMode: 'voice',
     gameState: 'menu',
     correctAnswers: 0,
     showEffect: false,
@@ -165,8 +165,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         return { ...state, userInput: action.payload };
     case 'SET_MESSAGE':
         return { ...state, message: action.payload };
-    case 'TOGGLE_VOICE_MODE':
-        return { ...state, isVoiceMode: !state.isVoiceMode };
+    case 'TOGGLE_PRACTICE_MODE':
+        return { ...state, practiceMode: state.practiceMode === 'voice' ? 'spelling' : 'voice' };
     case 'SET_SHOW_HINT':
         return { ...state, showHint: action.payload };
     case 'SET_RECOGNITION_LANG':
@@ -203,7 +203,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     enemyLives,
     collectedTools,
     message,
-    isVoiceMode,
+    practiceMode,
     gameState,
     correctAnswers,
     showEffect,
@@ -356,6 +356,15 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
       }
     } else {
       dispatch({ type: 'HANDLE_INCORRECT_ANSWER' });
+      if ('speechSynthesis' in window && currentWord) {
+        const utterance = new SpeechSynthesisUtterance(currentWord.word);
+        if (recognitionLang.startsWith('en-')) {
+            utterance.lang = recognitionLang;
+        } else {
+            utterance.lang = 'en-US';
+        }
+        window.speechSynthesis.speak(utterance);
+      }
     }
     
     dispatch({ type: 'SET_USER_INPUT', payload: '' });
@@ -454,15 +463,28 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                 </div>
                 <div className="flex gap-2 items-center">
                   <button
-                    onClick={() => dispatch({ type: 'TOGGLE_VOICE_MODE' })}
-                    aria-label={isVoiceMode ? 'Switch to text input' : 'Switch to voice input'}
-                    className={`p-3 rounded-lg transition-colors ${
-                      isVoiceMode ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}
+                    onClick={() => dispatch({ type: 'TOGGLE_PRACTICE_MODE' })}
+                    aria-label={practiceMode === 'voice' ? '切換到拼字模式' : '切換到語音模式'}
+                    className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 font-semibold ${
+                      practiceMode === 'voice'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-200 text-gray-700'
+                    }`}
                   >
-                    {isVoiceMode ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+                    {practiceMode === 'voice' ? (
+                      <>
+                        <Mic className="w-5 h-5" />
+                        <span>語音</span>
+                      </>
+                    ) : (
+                      <>
+                        <MicOff className="w-5 h-5" />
+                        <span>拼字</span>
+                      </>
+                    )}
                   </button>
                   
-                  {isVoiceMode ? (
+                  {practiceMode === 'voice' ? (
                     <button
                       onClick={() => {
                         if (speech.listening) {
@@ -493,7 +515,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                    <LanguageSelector selectedLang={recognitionLang} onLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })} />
                 </div>
                 
-                {!isVoiceMode && (
+                {practiceMode === 'spelling' && (
                   <button
                     onClick={() => handleSubmit(userInput)}
                     className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-bold text-lg hover:from-purple-600 hover:to-pink-600 transform hover:scale-105 transition-all"
