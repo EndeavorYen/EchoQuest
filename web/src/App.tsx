@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useReducer } from 'react';
 import { Sword, Shield, Heart, Lock, Key, Mic, MicOff, Volume2, Star, Zap, Trophy, Skull, Sparkles, Settings, HelpCircle, SkipForward, Globe } from 'lucide-react';
 import { VocabManager, VocabItem } from './components/VocabManager';
 import { initialVocab as defaultInitialVocab } from './data/vocab';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
+import { Level, defaultLevels } from './data/levels';
 
 
 // LocalStorage Utilities
@@ -31,66 +32,155 @@ function saveLangToStorage(lang: string) {
     localStorage.setItem(STORAGE_KEY_LANG, lang);
 }
 
+// --- State and Reducer ---
 
-export interface Level { // Export for use in tests
-  id: number;
-  name: string;
-  type: 'boss' | 'puzzle';
-  description: string;
-  imageEmoji: string;
-  requiredWords: number;
-  enemyLives?: number;
-  tools?: string[];
+type GameState = 'menu' | 'playing' | 'victory' | 'vocab_management';
+
+interface AppState {
+  vocab: VocabItem[];
+  levels: Level[];
+  currentLevel: number;
+  currentWord: VocabItem | null;
+  userInput: string;
+  score: number;
+  enemyLives: number;
+  collectedTools: string[];
+  message: string;
+  isVoiceMode: boolean;
+  gameState: GameState;
+  correctAnswers: number;
+  showEffect: boolean;
+  combo: number;
+  showHint: boolean;
+  isBossShaking: boolean;
+  recognitionLang: string;
 }
 
-// Define default levels so they can be exported or used as a default prop
-const defaultLevels: Level[] = [
-    {
-      id: 1,
-      name: '巨龍巢穴',
-      type: 'boss',
-      description: '打敗守護寶藏的巨龍！',
-      imageEmoji: '🐉',
-      requiredWords: 5,
-      enemyLives: 5
-    },
-    {
-      id: 2,
-      name: '哥布林洞穴',
-      type: 'boss',
-      description: '一隻討厭的哥布林擋住了去路！',
-      imageEmoji: '👺',
-      requiredWords: 5,
-      enemyLives: 3
-    },
-    {
-      id: 3,
-      name: '石像巨人山脈',
-      type: 'boss',
-      description: '巨大的石像巨人覺醒了！',
-      imageEmoji: '🗿',
-      requiredWords: 5,
-      enemyLives: 8
-    },
-    {
-      id: 4,
-      name: '魔王城堡',
-      type: 'boss',
-      description: '最終挑戰：擊敗魔王！',
-      imageEmoji: '👿',
-      requiredWords: 5,
-      enemyLives: 12
-    },
-    {
-      id: 5,
-      name: '魔法之門',
-      type: 'puzzle',
-      description: '收集三個魔法工具來開啟大門！',
-      imageEmoji: '🚪✨',
-      requiredWords: 3,
-      tools: ['key', 'hammer', 'magic'] // These should map to words in vocab
-    }
-];
+type AppAction =
+  | { type: 'SET_VOCAB'; payload: VocabItem[] }
+  | { type: 'SET_LEVELS'; payload: Level[] }
+  | { type: 'START_GAME' }
+  | { type: 'SET_GAME_STATE'; payload: GameState }
+  | { type: 'SELECT_NEW_WORD'; payload: VocabItem | null }
+  | { type: 'SUBMIT_ANSWER'; payload: { isCorrect: boolean; submittedText: string } }
+  | { type: 'HANDLE_CORRECT_ANSWER'; payload: { points: number; damage: number; word: string } }
+  | { type: 'HANDLE_PUZZLE_CORRECT'; payload: { word: string } }
+  | { type: 'HANDLE_INCORRECT_ANSWER' }
+  | { type: 'NEXT_LEVEL'; payload?: { from: 'puzzle' | 'boss' } }
+  | { type: 'SET_USER_INPUT'; payload: string }
+  | { type: 'SET_MESSAGE'; payload: string }
+  | { type: 'TOGGLE_VOICE_MODE' }
+  | { type: 'SET_SHOW_HINT'; payload: boolean }
+  | { type: 'SET_RECOGNITION_LANG'; payload: string }
+  | { type: 'SKIP_WORD' }
+  | { type: 'SET_COMBO'; payload: number }
+  | { type: 'RESET_EFFECTS' };
+
+
+const initialState: AppState = {
+    vocab: [],
+    levels: defaultLevels,
+    currentLevel: 0,
+    currentWord: null,
+    userInput: '',
+    score: 0,
+    enemyLives: 5,
+    collectedTools: [],
+    message: '',
+    isVoiceMode: true,
+    gameState: 'menu',
+    correctAnswers: 0,
+    showEffect: false,
+    combo: 0,
+    showHint: false,
+    isBossShaking: false,
+    recognitionLang: loadLangFromStorage(),
+};
+
+function appReducer(state: AppState, action: AppAction): AppState {
+  switch (action.type) {
+    case 'SET_VOCAB':
+      return { ...state, vocab: action.payload };
+    case 'SET_LEVELS':
+        return { ...state, levels: action.payload };
+    case 'START_GAME':
+      return {
+        ...state,
+        gameState: 'playing',
+        currentLevel: 0,
+        score: 0,
+        enemyLives: state.levels[0]?.enemyLives || 5,
+        collectedTools: [],
+        correctAnswers: 0,
+        combo: 0,
+        message: '',
+      };
+    case 'SET_GAME_STATE':
+        return { ...state, gameState: action.payload, message: action.payload === 'menu' ? '請先到字彙管理新增單字!' : '' };
+    case 'SELECT_NEW_WORD':
+        return { ...state, currentWord: action.payload, userInput: '' };
+    case 'HANDLE_CORRECT_ANSWER':
+        const { points, damage, word } = action.payload;
+        const newEnemyLives = state.enemyLives - damage;
+        return {
+            ...state,
+            score: state.score + points,
+            combo: state.combo + 1,
+            showEffect: true,
+            enemyLives: newEnemyLives,
+            message: `太棒了! 對怪物造成 ${damage} 點傷害!`,
+            isBossShaking: true,
+            correctAnswers: state.correctAnswers + 1,
+        };
+    case 'HANDLE_PUZZLE_CORRECT':
+        const newCollectedTools = [...state.collectedTools, action.payload.word];
+        return {
+            ...state,
+            score: state.score + 10, // Or some other logic
+            combo: state.combo + 1,
+            showEffect: true,
+            collectedTools: newCollectedTools,
+            message: `獲得了 ${action.payload.word}!`,
+            correctAnswers: state.correctAnswers + 1,
+        };
+    case 'HANDLE_INCORRECT_ANSWER':
+        return { ...state, message: '再試一次!', combo: 0 };
+    case 'NEXT_LEVEL':
+        const nextLevelIndex = state.currentLevel + 1;
+        if (nextLevelIndex >= state.levels.length) {
+            return { ...state, gameState: 'victory' };
+        }
+        const message = action.payload?.from === 'puzzle'
+            ? '謎題解開! 進入下一關!'
+            : '關卡完成! 進入下一關!';
+        return {
+            ...state,
+            currentLevel: nextLevelIndex,
+            enemyLives: state.levels[nextLevelIndex]?.enemyLives || 5,
+            collectedTools: [], // Reset for new puzzle level
+            message: message,
+        };
+    case 'SET_USER_INPUT':
+        return { ...state, userInput: action.payload };
+    case 'SET_MESSAGE':
+        return { ...state, message: action.payload };
+    case 'TOGGLE_VOICE_MODE':
+        return { ...state, isVoiceMode: !state.isVoiceMode };
+    case 'SET_SHOW_HINT':
+        return { ...state, showHint: action.payload };
+    case 'SET_RECOGNITION_LANG':
+        return { ...state, recognitionLang: action.payload };
+    case 'SKIP_WORD':
+        return { ...state, combo: 0 };
+    case 'SET_COMBO':
+      return { ...state, combo: action.payload };
+    case 'RESET_EFFECTS':
+        return { ...state, showEffect: false, isBossShaking: false };
+    default:
+      return state;
+  }
+}
+
 
 interface AppProps {
     initialVocab?: VocabItem[];
@@ -98,24 +188,29 @@ interface AppProps {
 }
 
 const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels = defaultLevels }) => {
-  const [vocab, setVocab] = useState<VocabItem[]>([]);
-  const [levels, setLevels] = useState<Level[]>(initialLevels);
-
-  const [currentLevel, setCurrentLevel] = useState(0);
-  const [currentWord, setCurrentWord] = useState<VocabItem | null>(null);
-  const [userInput, setUserInput] = useState('');
-  const [score, setScore] = useState(0);
-  const [enemyLives, setEnemyLives] = useState(5);
-  const [collectedTools, setCollectedTools] = useState<string[]>([]);
-  const [message, setMessage] = useState('');
-  const [isVoiceMode, setIsVoiceMode] = useState(true);
-  const [gameState, setGameState] = useState<'menu' | 'playing' | 'victory' | 'vocab_management'>('menu');
-  const [correctAnswers, setCorrectAnswers] = useState(0);
-  const [showEffect, setShowEffect] = useState(false);
-  const [combo, setCombo] = useState(0);
-  const [showHint, setShowHint] = useState(false);
-  const [isBossShaking, setIsBossShaking] = useState(false);
-  const [recognitionLang, setRecognitionLang] = useState(loadLangFromStorage());
+  const [state, dispatch] = useReducer(appReducer, {
+    ...initialState,
+    levels: initialLevels,
+  });
+  const {
+    vocab,
+    levels,
+    currentLevel,
+    currentWord,
+    userInput,
+    score,
+    enemyLives,
+    collectedTools,
+    message,
+    isVoiceMode,
+    gameState,
+    correctAnswers,
+    showEffect,
+    combo,
+    showHint,
+    isBossShaking,
+    recognitionLang,
+  } = state;
 
   const speech = useSpeechRecognition();
   const wasListeningRef = useRef(false);
@@ -123,11 +218,11 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   // Load vocab on mount or when prop changes
   useEffect(() => {
     if (initialVocabProp) {
-        setVocab(initialVocabProp);
+        dispatch({ type: 'SET_VOCAB', payload: initialVocabProp });
     } else {
         const storedVocab = loadVocabFromStorage();
         const initialVocab = storedVocab.length > 0 ? storedVocab : defaultInitialVocab;
-        setVocab(initialVocab);
+        dispatch({ type: 'SET_VOCAB', payload: initialVocab });
     }
   }, [initialVocabProp]);
 
@@ -138,7 +233,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     }
   }, [vocab, initialVocabProp]);
 
-  const enabledVocab = useMemo(() => vocab.filter(v => v.enabled), [vocab]);
+  const enabledVocab = useMemo(() => vocab.filter((v: VocabItem) => v.enabled), [vocab]);
 
   useEffect(() => {
     if (gameState === 'playing' && !currentWord) {
@@ -163,8 +258,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
 
   const selectNewWord = () => {
     if (enabledVocab.length === 0) {
-        setMessage('請先到字彙管理新增單字!');
-        setGameState('menu');
+        dispatch({ type: 'SET_GAME_STATE', payload: 'menu' });
         return;
     }
 
@@ -172,30 +266,24 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     let availableWords = enabledVocab;
     
     if (level.type === 'puzzle' && level.tools) {
-      availableWords = enabledVocab.filter(w => level.tools?.includes(w.word) && !collectedTools.includes(w.word));
+      availableWords = enabledVocab.filter((w: VocabItem) => level.tools?.includes(w.word) && !collectedTools.includes(w.word));
     } 
     
     if (availableWords.length > 0) {
       const randomWord = availableWords[Math.floor(Math.random() * availableWords.length)];
-      setCurrentWord(randomWord);
+      dispatch({ type: 'SELECT_NEW_WORD', payload: randomWord });
     } else {
         // No more words for this level
         if (currentLevel < levels.length - 1) {
-            setCurrentLevel(currentLevel + 1);
+            dispatch({ type: 'NEXT_LEVEL' });
         } else {
-            setGameState('victory');
+            dispatch({ type: 'SET_GAME_STATE', payload: 'victory' });
         }
     }
   };
 
   const startGame = () => {
-    setGameState('playing');
-    setCurrentLevel(0);
-    setScore(0);
-    setEnemyLives(levels[0].enemyLives || 5);
-    setCollectedTools([]);
-    setCorrectAnswers(0);
-    setCombo(0);
+    dispatch({ type: 'START_GAME' });
     selectNewWord();
   };
 
@@ -205,31 +293,25 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     const isCorrect = submittedText.toLowerCase().trim().replace(/[^a-z]/g, '') === currentWord.word;
     
     if (isCorrect) {
-      const points = currentWord.difficulty * 10 * (combo + 1);
-      setScore(score + points);
-      setCombo(combo + 1);
-      setShowEffect(true);
-      setTimeout(() => setShowEffect(false), 500);
-      
       const level = levels[currentLevel];
       
       if (level.type === 'boss') {
         const damage = currentWord.difficulty;
-        setEnemyLives(enemyLives - damage);
-        setMessage(`太棒了! 對怪物造成 ${damage} 點傷害!`);
-        setIsBossShaking(true);
-        setTimeout(() => setIsBossShaking(false), 500);
+        const points = currentWord.difficulty * 10 * (combo + 1);
+        dispatch({ type: 'HANDLE_CORRECT_ANSWER', payload: { points, damage, word: currentWord.word } });
+
+        setTimeout(() => {
+            dispatch({ type: 'RESET_EFFECTS' });
+        }, 500);
         
         if (enemyLives - damage <= 0) {
           if (currentLevel < levels.length - 1) {
             setTimeout(() => {
-              setCurrentLevel(currentLevel + 1);
-              setEnemyLives(levels[currentLevel + 1].enemyLives || 5);
-              setMessage('關卡完成! 進入下一關!');
+              dispatch({ type: 'NEXT_LEVEL', payload: { from: 'boss' } });
               selectNewWord();
             }, 1500);
           } else {
-            setGameState('victory');
+            dispatch({ type: 'SET_GAME_STATE', payload: 'victory' });
           }
         } else {
           setTimeout(() => {
@@ -237,20 +319,17 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
           }, 1500);
         }
       } else if (level.type === 'puzzle') {
-        const newCollectedTools = [...collectedTools, currentWord.word];
-        setCollectedTools(newCollectedTools);
-        setMessage(`獲得了 ${currentWord.word}!`);
+        dispatch({ type: 'HANDLE_PUZZLE_CORRECT', payload: { word: currentWord.word } });
         
+        const newCollectedTools = [...collectedTools, currentWord.word];
         if (newCollectedTools.length >= (level.tools?.length || 0)) {
             if (currentLevel < levels.length - 1) {
                 setTimeout(() => {
-                  setCurrentLevel(currentLevel + 1);
-                  setEnemyLives(levels[currentLevel + 1].enemyLives || 5); // Set lives for next level if it's a boss
-                  setMessage('謎題解開! 進入下一關!');
+                  dispatch({ type: 'NEXT_LEVEL', payload: { from: 'puzzle' } });
                   selectNewWord();
                 }, 1500);
               } else {
-                setGameState('victory');
+                dispatch({ type: 'SET_GAME_STATE', payload: 'victory' });
               }
         } else {
           setTimeout(() => {
@@ -258,19 +337,16 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
           }, 1500);
         }
       }
-      
-      setCorrectAnswers(correctAnswers + 1);
     } else {
-      setMessage('再試一次!');
-      setCombo(0);
+      dispatch({ type: 'HANDLE_INCORRECT_ANSWER' });
     }
     
-    setUserInput('');
-    setTimeout(() => setMessage(''), 2000);
+    dispatch({ type: 'SET_USER_INPUT', payload: '' });
+    setTimeout(() => dispatch({ type: 'SET_MESSAGE', payload: '' }), 2000);
   };
 
   const handleSkip = () => {
-    setCombo(0);
+    dispatch({ type: 'SKIP_WORD' });
     selectNewWord();
   };
 
@@ -362,7 +438,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                 </div>
                 <div className="flex gap-2 items-center">
                   <button
-                    onClick={() => setIsVoiceMode(!isVoiceMode)}
+                    onClick={() => dispatch({ type: 'TOGGLE_VOICE_MODE' })}
                     aria-label={isVoiceMode ? 'Switch to text input' : 'Switch to voice input'}
                     className={`p-3 rounded-lg transition-colors ${
                       isVoiceMode ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}
@@ -392,13 +468,13 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                     <input
                       type="text"
                       value={userInput}
-                      onChange={(e) => setUserInput(e.target.value)}
+                      onChange={(e) => dispatch({ type: 'SET_USER_INPUT', payload: e.target.value })}
                       onKeyPress={(e) => e.key === 'Enter' && handleSubmit(userInput)}
                       placeholder="輸入英文單字"
                       className="px-4 py-3 border-2 border-purple-300 rounded-lg text-lg focus:outline-none focus:border-purple-500"
                     />
                   )}
-                   <LanguageSelector selectedLang={recognitionLang} onLangChange={setRecognitionLang} />
+                   <LanguageSelector selectedLang={recognitionLang} onLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })} />
                 </div>
                 
                 {!isVoiceMode && (
@@ -415,10 +491,10 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                     <button
                         aria-label="Show hint"
                         className="p-3 rounded-lg bg-yellow-400 text-white hover:bg-yellow-500"
-                        onMouseDown={() => setShowHint(true)}
-                        onMouseUp={() => setShowHint(false)}
-                        onTouchStart={() => setShowHint(true)}
-                        onTouchEnd={() => setShowHint(false)}
+                        onMouseDown={() => dispatch({ type: 'SET_SHOW_HINT', payload: true })}
+                        onMouseUp={() => dispatch({ type: 'SET_SHOW_HINT', payload: false })}
+                        onTouchStart={() => dispatch({ type: 'SET_SHOW_HINT', payload: true })}
+                        onTouchEnd={() => dispatch({ type: 'SET_SHOW_HINT', payload: false })}
                     >
                         <HelpCircle className="w-6 h-6" />
                     </button>
@@ -452,7 +528,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
           <p className="text-gray-600">學習英文，打敗怪物！</p>
         </div>
         <div className="mb-6 flex justify-center">
-            <LanguageSelector selectedLang={recognitionLang} onLangChange={setRecognitionLang} isMenu={true} />
+            <LanguageSelector selectedLang={recognitionLang} onLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })} isMenu={true} />
         </div>
         <button
           onClick={startGame}
@@ -461,7 +537,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
           開始遊戲
         </button>
         <button
-          onClick={() => setGameState('vocab_management')}
+          onClick={() => dispatch({ type: 'SET_GAME_STATE', payload: 'vocab_management' })}
           className="w-full py-3 bg-gray-200 text-gray-800 rounded-xl font-bold text-lg hover:bg-gray-300 transition-all flex items-center justify-center gap-2"
         >
           <Settings className="w-5 h-5"/>
@@ -501,7 +577,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     case 'victory':
       return renderVictory();
     case 'vocab_management':
-        return <VocabManager vocab={vocab} onVocabChange={setVocab} onGoBack={() => setGameState('menu')} />;
+        return <VocabManager vocab={vocab} onVocabChange={(v) => dispatch({ type: 'SET_VOCAB', payload: v })} onGoBack={() => dispatch({ type: 'SET_GAME_STATE', payload: 'menu' })} />;
     default:
       return renderMenu();
   }

@@ -1,20 +1,43 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import App, { Level } from './App'; // Import Level type
+import App from './App';
+import { Level } from './data/levels';
 import { VocabItem } from './components/VocabManager';
 
 // Mock SpeechRecognition
-const mockSpeech = {
+// JSDOM doesn't have SpeechRecognition, so we mock it and its related event types.
+const mockSpeechRecognition = {
   start: jest.fn(),
   stop: jest.fn(),
   onstart: () => {},
   onend: () => {},
   onerror: () => {},
   onresult: () => {},
+  // Add any other properties/methods your hook uses
 };
-(global as any).SpeechRecognition = jest.fn(() => mockSpeech);
-(global as any).webkitSpeechRecognition = jest.fn(() => mockSpeech);
+
+(global as any).SpeechRecognition = jest.fn(() => mockSpeechRecognition);
+(global as any).webkitSpeechRecognition = (global as any).SpeechRecognition;
+
+// Mock the event types if they are used in a way that Jest can't resolve
+if (typeof (global as any).SpeechRecognitionEvent === 'undefined') {
+  (global as any).SpeechRecognitionEvent = class SpeechRecognitionEvent extends Event {
+    constructor(type: string, options: any) {
+      super(type, options);
+      // You might need to initialize properties based on options
+    }
+  };
+}
+
+if (typeof (global as any).SpeechRecognitionErrorEvent === 'undefined') {
+    (global as any).SpeechRecognitionErrorEvent = class SpeechRecognitionErrorEvent extends Event {
+        constructor(type: string, options: any) {
+            super(type, options);
+             // You might need to initialize properties based on options
+        }
+    };
+}
 
 // Mock localStorage
 const localStorageMock = (() => {
