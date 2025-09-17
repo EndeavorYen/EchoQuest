@@ -235,27 +235,6 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
 
   const enabledVocab = useMemo(() => vocab.filter((v: VocabItem) => v.enabled), [vocab]);
 
-  useEffect(() => {
-    if (gameState === 'playing' && !currentWord) {
-      selectNewWord();
-    }
-  }, [gameState, currentWord]);
-
-  // Handle speech recognition result
-  useEffect(() => {
-    // When listening stops, and we have a transcript, submit it.
-    if (!speech.listening && wasListeningRef.current && speech.transcript) {
-      handleSubmit(speech.transcript);
-      speech.resetTranscript();
-    }
-    wasListeningRef.current = speech.listening;
-  }, [speech.listening]);
-
-  // Persist language selection
-  useEffect(() => {
-    saveLangToStorage(recognitionLang);
-  }, [recognitionLang]);
-
   const selectNewWord = () => {
     if (enabledVocab.length === 0) {
         dispatch({ type: 'SET_GAME_STATE', payload: 'menu' });
@@ -282,9 +261,71 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     }
   };
 
+  // Effect to select a new word when the game starts or level changes.
+  useEffect(() => {
+    if (gameState === 'playing') {
+      selectNewWord();
+    }
+  }, [gameState, currentLevel]);
+
+  // Effect to handle the consequences of a correct answer.
+  const correctAnswersRef = useRef(correctAnswers);
+  useEffect(() => {
+    // This effect should only trigger when a correct answer has been submitted.
+    if (gameState !== 'playing' || correctAnswers === correctAnswersRef.current) {
+        return;
+    }
+    correctAnswersRef.current = correctAnswers;
+
+    // Reset visual effects after a short delay
+    const effectTimer = setTimeout(() => dispatch({ type: 'RESET_EFFECTS' }), 500);
+
+    const level = levels[currentLevel];
+    let levelComplete = false;
+    if (level.type === 'boss' && enemyLives <= 0) {
+        levelComplete = true;
+    } else if (level.type === 'puzzle' && collectedTools.length >= (level.tools?.length || 0)) {
+        levelComplete = true;
+    }
+
+    // After a longer delay, advance the game
+    const gameFlowTimer = setTimeout(() => {
+        if (levelComplete) {
+            if (currentLevel < levels.length - 1) {
+                dispatch({ type: 'NEXT_LEVEL', payload: { from: level.type } });
+            } else {
+                dispatch({ type: 'SET_GAME_STATE', payload: 'victory' });
+            }
+        } else {
+            selectNewWord(); // Not level complete, so just get the next word.
+        }
+    }, 1500);
+
+    return () => {
+        clearTimeout(effectTimer);
+        clearTimeout(gameFlowTimer);
+    };
+  }, [correctAnswers, gameState, enemyLives, collectedTools, currentLevel, levels]);
+
+
+  // Handle speech recognition result
+  useEffect(() => {
+    // When listening stops, and we have a transcript, submit it.
+    if (!speech.listening && wasListeningRef.current && speech.transcript) {
+      handleSubmit(speech.transcript);
+      speech.resetTranscript();
+    }
+    wasListeningRef.current = speech.listening;
+  }, [speech.listening]);
+
+  // Persist language selection
+  useEffect(() => {
+    saveLangToStorage(recognitionLang);
+  }, [recognitionLang]);
+
   const startGame = () => {
     dispatch({ type: 'START_GAME' });
-    selectNewWord();
+    // The useEffect listening on [gameState, currentLevel] will call selectNewWord.
   };
 
   const handleSubmit = (submittedText: string) => {
@@ -299,43 +340,8 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
         const damage = currentWord.difficulty;
         const points = currentWord.difficulty * 10 * (combo + 1);
         dispatch({ type: 'HANDLE_CORRECT_ANSWER', payload: { points, damage, word: currentWord.word } });
-
-        setTimeout(() => {
-            dispatch({ type: 'RESET_EFFECTS' });
-        }, 500);
-        
-        if (enemyLives - damage <= 0) {
-          if (currentLevel < levels.length - 1) {
-            setTimeout(() => {
-              dispatch({ type: 'NEXT_LEVEL', payload: { from: 'boss' } });
-              selectNewWord();
-            }, 1500);
-          } else {
-            dispatch({ type: 'SET_GAME_STATE', payload: 'victory' });
-          }
-        } else {
-          setTimeout(() => {
-            selectNewWord();
-          }, 1500);
-        }
       } else if (level.type === 'puzzle') {
         dispatch({ type: 'HANDLE_PUZZLE_CORRECT', payload: { word: currentWord.word } });
-        
-        const newCollectedTools = [...collectedTools, currentWord.word];
-        if (newCollectedTools.length >= (level.tools?.length || 0)) {
-            if (currentLevel < levels.length - 1) {
-                setTimeout(() => {
-                  dispatch({ type: 'NEXT_LEVEL', payload: { from: 'puzzle' } });
-                  selectNewWord();
-                }, 1500);
-              } else {
-                dispatch({ type: 'SET_GAME_STATE', payload: 'victory' });
-              }
-        } else {
-          setTimeout(() => {
-            selectNewWord();
-          }, 1500);
-        }
       }
     } else {
       dispatch({ type: 'HANDLE_INCORRECT_ANSWER' });

@@ -213,7 +213,7 @@ describe('<App />', () => {
 
     await waitFor(() => {
       expect(screen.getByText('勝利！')).toBeInTheDocument();
-    });
+    }, { timeout: 2000 });
   });
 
   it('should handle puzzle levels correctly', async () => {

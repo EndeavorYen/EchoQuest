@@ -52,14 +52,14 @@ export function useSpeechRecognition() {
       recognitionRef.current = null;
     };
 
-    newRecognition.onerror = (event: any) => {
+    newRecognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error(`Speech recognition error: ${event.error}`);
       setListening(false);
       setInterimTranscript('');
       recognitionRef.current = null;
     };
 
-    newRecognition.onresult = (event: any) => {
+    newRecognition.onresult = (event: SpeechRecognitionEvent) => {
       let final_transcript = '';
       let interim_transcript = '';
 
