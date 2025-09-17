@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 // Speech Recognition Hook
 declare global {
@@ -6,26 +6,39 @@ declare global {
     webkitSpeechRecognition?: any;
     SpeechRecognition?: any;
   }
+  interface SpeechRecognitionErrorEvent extends Event {
+    error: string;
+  }
 }
 
-export function useSpeechRecognition() {
+export interface UseSpeechRecognitionOptions {
+  onResult?: (transcript: string) => void;
+}
+
+export function useSpeechRecognition({ onResult }: UseSpeechRecognitionOptions = {}) {
   const [listening, setListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
+  const manualStop = useRef(false);
+  const langRef = useRef('en-US');
 
-  const stop = () => {
+  const stop = useCallback(() => {
     if (recognitionRef.current) {
+      manualStop.current = true;
       recognitionRef.current.stop();
-      // No need for a timeout failsafe here, onend should be reliable enough
-      // for the purpose of stopping. The App's state handles the rest.
     }
-  };
+  }, []);
 
-  const start = (lang: string = 'en-US') => {
+  const start = useCallback((lang: string = 'en-US') => {
+    langRef.current = lang;
+    manualStop.current = false;
+
     if (listening) {
-      // If already listening, calling start again does nothing.
-      // Use stop() to explicitly stop.
+      // If we are already listening, a call to start is likely to set a new language.
+      // We can stop the current recognition, and onend will handle the restart with the new language.
+      if (recognitionRef.current && recognitionRef.current.lang !== lang) {
+         recognitionRef.current.stop();
+      }
       return;
     }
 
@@ -36,27 +49,39 @@ export function useSpeechRecognition() {
     }
 
     const newRecognition = new SpeechRecognition();
-    newRecognition.continuous = true; // Process multiple results
-    newRecognition.lang = lang;
-    newRecognition.interimResults = true; // Get results as the user speaks
+    newRecognition.continuous = true;
+    newRecognition.lang = langRef.current;
+    newRecognition.interimResults = true;
 
     newRecognition.onstart = () => {
       setListening(true);
-      setTranscript('');
       setInterimTranscript('');
     };
 
     newRecognition.onend = () => {
       setListening(false);
       setInterimTranscript('');
+      if (!manualStop.current) {
+        // If the recognition ended unexpectedly, restart it
+        start(langRef.current);
+      }
       recognitionRef.current = null;
     };
 
-    newRecognition.onerror = (event: any) => {
+    newRecognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error(`Speech recognition error: ${event.error}`);
-      setListening(false);
-      setInterimTranscript('');
-      recognitionRef.current = null;
+      // Some errors are not fatal, we can try to restart.
+      // 'no-speech' and 'network' are common issues that might resolve.
+      if (event.error === 'no-speech' || event.error === 'network') {
+        if (!manualStop.current) {
+            // Treat it like an unexpected end.
+            newRecognition.stop(); // Stop the current errored instance
+        }
+      } else {
+        setListening(false);
+        setInterimTranscript('');
+        recognitionRef.current = null;
+      }
     };
 
     newRecognition.onresult = (event: any) => {
@@ -71,18 +96,22 @@ export function useSpeechRecognition() {
         }
       }
 
-      setTranscript(prev => prev + final_transcript);
+      if (final_transcript && onResult) {
+        onResult(final_transcript.trim());
+      }
       setInterimTranscript(interim_transcript);
     };
 
     newRecognition.start();
     recognitionRef.current = newRecognition;
-  };
+  }, [listening, onResult]);
 
   const resetTranscript = () => {
-    setTranscript('');
+    // Transcript is now managed by the parent component.
+    // Interim transcript is still internal.
     setInterimTranscript('');
   };
 
-  return { listening, transcript, interimTranscript, start, stop, resetTranscript };
+  // We no longer return `transcript` as it's handled via onResult.
+  return { listening, interimTranscript, start, stop, resetTranscript };
 }

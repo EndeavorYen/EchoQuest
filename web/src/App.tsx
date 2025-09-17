@@ -116,9 +116,17 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   const [showHint, setShowHint] = useState(false);
   const [isBossShaking, setIsBossShaking] = useState(false);
   const [recognitionLang, setRecognitionLang] = useState(loadLangFromStorage());
+  const [lastSubmittedTranscript, setLastSubmittedTranscript] = useState('');
 
-  const speech = useSpeechRecognition();
-  const wasListeningRef = useRef(false);
+  const speech = useSpeechRecognition({
+    onResult: (result) => {
+      // To avoid processing the same result multiple times due to restarts
+      if (result !== lastSubmittedTranscript) {
+        handleSubmit(result);
+        setLastSubmittedTranscript(result);
+      }
+    }
+  });
 
   // Load vocab on mount or when prop changes
   useEffect(() => {
@@ -145,16 +153,6 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
       selectNewWord();
     }
   }, [gameState, currentWord]);
-
-  // Handle speech recognition result
-  useEffect(() => {
-    // When listening stops, and we have a transcript, submit it.
-    if (!speech.listening && wasListeningRef.current && speech.transcript) {
-      handleSubmit(speech.transcript);
-      speech.resetTranscript();
-    }
-    wasListeningRef.current = speech.listening;
-  }, [speech.listening]);
 
   // Persist language selection
   useEffect(() => {
@@ -356,8 +354,8 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
               <div className="flex flex-col items-center gap-4">
                 <div className="relative w-full text-center h-12 mb-2">
                     <p className="text-xl text-gray-500 h-full flex items-center justify-center">
-                        <span className="text-purple-500 font-semibold">{speech.transcript}</span>
-                        <span className="text-gray-400">{speech.interimTranscript}</span>
+                        {/* Display last final result for a moment, then interim */}
+                        <span className="text-gray-400">{speech.interimTranscript ? speech.interimTranscript : lastSubmittedTranscript}</span>
                     </p>
                 </div>
                 <div className="flex gap-2 items-center">
@@ -386,7 +384,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                       }`}
                     >
                       <Volume2 className="w-5 h-5" />
-                      {speech.listening ? '聆聽中...' : '點擊說話'}
+                      {speech.listening ? '聆聽中...' : '開始辨識'}
                     </button>
                   ) : (
                     <input
