@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Sword, Shield, Heart, Lock, Key, Mic, MicOff, Volume2, Star, Zap, Trophy, Skull, Sparkles, Settings, HelpCircle, SkipForward, Globe } from 'lucide-react';
 import { VocabManager, VocabItem } from './components/VocabManager';
 import { initialVocab as defaultInitialVocab } from './data/vocab';
@@ -29,6 +29,10 @@ function loadLangFromStorage(): string {
 
 function saveLangToStorage(lang: string) {
     localStorage.setItem(STORAGE_KEY_LANG, lang);
+}
+
+function sanitizeAnswer(value: string): string {
+  return value.toLowerCase().trim().replace(/[^a-z]/g, '');
 }
 
 
@@ -119,6 +123,8 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
 
   const speech = useSpeechRecognition();
   const wasListeningRef = useRef(false);
+  const languageRestartPendingRef = useRef(false);
+  const lastRecognitionLangRef = useRef(recognitionLang);
 
   // Load vocab on mount or when prop changes
   useEffect(() => {
@@ -140,28 +146,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
 
   const enabledVocab = useMemo(() => vocab.filter(v => v.enabled), [vocab]);
 
-  useEffect(() => {
-    if (gameState === 'playing' && !currentWord) {
-      selectNewWord();
-    }
-  }, [gameState, currentWord]);
-
-  // Handle speech recognition result
-  useEffect(() => {
-    // When listening stops, and we have a transcript, submit it.
-    if (!speech.listening && wasListeningRef.current && speech.transcript) {
-      handleSubmit(speech.transcript);
-      speech.resetTranscript();
-    }
-    wasListeningRef.current = speech.listening;
-  }, [speech.listening]);
-
-  // Persist language selection
-  useEffect(() => {
-    saveLangToStorage(recognitionLang);
-  }, [recognitionLang]);
-
-  const selectNewWord = () => {
+  const selectNewWord = useCallback(() => {
     if (enabledVocab.length === 0) {
         setMessage('請先到字彙管理新增單字!');
         setGameState('menu');
@@ -170,11 +155,11 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
 
     const level = levels[currentLevel];
     let availableWords = enabledVocab;
-    
+
     if (level.type === 'puzzle' && level.tools) {
       availableWords = enabledVocab.filter(w => level.tools?.includes(w.word) && !collectedTools.includes(w.word));
-    } 
-    
+    }
+
     if (availableWords.length > 0) {
       const randomWord = availableWords[Math.floor(Math.random() * availableWords.length)];
       setCurrentWord(randomWord);
@@ -186,7 +171,18 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
             setGameState('victory');
         }
     }
-  };
+  }, [collectedTools, currentLevel, enabledVocab, levels]);
+
+  useEffect(() => {
+    if (gameState === 'playing' && !currentWord) {
+      selectNewWord();
+    }
+  }, [gameState, currentWord, selectNewWord]);
+
+  // Persist language selection
+  useEffect(() => {
+    saveLangToStorage(recognitionLang);
+  }, [recognitionLang]);
 
   const startGame = () => {
     setGameState('playing');
@@ -199,28 +195,30 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     selectNewWord();
   };
 
-  const handleSubmit = (submittedText: string) => {
+  const handleSubmit = useCallback((submittedText: string) => {
     if (!currentWord) return;
-    
-    const isCorrect = submittedText.toLowerCase().trim().replace(/[^a-z]/g, '') === currentWord.word;
-    
+
+    const isCorrect = sanitizeAnswer(submittedText) === currentWord.word;
+
     if (isCorrect) {
-      const points = currentWord.difficulty * 10 * (combo + 1);
-      setScore(score + points);
-      setCombo(combo + 1);
+      const nextCombo = combo + 1;
+      const points = currentWord.difficulty * 10 * nextCombo;
+      setScore((prev) => prev + points);
+      setCombo(nextCombo);
       setShowEffect(true);
       setTimeout(() => setShowEffect(false), 500);
-      
+
       const level = levels[currentLevel];
-      
+
       if (level.type === 'boss') {
         const damage = currentWord.difficulty;
-        setEnemyLives(enemyLives - damage);
+        const updatedEnemyLives = enemyLives - damage;
+        setEnemyLives(updatedEnemyLives);
         setMessage(`太棒了! 對怪物造成 ${damage} 點傷害!`);
         setIsBossShaking(true);
         setTimeout(() => setIsBossShaking(false), 500);
-        
-        if (enemyLives - damage <= 0) {
+
+        if (updatedEnemyLives <= 0) {
           if (currentLevel < levels.length - 1) {
             setTimeout(() => {
               setCurrentLevel(currentLevel + 1);
@@ -240,7 +238,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
         const newCollectedTools = [...collectedTools, currentWord.word];
         setCollectedTools(newCollectedTools);
         setMessage(`獲得了 ${currentWord.word}!`);
-        
+
         if (newCollectedTools.length >= (level.tools?.length || 0)) {
             if (currentLevel < levels.length - 1) {
                 setTimeout(() => {
@@ -258,25 +256,88 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
           }, 1500);
         }
       }
-      
-      setCorrectAnswers(correctAnswers + 1);
+
+      setCorrectAnswers((prev) => prev + 1);
     } else {
       setMessage('再試一次!');
       setCombo(0);
     }
-    
+
     setUserInput('');
     setTimeout(() => setMessage(''), 2000);
-  };
+  }, [collectedTools, combo, currentLevel, currentWord, enemyLives, levels, selectNewWord]);
 
-  const handleSkip = () => {
+  const handleSkip = useCallback(() => {
     setCombo(0);
     selectNewWord();
-  };
+  }, [selectNewWord]);
+
+  useEffect(() => {
+    if (!speech.listening && wasListeningRef.current && speech.transcript) {
+      handleSubmit(speech.transcript);
+      speech.resetTranscript();
+    }
+    wasListeningRef.current = speech.listening;
+  }, [handleSubmit, speech.listening, speech.resetTranscript, speech.transcript]);
+
+  useEffect(() => {
+    if (!speech.isSupported) {
+      setIsVoiceMode(false);
+    }
+  }, [speech.isSupported]);
+
+  useEffect(() => {
+    if (!isVoiceMode) {
+      languageRestartPendingRef.current = false;
+      speech.resetTranscript();
+    }
+  }, [isVoiceMode, speech.resetTranscript]);
+
+  useEffect(() => {
+    if (!isVoiceMode && speech.listening) {
+      speech.stop();
+    }
+  }, [isVoiceMode, speech.listening, speech.stop]);
+
+  useEffect(() => {
+    if (gameState !== 'playing' && speech.listening) {
+      speech.stop();
+    }
+  }, [gameState, speech.listening, speech.stop]);
+
+  useEffect(() => {
+    if (speech.error && isVoiceMode) {
+      setIsVoiceMode(false);
+    }
+  }, [isVoiceMode, speech.error]);
+
+  useEffect(() => {
+    if (lastRecognitionLangRef.current === recognitionLang) {
+      return;
+    }
+    lastRecognitionLangRef.current = recognitionLang;
+
+    if (!isVoiceMode || !speech.listening) {
+      return;
+    }
+
+    languageRestartPendingRef.current = true;
+    speech.stop();
+  }, [isVoiceMode, recognitionLang, speech.listening, speech.stop]);
+
+  useEffect(() => {
+    if (!languageRestartPendingRef.current || speech.listening) {
+      return;
+    }
+
+    languageRestartPendingRef.current = false;
+    speech.start(recognitionLang);
+  }, [recognitionLang, speech.listening, speech.start]);
 
   const renderGame = () => {
     const level = levels[currentLevel];
-    
+    const speechControlDisabled = !speech.isSupported || Boolean(speech.error);
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-400 to-pink-300 p-8">
         <div className="max-w-4xl mx-auto">
@@ -365,7 +426,9 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                     onClick={() => setIsVoiceMode(!isVoiceMode)}
                     aria-label={isVoiceMode ? 'Switch to text input' : 'Switch to voice input'}
                     className={`p-3 rounded-lg transition-colors ${
-                      isVoiceMode ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}
+                      isVoiceMode ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'} ${
+                      speechControlDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={speechControlDisabled}
                   >
                     {isVoiceMode ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
                   </button>
@@ -393,14 +456,29 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                       type="text"
                       value={userInput}
                       onChange={(e) => setUserInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSubmit(userInput)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSubmit(userInput);
+                        }
+                      }}
                       placeholder="輸入英文單字"
                       className="px-4 py-3 border-2 border-purple-300 rounded-lg text-lg focus:outline-none focus:border-purple-500"
                     />
                   )}
-                   <LanguageSelector selectedLang={recognitionLang} onLangChange={setRecognitionLang} />
+                  <LanguageSelector selectedLang={recognitionLang} onLangChange={setRecognitionLang} />
                 </div>
-                
+
+                {speech.error && (
+                  <p className="text-sm text-red-500 text-center" role="alert">
+                    Speech recognition error: {speech.error}
+                  </p>
+                )}
+                {!speech.isSupported && (
+                  <p className="text-sm text-gray-500 text-center" role="alert">
+                    Speech recognition is not supported in this browser.
+                  </p>
+                )}
+
                 {!isVoiceMode && (
                   <button
                     onClick={() => handleSubmit(userInput)}
@@ -467,6 +545,11 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
           <Settings className="w-5 h-5"/>
           字彙管理
         </button>
+        {!speech.isSupported && (
+          <p className="mt-4 text-center text-sm text-gray-600" role="alert">
+            Speech recognition is not supported in this browser.
+          </p>
+        )}
         {message && (
           <p className="mt-4 text-center text-red-500 font-bold animate-bounce">
             {message}
