@@ -76,6 +76,7 @@ type AppAction =
   | { type: 'SET_COMBO'; payload: number }
   | { type: 'RESET_EFFECTS' };
 
+const POINTS_PER_PUZZLE = 10;
 
 const initialState: AppState = {
     vocab: [],
@@ -136,7 +137,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         const newCollectedTools = [...state.collectedTools, action.payload.word];
         return {
             ...state,
-            score: state.score + 10, // Or some other logic
+            score: state.score + POINTS_PER_PUZZLE,
             combo: state.combo + 1,
             showEffect: true,
             collectedTools: newCollectedTools,
@@ -323,6 +324,16 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     saveLangToStorage(recognitionLang);
   }, [recognitionLang]);
 
+  // Effect to clear messages after a delay
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => {
+        dispatch({ type: 'SET_MESSAGE', payload: '' });
+      }, 2000); // Message disappears after 2 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
   const startGame = () => {
     dispatch({ type: 'START_GAME' });
     // The useEffect listening on [gameState, currentLevel] will call selectNewWord.
@@ -348,7 +359,6 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     }
     
     dispatch({ type: 'SET_USER_INPUT', payload: '' });
-    setTimeout(() => dispatch({ type: 'SET_MESSAGE', payload: '' }), 2000);
   };
 
   const handleSkip = () => {
