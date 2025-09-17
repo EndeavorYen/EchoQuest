@@ -77,6 +77,7 @@ type AppAction =
   | { type: 'RESET_EFFECTS' };
 
 const POINTS_PER_PUZZLE = 10;
+const BASE_POINTS_PER_WORD = 10;
 
 const initialState: AppState = {
     vocab: [],
@@ -349,7 +350,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
       
       if (level.type === 'boss') {
         const damage = currentWord.difficulty;
-        const points = currentWord.difficulty * 10 * (combo + 1);
+        const points = currentWord.difficulty * BASE_POINTS_PER_WORD * (combo + 1);
         dispatch({ type: 'HANDLE_CORRECT_ANSWER', payload: { points, damage, word: currentWord.word } });
       } else if (level.type === 'puzzle') {
         dispatch({ type: 'HANDLE_PUZZLE_CORRECT', payload: { word: currentWord.word } });
