@@ -105,7 +105,7 @@ describe('<App />', () => {
       expect(screen.getByText('關卡 1')).toBeInTheDocument();
     });
 
-    const voiceModeButton = screen.getByRole('button', { name: /switch to text input/i });
+    const voiceModeButton = screen.getByRole('button', { name: /切換到拼字模式/i });
     fireEvent.click(voiceModeButton);
 
     const input = screen.getByPlaceholderText('輸入英文單字');
@@ -128,7 +128,7 @@ describe('<App />', () => {
       expect(screen.getByText('關卡 1')).toBeInTheDocument();
     });
 
-    const voiceModeButton = screen.getByRole('button', { name: /switch to text input/i });
+    const voiceModeButton = screen.getByRole('button', { name: /切換到拼字模式/i });
     fireEvent.click(voiceModeButton);
 
     const input = screen.getByPlaceholderText('輸入英文單字');
@@ -202,7 +202,7 @@ describe('<App />', () => {
         expect(screen.getByText('Test Boss')).toBeInTheDocument();
     });
 
-    const voiceModeButton = screen.getByRole('button', { name: /switch to text input/i });
+    const voiceModeButton = screen.getByRole('button', { name: /切換到拼字模式/i });
     fireEvent.click(voiceModeButton);
 
     const input = screen.getByPlaceholderText('輸入英文單字');
@@ -234,7 +234,7 @@ describe('<App />', () => {
       expect(screen.getByText('Puzzle Level')).toBeInTheDocument();
     });
 
-    const voiceModeButton = screen.getByRole('button', { name: /switch to text input/i });
+    const voiceModeButton = screen.getByRole('button', { name: /切換到拼字模式/i });
     fireEvent.click(voiceModeButton);
 
     const input = screen.getByPlaceholderText('輸入英文單字');
