@@ -39,6 +39,8 @@ describe('gameReducer', () => {
       enemyLives: 1,
       collectedTools: ['key'],
       correctAnswers: 5,
+      levelCorrectAnswers: 2,
+      skippedWords: 1,
       combo: 3,
       message: 'old message',
     };
@@ -50,6 +52,8 @@ describe('gameReducer', () => {
       enemyLives: 4,
       collectedTools: [],
       correctAnswers: 0,
+      levelCorrectAnswers: 0,
+      skippedWords: 0,
       combo: 0,
       message: '',
     });
@@ -63,6 +67,7 @@ describe('gameReducer', () => {
       score: 10,
       combo: 1,
       correctAnswers: 2,
+      levelCorrectAnswers: 1,
     };
 
     expect(
@@ -77,7 +82,67 @@ describe('gameReducer', () => {
       showEffect: true,
       isBossShaking: true,
       correctAnswers: 3,
-      message: '太棒了! 對怪物造成 2 點傷害!',
+      levelCorrectAnswers: 2,
+      message: '太棒了! +40 分，對怪物造成 2 點傷害!',
+    });
+  });
+
+  it('resets the current level progress when moving to the next level', () => {
+    const state = {
+      ...createInitialState({ levels, recognitionLang: 'en-US' }),
+      currentLevel: 0,
+      levelCorrectAnswers: 1,
+      skippedWords: 2,
+    };
+
+    expect(gameReducer(state, { type: 'NEXT_LEVEL', payload: { from: 'boss' } })).toMatchObject({
+      currentLevel: 1,
+      levelCorrectAnswers: 0,
+      skippedWords: 0,
+      message: '目標完成! 進入下一關!',
+    });
+  });
+
+  it('makes skipping a meaningful choice by clearing combo, tracking skips, and applying a small score penalty', () => {
+    const state = {
+      ...createInitialState({ levels, recognitionLang: 'en-US' }),
+      score: 12,
+      combo: 3,
+      skippedWords: 1,
+    };
+
+    expect(gameReducer(state, { type: 'SKIP_WORD' })).toMatchObject({
+      score: 7,
+      combo: 0,
+      skippedWords: 2,
+      message: '已跳過這題：扣 5 分並失去連擊。',
+    });
+  });
+
+  it('does not let skip penalties push score below zero', () => {
+    const state = {
+      ...createInitialState({ levels, recognitionLang: 'en-US' }),
+      score: 3,
+      combo: 1,
+    };
+
+    expect(gameReducer(state, { type: 'SKIP_WORD' })).toMatchObject({
+      score: 0,
+      combo: 0,
+    });
+  });
+
+  it('explains mistakes without subtracting score', () => {
+    const state = {
+      ...createInitialState({ levels, recognitionLang: 'en-US' }),
+      score: 12,
+      combo: 2,
+    };
+
+    expect(gameReducer(state, { type: 'HANDLE_INCORRECT_ANSWER' })).toMatchObject({
+      score: 12,
+      combo: 0,
+      message: '再試一次! 連擊歸零，但不扣分。',
     });
   });
 

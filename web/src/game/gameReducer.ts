@@ -16,6 +16,8 @@ export interface AppState {
   practiceMode: 'voice' | 'spelling';
   gameState: GameState;
   correctAnswers: number;
+  levelCorrectAnswers: number;
+  skippedWords: number;
   showEffect: boolean;
   combo: number;
   showHint: boolean;
@@ -44,6 +46,7 @@ export type AppAction =
   | { type: 'RESET_EFFECTS' };
 
 export const POINTS_PER_PUZZLE = 10;
+export const SKIP_PENALTY = 5;
 
 interface InitialStateOptions {
   levels?: Level[];
@@ -67,6 +70,8 @@ export function createInitialState({
     practiceMode: 'voice',
     gameState: 'menu',
     correctAnswers: 0,
+    levelCorrectAnswers: 0,
+    skippedWords: 0,
     showEffect: false,
     combo: 0,
     showHint: false,
@@ -90,6 +95,8 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
         enemyLives: state.levels[0]?.enemyLives || 5,
         collectedTools: [],
         correctAnswers: 0,
+        levelCorrectAnswers: 0,
+        skippedWords: 0,
         combo: 0,
         message: '',
       };
@@ -111,9 +118,10 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
         combo: state.combo + 1,
         showEffect: true,
         enemyLives: newEnemyLives,
-        message: `太棒了! 對怪物造成 ${damage} 點傷害!`,
+        message: `太棒了! +${points} 分，對怪物造成 ${damage} 點傷害!`,
         isBossShaking: true,
         correctAnswers: state.correctAnswers + 1,
+        levelCorrectAnswers: state.levelCorrectAnswers + 1,
       };
     }
     case 'HANDLE_PUZZLE_CORRECT': {
@@ -127,10 +135,11 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
         collectedTools: newCollectedTools,
         message: `獲得了 ${action.payload.word}!`,
         correctAnswers: state.correctAnswers + 1,
+        levelCorrectAnswers: state.levelCorrectAnswers + 1,
       };
     }
     case 'HANDLE_INCORRECT_ANSWER':
-      return { ...state, message: '再試一次!', combo: 0 };
+      return { ...state, message: '再試一次! 連擊歸零，但不扣分。', combo: 0 };
     case 'NEXT_LEVEL': {
       const nextLevelIndex = state.currentLevel + 1;
 
@@ -140,13 +149,15 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
 
       const message = action.payload?.from === 'puzzle'
         ? '謎題解開! 進入下一關!'
-        : '關卡完成! 進入下一關!';
+        : '目標完成! 進入下一關!';
 
       return {
         ...state,
         currentLevel: nextLevelIndex,
         enemyLives: state.levels[nextLevelIndex]?.enemyLives || 5,
         collectedTools: [],
+        levelCorrectAnswers: 0,
+        skippedWords: 0,
         message,
       };
     }
@@ -163,7 +174,13 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
     case 'SET_RECOGNITION_LANG':
       return { ...state, recognitionLang: action.payload };
     case 'SKIP_WORD':
-      return { ...state, combo: 0 };
+      return {
+        ...state,
+        score: Math.max(0, state.score - SKIP_PENALTY),
+        combo: 0,
+        skippedWords: state.skippedWords + 1,
+        message: `已跳過這題：扣 ${SKIP_PENALTY} 分並失去連擊。`,
+      };
     case 'SET_COMBO':
       return { ...state, combo: action.payload };
     case 'RESET_EFFECTS':
