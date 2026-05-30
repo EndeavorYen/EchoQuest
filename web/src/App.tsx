@@ -70,6 +70,7 @@ type AppAction =
   | { type: 'SET_USER_INPUT'; payload: string }
   | { type: 'SET_MESSAGE'; payload: string }
   | { type: 'TOGGLE_PRACTICE_MODE' }
+  | { type: 'SET_PRACTICE_MODE'; payload: AppState['practiceMode'] }
   | { type: 'SET_SHOW_HINT'; payload: boolean }
   | { type: 'SET_RECOGNITION_LANG'; payload: string }
   | { type: 'SKIP_WORD' }
@@ -167,7 +168,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_MESSAGE':
         return { ...state, message: action.payload };
     case 'TOGGLE_PRACTICE_MODE':
-        return { ...state, practiceMode: state.practiceMode === 'voice' ? 'spelling' : 'voice' };
+      return { ...state, practiceMode: state.practiceMode === 'voice' ? 'spelling' : 'voice' };
+    case 'SET_PRACTICE_MODE':
+      return { ...state, practiceMode: action.payload };
     case 'SET_SHOW_HINT':
         return { ...state, showHint: action.payload };
     case 'SET_RECOGNITION_LANG':
@@ -214,8 +217,11 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     recognitionLang,
   } = state;
 
-  const speech = useSpeechRecognition();
-  const wasListeningRef = useRef(false);
+  const handleSubmitRef = useRef<(submittedText: string) => void>(() => {});
+  const speech = useSpeechRecognition({
+    autoRestart: gameState === 'playing' && practiceMode === 'voice',
+    onResult: (result) => handleSubmitRef.current(result),
+  });
 
   // Load vocab on mount or when prop changes
   useEffect(() => {
@@ -309,17 +315,6 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     };
   }, [correctAnswers, gameState, enemyLives, collectedTools, currentLevel, levels]);
 
-
-  // Handle speech recognition result
-  useEffect(() => {
-    // When listening stops, and we have a transcript, submit it.
-    if (!speech.listening && wasListeningRef.current && speech.transcript) {
-      handleSubmit(speech.transcript);
-      speech.resetTranscript();
-    }
-    wasListeningRef.current = speech.listening;
-  }, [speech.listening]);
-
   // Persist language selection
   useEffect(() => {
     saveLangToStorage(recognitionLang);
@@ -371,6 +366,43 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     dispatch({ type: 'SET_USER_INPUT', payload: '' });
   };
 
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  });
+
+  useEffect(() => {
+    if (!speech.isSupported && practiceMode === 'voice') {
+      dispatch({ type: 'SET_PRACTICE_MODE', payload: 'spelling' });
+    }
+  }, [practiceMode, speech.isSupported]);
+
+  useEffect(() => {
+    if (speech.error && practiceMode === 'voice') {
+      dispatch({ type: 'SET_PRACTICE_MODE', payload: 'spelling' });
+    }
+  }, [practiceMode, speech.error]);
+
+  useEffect(() => {
+    if (practiceMode !== 'voice' && speech.listening) {
+      speech.stop();
+    }
+    if (practiceMode !== 'voice') {
+      speech.resetTranscript();
+    }
+  }, [practiceMode, speech.listening, speech.resetTranscript, speech.stop]);
+
+  useEffect(() => {
+    if (gameState !== 'playing' && speech.listening) {
+      speech.stop();
+    }
+  }, [gameState, speech.listening, speech.stop]);
+
+  useEffect(() => {
+    if (practiceMode === 'voice' && speech.listening) {
+      speech.start(recognitionLang);
+    }
+  }, [practiceMode, recognitionLang, speech.listening, speech.start]);
+
   const handleSkip = () => {
     dispatch({ type: 'SKIP_WORD' });
     selectNewWord();
@@ -378,6 +410,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
 
   const renderGame = () => {
     const level = levels[currentLevel];
+    const speechUnavailable = !speech.isSupported || Boolean(speech.error);
     
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-400 to-pink-300 p-8">
@@ -464,13 +497,18 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                 </div>
                 <div className="flex gap-2 items-center">
                   <button
-                    onClick={() => dispatch({ type: 'TOGGLE_PRACTICE_MODE' })}
+                    onClick={() => {
+                      if (practiceMode === 'voice' || !speechUnavailable) {
+                        dispatch({ type: 'TOGGLE_PRACTICE_MODE' });
+                      }
+                    }}
                     aria-label={practiceMode === 'voice' ? '切換到拼字模式' : '切換到語音模式'}
                     className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 font-semibold ${
                       practiceMode === 'voice'
                         ? 'bg-blue-500 text-white'
                         : 'bg-gray-200 text-gray-700'
-                    }`}
+                    } ${practiceMode === 'spelling' && speechUnavailable ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={practiceMode === 'spelling' && speechUnavailable}
                   >
                     {practiceMode === 'voice' ? (
                       <>
@@ -494,11 +532,12 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                           speech.start(recognitionLang);
                         }
                       }}
+                      disabled={speechUnavailable}
                       className={`px-6 py-3 text-white rounded-lg font-bold flex items-center gap-2 transition-colors ${
                         speech.listening
                           ? 'bg-red-500 hover:bg-red-600'
                           : 'bg-blue-500 hover:bg-blue-600'
-                      }`}
+                      } ${speechUnavailable ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <Volume2 className="w-5 h-5" />
                       {speech.listening ? '聆聽中...' : '點擊說話'}
@@ -508,14 +547,25 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                       type="text"
                       value={userInput}
                       onChange={(e) => dispatch({ type: 'SET_USER_INPUT', payload: e.target.value })}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSubmit(userInput)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSubmit(userInput)}
                       placeholder="輸入英文單字"
                       className="px-4 py-3 border-2 border-purple-300 rounded-lg text-lg focus:outline-none focus:border-purple-500"
                     />
                   )}
                    <LanguageSelector selectedLang={recognitionLang} onLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })} />
                 </div>
-                
+
+                {speech.error && (
+                  <p className="text-sm text-red-500 text-center" role="alert">
+                    Speech recognition error: {speech.error}
+                  </p>
+                )}
+                {!speech.isSupported && (
+                  <p className="text-sm text-gray-500 text-center" role="alert">
+                    Speech recognition is not supported in this browser.
+                  </p>
+                )}
+
                 {practiceMode === 'spelling' && (
                   <button
                     onClick={() => handleSubmit(userInput)}
@@ -582,6 +632,11 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
           <Settings className="w-5 h-5"/>
           字彙管理
         </button>
+        {!speech.isSupported && (
+          <p className="mt-4 text-center text-sm text-gray-600" role="alert">
+            Speech recognition is not supported in this browser.
+          </p>
+        )}
         {message && (
           <p className="mt-4 text-center text-red-500 font-bold animate-bounce">
             {message}
