@@ -1,7 +1,8 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { VocabManager, VocabItem, fileNameToWord, parseDifficultyFromPath } from './VocabManager';
+import { VocabManager, fileNameToWord, parseDifficultyFromPath } from './VocabManager';
+import type { VocabItem } from '../types/vocab';
 
 // Mock data for testing the component
 const mockVocab: VocabItem[] = [

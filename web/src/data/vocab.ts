@@ -1,4 +1,4 @@
-import { VocabItem } from '../components/VocabManager';
+import type { VocabItem } from '../types/vocab';
 
 export const initialVocab: VocabItem[] = [
     // Difficulty 1
