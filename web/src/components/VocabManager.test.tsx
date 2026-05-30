@@ -82,6 +82,7 @@ describe('<VocabManager /> Component', () => {
   });
 
   it('should render the list of vocabulary items', () => {
+    expect(screen.getByRole('main', { name: 'EchoQuest 字彙庫' })).toHaveAttribute('data-screen', 'vocab-management');
     expect(screen.getByText('apple')).toBeInTheDocument();
     expect(screen.getByText('banana')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem').length).toBe(2);

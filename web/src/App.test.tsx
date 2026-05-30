@@ -106,6 +106,9 @@ describe('<App />', () => {
 
   it('should render the main menu by default', () => {
     render(<App />);
+    const menu = screen.getByRole('main', { name: 'EchoQuest 主選單' });
+
+    expect(menu).toHaveAttribute('data-screen', 'menu');
     expect(screen.getByText('EchoQuest')).toBeInTheDocument();
     expect(screen.getByText('開始遊戲')).toBeInTheDocument();
     expect(screen.getByText('字彙管理')).toBeInTheDocument();
@@ -118,6 +121,7 @@ describe('<App />', () => {
     await waitFor(() => {
         expect(screen.getByText('關卡 1')).toBeInTheDocument();
     });
+    expect(screen.getByRole('main', { name: 'EchoQuest 遊戲進行中' })).toHaveAttribute('data-screen', 'playing');
     expect(screen.getByText('🍎')).toBeInTheDocument();
     expect(screen.getByText('分數: 0')).toBeInTheDocument();
   });
@@ -314,6 +318,7 @@ describe('<App />', () => {
     await waitFor(() => {
       expect(screen.getByText('勝利！')).toBeInTheDocument();
     }, { timeout: 2000 });
+    expect(screen.getByRole('main', { name: 'EchoQuest 勝利結果' })).toHaveAttribute('data-screen', 'victory');
   });
 
   it('should handle puzzle levels correctly', async () => {

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useReducer } from 'react';
-import { Sword, Shield, Heart, Lock, Key, Mic, MicOff, Volume2, Star, Zap, Trophy, Skull, Sparkles, Settings, HelpCircle, SkipForward, Globe } from 'lucide-react';
+import { Sword, Heart, Mic, MicOff, Volume2, Star, Zap, Trophy, Skull, Sparkles, Settings, HelpCircle, SkipForward, Globe } from 'lucide-react';
 import { VocabManager } from './components/VocabManager';
+import { IconButton, Panel, QuestButton, ScreenShell, StatBadge } from './components/QuestFrame';
 import type { VocabItem } from './types/vocab';
 import { initialVocab as defaultInitialVocab } from './data/vocab';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
@@ -264,46 +265,34 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
       : `目標: 答對 ${levelCorrectAnswers}/${level.requiredWords} 個單字，或清空生命值 ${enemyLives}/${totalEnemyLives}`;
     
     return (
-      <div className="min-h-screen bg-gradient-to-b from-purple-400 to-pink-300 p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-4">
-                <Trophy className="w-8 h-8 text-yellow-500" />
-                <span className="text-2xl font-bold text-gray-800">分數: {score}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Zap className="w-6 h-6 text-yellow-500" />
-                <span className="text-lg font-semibold text-gray-700">連擊 x{combo}</span>
-              </div>
-              <div className="text-sm font-semibold text-gray-600">
-                跳過 {skippedWords} 次
-              </div>
-              <div className="flex items-center gap-4">
-                <Star className="w-8 h-8 text-yellow-500" />
-                <span className="text-xl font-bold text-gray-800">關卡 {currentLevel + 1}</span>
-              </div>
-            </div>
+      <ScreenShell screen="playing" label="EchoQuest 遊戲進行中">
+        <div className="eq-game-shell">
+          <div className="eq-hud" aria-label="冒險狀態">
+            <StatBadge icon={<Trophy className="w-6 h-6" />} label="得分" value={`分數: ${score}`} tone="gold" />
+            <StatBadge icon={<Zap className="w-6 h-6" />} label="節奏" value={`連擊 x${combo}`} tone="green" />
+            <StatBadge icon={<SkipForward className="w-6 h-6" />} label="選擇" value={`跳過 ${skippedWords} 次`} tone="blue" />
+            <StatBadge icon={<Star className="w-6 h-6" />} label="進度" value={`關卡 ${currentLevel + 1}`} tone="red" />
           </div>
 
-          <div className="flex flex-col md:flex-row gap-8">
-            <div className="bg-white rounded-2xl shadow-xl p-6 md:w-1/2">
-              <h2 className="text-3xl font-bold text-center mb-2 text-purple-600">{level.name}</h2>
-              <p className="text-center text-gray-600 mb-4">{level.description}</p>
-              <p className="text-center text-indigo-700 font-semibold mb-4">{objectiveText}</p>
+          <div className="eq-game-grid">
+            <Panel className="eq-level-panel">
+              <p className="text-sm font-extrabold uppercase text-[color:var(--eq-muted)]">Quest Log</p>
+              <h2 className="eq-display eq-level-title">{level.name}</h2>
+              <p className="mt-2 text-[color:var(--eq-muted)]">{level.description}</p>
+              <p className="eq-objective">{objectiveText}</p>
 
-              <div className={`my-4 text-center text-9xl ${isBossShaking ? 'shake' : ''}`}>
+              <div className={`eq-enemy-figure ${isBossShaking ? 'shake' : ''}`} aria-hidden="true">
                 {level.imageEmoji}
               </div>
 
               {level.type === 'boss' && (
-                <div className="flex justify-center items-center gap-2">
-                  <Skull className="w-8 h-8 text-red-500" />
+                <div className="flex justify-center items-center gap-2" aria-label="Boss health">
+                  <Skull className="w-7 h-7 text-[color:var(--eq-rust)]" />
                   <div className="flex gap-1">
-                    {[...Array(level.enemyLives)].map((_, i) => (
+                    {[...Array(level.enemyLives ?? 0)].map((_, i) => (
                       <Heart
                         key={i}
-                        className={`w-8 h-8 ${i < enemyLives ? 'text-red-500' : 'text-gray-300'}`}
+                        className={`w-7 h-7 ${i < enemyLives ? 'text-[color:var(--eq-rust)]' : 'text-stone-300'}`}
                         fill={i < enemyLives ? 'currentColor' : 'none'}
                       />
                     ))}
@@ -312,7 +301,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
               )}
 
               {level.type === 'puzzle' && (
-                <div className="flex justify-center items-center gap-2 text-4xl">
+                <div className="flex justify-center items-center gap-2 text-4xl" aria-label="Puzzle progress">
                   {[...Array(level.tools ? level.tools.length - collectedTools.length : 0)].map((_, i) => (
                     <span key={i}>🚪</span>
                   ))}
@@ -321,204 +310,190 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                   ))}
                 </div>
               )}
-            </div>
+            </Panel>
 
             {currentWord && (
-              <div className="bg-white rounded-2xl shadow-xl p-8 md:w-1/2">
-              <div className={`text-center mb-6 transition-all relative ${showEffect ? 'scale-110' : 'scale-100'}`}>
-                {currentWord.imageDataUrl ? 
-                    <img src={currentWord.imageDataUrl} alt={currentWord.word} className="w-40 h-40 object-cover rounded-xl border inline-block"/> :
-                    <div className="text-8xl mb-4">{currentWord.imageName}</div>
-                }
-                <div className="flex justify-center gap-1 my-2">
-                  {[...Array(currentWord.difficulty)].map((_, i) => (
-                    <Star key={i} className="w-6 h-6 text-yellow-500" fill="currentColor" />
-                  ))}
-                </div>
-                <p className="text-sm text-gray-500">難度等級</p>
-                {showHint && (
-                    <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center rounded-xl">
-                        <span className="text-white text-4xl font-bold">{currentWord.word}</span>
+              <Panel className="eq-challenge-panel">
+                <div className={`eq-word-stage ${showEffect ? 'eq-word-stage--success' : ''}`}>
+                  {currentWord.imageDataUrl ? (
+                    <img src={currentWord.imageDataUrl} alt={currentWord.word} className="eq-word-photo" />
+                  ) : (
+                    <div className="eq-word-image" aria-hidden="true">{currentWord.imageName}</div>
+                  )}
+                  <div className="mt-4 flex justify-center gap-1">
+                    {[...Array(currentWord.difficulty)].map((_, i) => (
+                      <Star key={i} className="w-5 h-5 text-[color:var(--eq-sun)]" fill="currentColor" />
+                    ))}
+                  </div>
+                  <p className="mt-1 text-sm font-bold text-[color:var(--eq-muted)]">難度等級</p>
+                  {showHint && (
+                    <div className="eq-hint-overlay">
+                      <span className="eq-display text-4xl font-extrabold">{currentWord.word}</span>
                     </div>
-                )}
-              </div>
-              
-              <div className="flex flex-col items-center gap-4">
-                <div className="relative w-full text-center h-12 mb-2">
-                    <p className="text-xl text-gray-500 h-full flex items-center justify-center">
-                        <span className="text-purple-500 font-semibold">{speech.transcript}</span>
-                        <span className="text-gray-400">{speech.interimTranscript}</span>
-                    </p>
+                  )}
                 </div>
-                <div className="flex gap-2 items-center">
-                  <button
-                    onClick={() => {
-                      if (practiceMode === 'voice' || !speechUnavailable) {
-                        if (practiceMode === 'spelling') {
-                          speech.clearError();
-                        }
-                        dispatch({ type: 'TOGGLE_PRACTICE_MODE' });
-                      }
-                    }}
-                    aria-label={practiceMode === 'voice' ? '切換到拼字模式' : '切換到語音模式'}
-                    className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 font-semibold ${
-                      practiceMode === 'voice'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-200 text-gray-700'
-                    } ${practiceMode === 'spelling' && speechUnavailable ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    disabled={practiceMode === 'spelling' && speechUnavailable}
-                  >
-                    {practiceMode === 'voice' ? (
-                      <>
-                        <Mic className="w-5 h-5" />
-                        <span>語音</span>
-                      </>
-                    ) : (
-                      <>
-                        <MicOff className="w-5 h-5" />
-                        <span>拼字</span>
-                      </>
-                    )}
-                  </button>
-                  
-                  {practiceMode === 'voice' ? (
-                    <button
+
+                <div className="flex flex-col items-center gap-4">
+                  <div className="eq-transcript w-full">
+                    <p className="text-xl">
+                      <span className="font-extrabold text-[color:var(--eq-river)]">{speech.transcript}</span>
+                      <span className="text-[color:var(--eq-muted)]">{speech.interimTranscript}</span>
+                    </p>
+                  </div>
+
+                  <div className="eq-control-row">
+                    <QuestButton
+                      variant={practiceMode === 'voice' ? 'secondary' : 'quiet'}
                       onClick={() => {
-                        if (speech.listening) {
-                          speech.stop();
-                        } else {
-                          speech.start(recognitionLang);
+                        if (practiceMode === 'voice' || !speechUnavailable) {
+                          if (practiceMode === 'spelling') {
+                            speech.clearError();
+                          }
+                          dispatch({ type: 'TOGGLE_PRACTICE_MODE' });
                         }
                       }}
-                      disabled={speechUnavailable}
-                      className={`px-6 py-3 text-white rounded-lg font-bold flex items-center gap-2 transition-colors ${
-                        speech.listening
-                          ? 'bg-red-500 hover:bg-red-600'
-                          : 'bg-blue-500 hover:bg-blue-600'
-                      } ${speechUnavailable ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      aria-label={practiceMode === 'voice' ? '切換到拼字模式' : '切換到語音模式'}
+                      disabled={practiceMode === 'spelling' && speechUnavailable}
+                      icon={practiceMode === 'voice' ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                     >
-                      <Volume2 className="w-5 h-5" />
-                      {speech.listening ? '聆聽中...' : '點擊說話'}
-                    </button>
-                  ) : (
-                    <input
-                      type="text"
-                      value={userInput}
-                      onChange={(e) => dispatch({ type: 'SET_USER_INPUT', payload: e.target.value })}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSubmit(userInput)}
-                      placeholder="輸入英文單字"
-                      className="px-4 py-3 border-2 border-purple-300 rounded-lg text-lg focus:outline-none focus:border-purple-500"
-                    />
+                      {practiceMode === 'voice' ? '語音' : '拼字'}
+                    </QuestButton>
+
+                    {practiceMode === 'voice' ? (
+                      <QuestButton
+                        variant={speech.listening ? 'danger' : 'primary'}
+                        onClick={() => {
+                          if (speech.listening) {
+                            speech.stop();
+                          } else {
+                            speech.start(recognitionLang);
+                          }
+                        }}
+                        disabled={speechUnavailable}
+                        icon={<Volume2 className="w-5 h-5" />}
+                      >
+                        {speech.listening ? '聆聽中...' : '點擊說話'}
+                      </QuestButton>
+                    ) : (
+                      <input
+                        type="text"
+                        value={userInput}
+                        onChange={(e) => dispatch({ type: 'SET_USER_INPUT', payload: e.target.value })}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSubmit(userInput)}
+                        placeholder="輸入英文單字"
+                        className="eq-input"
+                      />
+                    )}
+                    <LanguageSelector selectedLang={recognitionLang} onLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })} />
+                  </div>
+
+                  {speech.error && (
+                    <p className="text-sm text-[color:var(--eq-ruby)] text-center" role="alert">
+                      Speech recognition error: {speech.error}
+                    </p>
                   )}
-                   <LanguageSelector selectedLang={recognitionLang} onLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })} />
-                </div>
+                  {!speech.isSupported && (
+                    <p className="text-sm text-[color:var(--eq-muted)] text-center" role="alert">
+                      Speech recognition is not supported in this browser.
+                    </p>
+                  )}
 
-                {speech.error && (
-                  <p className="text-sm text-red-500 text-center" role="alert">
-                    Speech recognition error: {speech.error}
-                  </p>
-                )}
-                {!speech.isSupported && (
-                  <p className="text-sm text-gray-500 text-center" role="alert">
-                    Speech recognition is not supported in this browser.
-                  </p>
-                )}
-
-                {practiceMode === 'spelling' && (
-                  <button
-                    onClick={() => handleSubmit(userInput)}
-                    className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-bold text-lg hover:from-purple-600 hover:to-pink-600 transform hover:scale-105 transition-all"
-                  >
-                    <Sword className="inline w-5 h-5 mr-2" />
-                    攻擊!
-                  </button>
-                )}
-
-                <div className="flex gap-4 items-center mt-4">
-                    <button
-                        aria-label="Show hint"
-                        className="p-3 rounded-lg bg-yellow-400 text-white hover:bg-yellow-500"
-                        onMouseDown={() => dispatch({ type: 'SET_SHOW_HINT', payload: true })}
-                        onMouseUp={() => dispatch({ type: 'SET_SHOW_HINT', payload: false })}
-                        onTouchStart={() => dispatch({ type: 'SET_SHOW_HINT', payload: true })}
-                        onTouchEnd={() => dispatch({ type: 'SET_SHOW_HINT', payload: false })}
+                  {practiceMode === 'spelling' && (
+                    <QuestButton
+                      variant="gold"
+                      onClick={() => handleSubmit(userInput)}
+                      icon={<Sword className="w-5 h-5" />}
                     >
-                        <HelpCircle className="w-6 h-6" />
-                    </button>
-                    <button aria-label="Skip word" onClick={handleSkip} className="p-3 rounded-lg bg-gray-400 text-white hover:bg-gray-500">
-                        <SkipForward className="w-6 h-6" />
-                    </button>
+                      攻擊!
+                    </QuestButton>
+                  )}
+
+                  <div className="flex gap-3 items-center">
+                    <IconButton
+                      aria-label="Show hint"
+                      onMouseDown={() => dispatch({ type: 'SET_SHOW_HINT', payload: true })}
+                      onMouseUp={() => dispatch({ type: 'SET_SHOW_HINT', payload: false })}
+                      onTouchStart={() => dispatch({ type: 'SET_SHOW_HINT', payload: true })}
+                      onTouchEnd={() => dispatch({ type: 'SET_SHOW_HINT', payload: false })}
+                    >
+                      <HelpCircle className="w-6 h-6" />
+                    </IconButton>
+                    <IconButton aria-label="Skip word" onClick={handleSkip} variant="danger">
+                      <SkipForward className="w-6 h-6" />
+                    </IconButton>
+                  </div>
                 </div>
-              </div>
-              
-              {message && (
-                <div className="mt-6 text-center">
-                  <p className="text-xl font-bold text-purple-600 animate-bounce">
-                    {message}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
+
+                {message && (
+                  <div className="text-center">
+                    <p className="eq-message animate-bounce">
+                      {message}
+                    </p>
+                  </div>
+                )}
+              </Panel>
+            )}
+          </div>
         </div>
-        </div>
-      </div>
+      </ScreenShell>
     );
   };
 
   const renderMenu = () => (
-    <div className="min-h-screen bg-gradient-to-b from-blue-400 to-purple-400 flex items-center justify-center p-8">
-      <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md w-full">
-        <div className="text-center mb-8">
-          <Sparkles className="w-16 h-16 text-purple-500 mx-auto mb-4" />
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">EchoQuest</h1>
-          <p className="text-gray-600">學習英文，打敗怪物！</p>
-        </div>
-        <div className="mb-6 flex justify-center">
+    <ScreenShell screen="menu" label="EchoQuest 主選單">
+      <div className="eq-menu">
+        <section>
+          <div className="eq-menu__mark" aria-hidden="true">
+            <Sparkles className="w-12 h-12" />
+          </div>
+          <h1 className="eq-display eq-menu__title">EchoQuest</h1>
+          <p className="eq-menu__subtitle">學習英文，打敗怪物！</p>
+        </section>
+
+        <Panel className="p-6 sm:p-8">
+          <div className="mb-6 flex justify-center">
             <LanguageSelector selectedLang={recognitionLang} onLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })} isMenu={true} />
-        </div>
-        <button
-          onClick={startGame}
-          className="w-full mb-4 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-bold text-xl hover:from-purple-600 hover:to-pink-600 transform hover:scale-105 transition-all"
-        >
-          開始遊戲
-        </button>
-        <button
-          onClick={() => dispatch({ type: 'SET_GAME_STATE', payload: 'vocab_management' })}
-          className="w-full py-3 bg-gray-200 text-gray-800 rounded-xl font-bold text-lg hover:bg-gray-300 transition-all flex items-center justify-center gap-2"
-        >
-          <Settings className="w-5 h-5"/>
-          字彙管理
-        </button>
-        {!speech.isSupported && (
-          <p className="mt-4 text-center text-sm text-gray-600" role="alert">
-            Speech recognition is not supported in this browser.
-          </p>
-        )}
-        {message && (
-          <p className="mt-4 text-center text-red-500 font-bold animate-bounce">
-            {message}
-          </p>
-        )}
+          </div>
+          <div className="eq-menu__actions">
+            <QuestButton onClick={startGame} className="w-full" icon={<Sword className="w-5 h-5" />}>
+              開始遊戲
+            </QuestButton>
+            <QuestButton
+              variant="quiet"
+              onClick={() => dispatch({ type: 'SET_GAME_STATE', payload: 'vocab_management' })}
+              className="w-full"
+              icon={<Settings className="w-5 h-5" />}
+            >
+              字彙管理
+            </QuestButton>
+          </div>
+          {!speech.isSupported && (
+            <p className="mt-4 text-center text-sm text-[color:var(--eq-muted)]" role="alert">
+              Speech recognition is not supported in this browser.
+            </p>
+          )}
+          {message && (
+            <p className="eq-message text-center animate-bounce">
+              {message}
+            </p>
+          )}
+        </Panel>
       </div>
-    </div>
+    </ScreenShell>
   );
 
   const renderVictory = () => (
-    <div className="min-h-screen bg-gradient-to-b from-yellow-300 to-orange-400 flex items-center justify-center p-8">
-      <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-md w-full text-center">
-        <Trophy className="w-24 h-24 text-yellow-500 mx-auto mb-4" />
-        <h1 className="text-4xl font-bold text-gray-800 mb-4">勝利！</h1>
-        <p className="text-2xl text-gray-600 mb-2">最終分數: {score}</p>
-        <p className="text-lg text-gray-500 mb-6">答對 {correctAnswers} 個單字</p>
-        <button
-          onClick={startGame}
-          className="w-full py-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-xl font-bold text-xl hover:from-yellow-600 hover:to-orange-600"
-        >
+    <ScreenShell screen="victory" label="EchoQuest 勝利結果" className="grid place-items-center">
+      <Panel className="w-full max-w-md p-8 text-center">
+        <Trophy className="w-20 h-20 text-[color:var(--eq-sun)] mx-auto mb-4" />
+        <h1 className="eq-display text-4xl font-extrabold text-[color:var(--eq-ink)] mb-4">勝利！</h1>
+        <p className="text-2xl font-extrabold text-[color:var(--eq-river)] mb-2">最終分數: {score}</p>
+        <p className="text-lg text-[color:var(--eq-muted)] mb-6">答對 {correctAnswers} 個單字</p>
+        <QuestButton onClick={startGame} className="w-full" variant="gold" icon={<Trophy className="w-5 h-5" />}>
           再玩一次
-        </button>
-      </div>
-    </div>
+        </QuestButton>
+      </Panel>
+    </ScreenShell>
   );
 
   switch (gameState) {
@@ -546,11 +521,12 @@ const LanguageSelector: React.FC<{selectedLang: string, onLangChange: (lang: str
     if (isMenu) {
         return (
             <div className="flex items-center gap-2">
-                <Globe className="w-6 h-6 text-gray-600" />
+                <Globe className="w-6 h-6 text-[color:var(--eq-river)]" />
                 <select
                     value={selectedLang}
                     onChange={(e) => onLangChange(e.target.value)}
-                    className="bg-gray-200 border-none rounded-lg text-gray-800 font-semibold py-2 px-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    aria-label="Select recognition language"
+                    className="eq-select"
                 >
                     {languages.map(lang => <option key={lang.code} value={lang.code}>{lang.name}</option>)}
                 </select>
@@ -562,7 +538,7 @@ const LanguageSelector: React.FC<{selectedLang: string, onLangChange: (lang: str
         <select
             value={selectedLang}
             onChange={(e) => onLangChange(e.target.value)}
-            className="p-3 rounded-lg bg-gray-200 text-gray-600"
+            className="eq-select"
             aria-label="Select recognition language"
         >
             {languages.map(lang => <option key={lang.code} value={lang.code}>{lang.name}</option>)}
