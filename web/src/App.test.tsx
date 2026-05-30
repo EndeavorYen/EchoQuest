@@ -410,8 +410,31 @@ describe('<App />', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Speech recognition error: network')).toBeInTheDocument();
+      expect(screen.getByText('語音辨識暫時無法連線，已切換到拼字模式。')).toBeInTheDocument();
     });
+    expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
+  });
+
+  it('explains microphone permission errors without exposing raw browser codes', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('點擊說話'));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() => {
+      recognition.onstart?.();
+      recognition.onerror?.({ error: 'not-allowed' });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('麥克風權限被阻擋，已切換到拼字模式。請允許麥克風後再試。')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Speech recognition error: not-allowed')).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
   });
 
@@ -432,7 +455,7 @@ describe('<App />', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Speech recognition error: network')).toBeInTheDocument();
+      expect(screen.getByText('語音辨識暫時無法連線，已切換到拼字模式。')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
     });
 
@@ -453,7 +476,7 @@ describe('<App />', () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByText('Speech recognition error: network')).not.toBeInTheDocument();
+      expect(screen.queryByText('語音辨識暫時無法連線，已切換到拼字模式。')).not.toBeInTheDocument();
     });
   });
 

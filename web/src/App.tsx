@@ -14,6 +14,22 @@ import { createInitialState, gameReducer } from './game/gameReducer';
 const STORAGE_KEY_VOCAB = "echoquest_vocab_v1";
 const STORAGE_KEY_LANG = "echoquest_lang_v1";
 
+function getSpeechErrorMessage(error: string): string {
+  switch (error) {
+    case 'not-allowed':
+    case 'service-not-allowed':
+      return '麥克風權限被阻擋，已切換到拼字模式。請允許麥克風後再試。';
+    case 'network':
+      return '語音辨識暫時無法連線，已切換到拼字模式。';
+    case 'no-speech':
+      return '沒有聽到聲音，已切換到拼字模式。';
+    case 'audio-capture':
+      return '找不到可用的麥克風，已切換到拼字模式。';
+    default:
+      return `語音辨識暫時無法使用，已切換到拼字模式。 (${error})`;
+  }
+}
+
 function loadVocabFromStorage(): VocabItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_VOCAB);
@@ -389,7 +405,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
 
                   {speech.error && (
                     <p className="text-sm text-[color:var(--eq-ruby)] text-center" role="alert">
-                      Speech recognition error: {speech.error}
+                      {getSpeechErrorMessage(speech.error)}
                     </p>
                   )}
                   {!speech.isSupported && (
