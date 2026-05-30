@@ -1,3 +1,5 @@
 # Ignore Node.js dependencies and build outputs
 web/node_modules/
 web/dist/
+web/esbuild.log
+web/jules-scratch/

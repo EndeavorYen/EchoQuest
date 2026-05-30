@@ -5,20 +5,42 @@ import App from './App';
 import { Level } from './data/levels';
 import { VocabItem } from './components/VocabManager';
 
-// Mock SpeechRecognition
-// JSDOM doesn't have SpeechRecognition, so we mock it and its related event types.
-const mockSpeechRecognition = {
-  start: jest.fn(),
-  stop: jest.fn(),
-  onstart: () => {},
-  onend: () => {},
-  onerror: () => {},
-  onresult: () => {},
-  // Add any other properties/methods your hook uses
-};
+class MockSpeechRecognition {
+  static instances: MockSpeechRecognition[] = [];
 
-(global as any).SpeechRecognition = jest.fn(() => mockSpeechRecognition);
-(global as any).webkitSpeechRecognition = (global as any).SpeechRecognition;
+  continuous = false;
+  interimResults = false;
+  lang = '';
+  maxAlternatives = 0;
+  start = jest.fn();
+  stop = jest.fn();
+  abort = jest.fn();
+  onstart: (() => void) | null = null;
+  onend: (() => void) | null = null;
+  onerror: ((event: { error: string }) => void) | null = null;
+  onresult: ((event: unknown) => void) | null = null;
+
+  constructor() {
+    MockSpeechRecognition.instances.push(this);
+  }
+}
+
+function installSpeechRecognitionMock() {
+  MockSpeechRecognition.instances = [];
+  (global as any).SpeechRecognition = MockSpeechRecognition;
+  (global as any).webkitSpeechRecognition = MockSpeechRecognition;
+  (window as any).SpeechRecognition = MockSpeechRecognition;
+  (window as any).webkitSpeechRecognition = MockSpeechRecognition;
+}
+
+function uninstallSpeechRecognitionMock() {
+  delete (global as any).SpeechRecognition;
+  delete (global as any).webkitSpeechRecognition;
+  delete (window as any).SpeechRecognition;
+  delete (window as any).webkitSpeechRecognition;
+}
+
+installSpeechRecognitionMock();
 
 // Mock the event types if they are used in a way that Jest can't resolve
 if (typeof (global as any).SpeechRecognitionEvent === 'undefined') {
@@ -69,6 +91,7 @@ describe('<App />', () => {
     beforeEach(() => {
         localStorageMock.clear();
         jest.clearAllMocks();
+        installSpeechRecognitionMock();
         let callCount = 0;
         jest.spyOn(global.Math, 'random').mockImplementation(() => {
             callCount++;
@@ -78,6 +101,7 @@ describe('<App />', () => {
 
     afterEach(() => {
         jest.spyOn(global.Math, 'random').mockRestore();
+        uninstallSpeechRecognitionMock();
     });
 
   it('should render the main menu by default', () => {
@@ -271,5 +295,141 @@ describe('<App />', () => {
         expect(screen.getByText('Final Boss')).toBeInTheDocument();
     });
     jest.useRealTimers();
+  });
+
+  it('falls back to spelling mode when speech recognition is unsupported', async () => {
+    uninstallSpeechRecognitionMock();
+
+    render(<App initialVocab={defaultTestVocab} />);
+
+    expect(screen.getByText('Speech recognition is not supported in this browser.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
+    });
+    expect(screen.getByText('攻擊!')).toBeInTheDocument();
+  });
+
+  it('shows a user-facing speech recognition error and switches to spelling mode', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('點擊說話'));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() => {
+      recognition.onstart?.();
+      recognition.onerror?.({ error: 'network' });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Speech recognition error: network')).toBeInTheDocument();
+    });
+    expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
+  });
+
+  it('allows retrying voice mode after a transient speech recognition error', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('點擊說話'));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() => {
+      recognition.onstart?.();
+      recognition.onerror?.({ error: 'network' });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Speech recognition error: network')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
+    });
+
+    const voiceModeButton = screen.getByRole('button', { name: /切換到語音模式/i });
+    expect(voiceModeButton).not.toBeDisabled();
+
+    fireEvent.click(voiceModeButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('點擊說話')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('點擊說話'));
+    expect(recognition.start).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      recognition.onstart?.();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Speech recognition error: network')).not.toBeInTheDocument();
+    });
+  });
+
+  it('submits final speech recognition results immediately while still listening', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('點擊說話'));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() => {
+      recognition.onstart?.();
+      recognition.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: 'sword' } }],
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/太棒了! 對怪物造成 2 點傷害!/)).toBeInTheDocument();
+    });
+    expect(screen.getByText('聆聽中...')).toBeInTheDocument();
+  });
+
+  it('ignores late speech recognition results after switching to spelling mode', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('點擊說話'));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() => {
+      recognition.onstart?.();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /切換到拼字模式/i }));
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
+    });
+
+    act(() => {
+      recognition.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: 'sword' } }],
+      });
+    });
+
+    expect(screen.queryByText(/太棒了! 對怪物造成 2 點傷害!/)).not.toBeInTheDocument();
+    expect(screen.getByText('分數: 0')).toBeInTheDocument();
   });
 });
