@@ -97,6 +97,17 @@ describe('gameLogic', () => {
         vocab('shield', { difficulty: 3 }),
       ]);
     });
+
+    it('falls back to enabled boss words when difficulty constraints would empty the pool', () => {
+      const words = [
+        vocab('apple', { difficulty: 1 }),
+        vocab('disabled', { difficulty: 1, enabled: false }),
+      ];
+
+      expect(getAvailableWords(words, { ...bossLevel, minDifficulty: 3, maxDifficulty: 5 }, [])).toEqual([
+        vocab('apple', { difficulty: 1 }),
+      ]);
+    });
   });
 
   describe('selectWord', () => {

@@ -131,8 +131,37 @@ describe('<App />', () => {
     fireEvent.click(screen.getByText('開始遊戲'));
 
     await waitFor(() => {
-      expect(screen.getByText('目標: 答對 0/2 個單字')).toBeInTheDocument();
+      expect(screen.getByText('目標: 答對 0/2 個單字，或清空生命值 10/10')).toBeInTheDocument();
     });
+  });
+
+  it('keeps a constrained boss level playable when imported words are below the difficulty range', async () => {
+    const constrainedLevels: Level[] = [
+      {
+        id: 1,
+        name: 'Hard Gate',
+        type: 'boss',
+        enemyLives: 3,
+        description: '',
+        imageEmoji: 'H',
+        requiredWords: 2,
+        minDifficulty: 3,
+        maxDifficulty: 5,
+      },
+      { id: 2, name: 'Skipped Gate', type: 'boss', enemyLives: 1, description: '', imageEmoji: 'S', requiredWords: 1 },
+    ];
+    const importedVocab: VocabItem[] = [
+      { id: 'apple', word: 'apple', difficulty: 1, enabled: true, imageName: '🍎', size: 1, type: 'image/png' },
+    ];
+
+    render(<App initialLevels={constrainedLevels} initialVocab={importedVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('🍎')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Hard Gate')).toBeInTheDocument();
+    expect(screen.queryByText('Skipped Gate')).not.toBeInTheDocument();
   });
 
   it('advances a boss level after meeting requiredWords even when enemy lives remain', async () => {
@@ -187,7 +216,7 @@ describe('<App />', () => {
     });
     expect(screen.getByText('分數: 10')).toBeInTheDocument();
     expect(screen.getByText(/對怪物造成 1 點傷害!/)).toBeInTheDocument();
-    expect(screen.getByText('目標: 答對 1/5 個單字')).toBeInTheDocument();
+    expect(screen.getByText('目標: 答對 1/5 個單字，或清空生命值 4/5')).toBeInTheDocument();
   });
 
   it('should handle an incorrect text input answer', async () => {

@@ -258,9 +258,10 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   const renderGame = () => {
     const level = levels[currentLevel];
     const speechUnavailable = !speech.isSupported;
+    const totalEnemyLives = level.enemyLives ?? enemyLives;
     const objectiveText = level.type === 'puzzle'
       ? `目標: 收集 ${collectedTools.length}/${level.tools?.length || level.requiredWords} 個工具`
-      : `目標: 答對 ${levelCorrectAnswers}/${level.requiredWords} 個單字`;
+      : `目標: 答對 ${levelCorrectAnswers}/${level.requiredWords} 個單字，或清空生命值 ${enemyLives}/${totalEnemyLives}`;
     
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-400 to-pink-300 p-8">

@@ -30,16 +30,23 @@ export function getAvailableWords(
   }
 
   const { minDifficulty, maxDifficulty } = level;
+  const hasDifficultyConstraint = minDifficulty !== undefined || maxDifficulty !== undefined;
+
+  if (!hasDifficultyConstraint) {
+    return availableVocab;
+  }
+
+  let difficultyMatchedVocab = availableVocab;
 
   if (minDifficulty !== undefined) {
-    availableVocab = availableVocab.filter((word) => word.difficulty >= minDifficulty);
+    difficultyMatchedVocab = difficultyMatchedVocab.filter((word) => word.difficulty >= minDifficulty);
   }
 
   if (maxDifficulty !== undefined) {
-    availableVocab = availableVocab.filter((word) => word.difficulty <= maxDifficulty);
+    difficultyMatchedVocab = difficultyMatchedVocab.filter((word) => word.difficulty <= maxDifficulty);
   }
 
-  return availableVocab;
+  return difficultyMatchedVocab.length > 0 ? difficultyMatchedVocab : availableVocab;
 }
 
 export function selectWord(
