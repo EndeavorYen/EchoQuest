@@ -5,7 +5,7 @@ import type { VocabItem } from './types/vocab';
 import { initialVocab as defaultInitialVocab } from './data/vocab';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { defaultLevels, type Level } from './data/levels';
-import { calculateBossReward, getAvailableWords, isAnswerCorrect, isLevelComplete } from './game/gameLogic';
+import { calculateBossReward, getAvailableWords, isAnswerCorrect, isLevelComplete, selectWord } from './game/gameLogic';
 import { createInitialState, gameReducer } from './game/gameReducer';
 
 
@@ -58,6 +58,8 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     practiceMode,
     gameState,
     correctAnswers,
+    levelCorrectAnswers,
+    skippedWords,
     showEffect,
     combo,
     showHint,
@@ -108,7 +110,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     const availableWords = getAvailableWords(vocab, level, collectedTools);
     
     if (availableWords.length > 0) {
-      const randomWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+      const randomWord = selectWord(availableWords, Math.random, currentWord?.id);
       dispatch({ type: 'SELECT_NEW_WORD', payload: randomWord });
     } else {
         // No more words for this level
@@ -140,7 +142,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     const effectTimer = setTimeout(() => dispatch({ type: 'RESET_EFFECTS' }), 500);
 
     const level = levels[currentLevel];
-    const levelComplete = isLevelComplete(level, { enemyLives, collectedTools });
+    const levelComplete = isLevelComplete(level, { enemyLives, collectedTools, levelCorrectAnswers });
 
     // After a longer delay, advance the game
     const gameFlowTimer = setTimeout(() => {
@@ -159,7 +161,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
         clearTimeout(effectTimer);
         clearTimeout(gameFlowTimer);
     };
-  }, [correctAnswers, gameState, enemyLives, collectedTools, currentLevel, levels]);
+  }, [correctAnswers, gameState, enemyLives, collectedTools, levelCorrectAnswers, currentLevel, levels]);
 
   // Persist language selection
   useEffect(() => {
@@ -256,6 +258,9 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   const renderGame = () => {
     const level = levels[currentLevel];
     const speechUnavailable = !speech.isSupported;
+    const objectiveText = level.type === 'puzzle'
+      ? `目標: 收集 ${collectedTools.length}/${level.tools?.length || level.requiredWords} 個工具`
+      : `目標: 答對 ${levelCorrectAnswers}/${level.requiredWords} 個單字`;
     
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-400 to-pink-300 p-8">
@@ -270,6 +275,9 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                 <Zap className="w-6 h-6 text-yellow-500" />
                 <span className="text-lg font-semibold text-gray-700">連擊 x{combo}</span>
               </div>
+              <div className="text-sm font-semibold text-gray-600">
+                跳過 {skippedWords} 次
+              </div>
               <div className="flex items-center gap-4">
                 <Star className="w-8 h-8 text-yellow-500" />
                 <span className="text-xl font-bold text-gray-800">關卡 {currentLevel + 1}</span>
@@ -281,6 +289,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
             <div className="bg-white rounded-2xl shadow-xl p-6 md:w-1/2">
               <h2 className="text-3xl font-bold text-center mb-2 text-purple-600">{level.name}</h2>
               <p className="text-center text-gray-600 mb-4">{level.description}</p>
+              <p className="text-center text-indigo-700 font-semibold mb-4">{objectiveText}</p>
 
               <div className={`my-4 text-center text-9xl ${isBossShaking ? 'shake' : ''}`}>
                 {level.imageEmoji}

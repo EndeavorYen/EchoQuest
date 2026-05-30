@@ -5,6 +5,7 @@ import {
   getAvailableWords,
   isAnswerCorrect,
   isLevelComplete,
+  selectWord,
 } from './gameLogic';
 
 const vocab = (word: string, overrides: Partial<VocabItem> = {}): VocabItem => ({
@@ -84,10 +85,36 @@ describe('gameLogic', () => {
         vocab('hammer'),
       ]);
     });
+
+    it('applies level difficulty constraints to boss word pools', () => {
+      const words = [
+        vocab('apple', { difficulty: 1 }),
+        vocab('shield', { difficulty: 3 }),
+        vocab('castle', { difficulty: 4 }),
+      ];
+
+      expect(getAvailableWords(words, { ...bossLevel, minDifficulty: 2, maxDifficulty: 3 }, [])).toEqual([
+        vocab('shield', { difficulty: 3 }),
+      ]);
+    });
+  });
+
+  describe('selectWord', () => {
+    it('avoids selecting the previous word when another option is available', () => {
+      const words = [vocab('apple'), vocab('shield'), vocab('castle')];
+
+      expect(selectWord(words, () => 0, 'apple')?.word).toBe('shield');
+    });
+
+    it('allows selecting the previous word when it is the only available option', () => {
+      const words = [vocab('apple')];
+
+      expect(selectWord(words, () => 0.75, 'apple')?.word).toBe('apple');
+    });
   });
 
   describe('isLevelComplete', () => {
-    it('completes a boss level when enemy lives reach zero', () => {
+    it('completes a boss level when the required word goal is reached', () => {
       const bossLevel: Level = {
         id: 1,
         name: 'Boss',
@@ -95,10 +122,24 @@ describe('gameLogic', () => {
         description: '',
         imageEmoji: '',
         requiredWords: 1,
-        enemyLives: 1,
+        enemyLives: 5,
       };
 
-      expect(isLevelComplete(bossLevel, { enemyLives: 0, collectedTools: [] })).toBe(true);
+      expect(isLevelComplete(bossLevel, { enemyLives: 5, collectedTools: [], levelCorrectAnswers: 1 })).toBe(true);
+    });
+
+    it('keeps a boss level active until either word goal or lives are cleared', () => {
+      const bossLevel: Level = {
+        id: 1,
+        name: 'Boss',
+        type: 'boss',
+        description: '',
+        imageEmoji: '',
+        requiredWords: 2,
+        enemyLives: 5,
+      };
+
+      expect(isLevelComplete(bossLevel, { enemyLives: 4, collectedTools: [], levelCorrectAnswers: 1 })).toBe(false);
     });
 
     it('completes a puzzle level when all tools are collected', () => {
@@ -112,7 +153,7 @@ describe('gameLogic', () => {
         tools: ['key', 'hammer'],
       };
 
-      expect(isLevelComplete(puzzleLevel, { enemyLives: 3, collectedTools: ['key', 'hammer'] })).toBe(true);
+      expect(isLevelComplete(puzzleLevel, { enemyLives: 3, collectedTools: ['key', 'hammer'], levelCorrectAnswers: 2 })).toBe(true);
     });
   });
 });

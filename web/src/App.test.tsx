@@ -118,8 +118,52 @@ describe('<App />', () => {
     await waitFor(() => {
         expect(screen.getByText('關卡 1')).toBeInTheDocument();
     });
-    expect(screen.getByText('⚔️')).toBeInTheDocument();
+    expect(screen.getByText('🍎')).toBeInTheDocument();
     expect(screen.getByText('分數: 0')).toBeInTheDocument();
+  });
+
+  it('shows a visible boss objective based on required words', async () => {
+    const objectiveLevels: Level[] = [
+      { id: 1, name: 'Goal Boss', type: 'boss', enemyLives: 10, description: '', imageEmoji: 'G', requiredWords: 2 },
+    ];
+
+    render(<App initialLevels={objectiveLevels} initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('目標: 答對 0/2 個單字')).toBeInTheDocument();
+    });
+  });
+
+  it('advances a boss level after meeting requiredWords even when enemy lives remain', async () => {
+    jest.useFakeTimers();
+    const goalLevels: Level[] = [
+      { id: 1, name: 'Word Goal', type: 'boss', enemyLives: 10, description: '', imageEmoji: 'W', requiredWords: 1 },
+      { id: 2, name: 'Next Goal', type: 'boss', enemyLives: 1, description: '', imageEmoji: 'N', requiredWords: 1 },
+    ];
+    const goalVocab: VocabItem[] = [
+      { id: '1', word: 'apple', difficulty: 1, enabled: true, imageName: '🍎', size: 1, type: 'image/png' },
+    ];
+
+    render(<App initialLevels={goalLevels} initialVocab={goalVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Word Goal')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /切換到拼字模式/i }));
+    fireEvent.change(screen.getByPlaceholderText('輸入英文單字'), { target: { value: 'apple' } });
+    fireEvent.click(screen.getByText('攻擊!'));
+
+    act(() => {
+      jest.advanceTimersByTime(1500);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Next Goal')).toBeInTheDocument();
+    });
+    jest.useRealTimers();
   });
 
   it('should handle a correct text input answer', async () => {
@@ -135,14 +179,15 @@ describe('<App />', () => {
     const input = screen.getByPlaceholderText('輸入英文單字');
     const attackButton = screen.getByText('攻擊!');
 
-    fireEvent.change(input, { target: { value: 'sword' } });
+    fireEvent.change(input, { target: { value: 'apple' } });
     fireEvent.click(attackButton);
 
     await waitFor(() => {
       expect(screen.getByText(/太棒了!/)).toBeInTheDocument();
     });
-    expect(screen.getByText('分數: 20')).toBeInTheDocument();
-    expect(screen.getByText(/對怪物造成 2 點傷害!/)).toBeInTheDocument();
+    expect(screen.getByText('分數: 10')).toBeInTheDocument();
+    expect(screen.getByText(/對怪物造成 1 點傷害!/)).toBeInTheDocument();
+    expect(screen.getByText('目標: 答對 1/5 個單字')).toBeInTheDocument();
   });
 
   it('should handle an incorrect text input answer', async () => {
@@ -162,7 +207,7 @@ describe('<App />', () => {
     fireEvent.click(attackButton);
 
     await waitFor(() => {
-      expect(screen.getByText('再試一次!')).toBeInTheDocument();
+      expect(screen.getByText('再試一次! 連擊歸零，但不扣分。')).toBeInTheDocument();
     });
     expect(screen.getByText('分數: 0')).toBeInTheDocument();
   });
@@ -171,35 +216,37 @@ describe('<App />', () => {
     render(<App initialVocab={defaultTestVocab} />);
     fireEvent.click(screen.getByText('開始遊戲'));
     await waitFor(() => {
-      expect(screen.getByText('⚔️')).toBeInTheDocument();
+      expect(screen.getByText('🍎')).toBeInTheDocument();
     });
 
     const skipButton = screen.getByRole('button', { name: /skip word/i });
     fireEvent.click(skipButton);
 
     await waitFor(() => {
-      expect(screen.getByText('🛡️')).toBeInTheDocument();
+      expect(screen.getByText('⚔️')).toBeInTheDocument();
     });
+    expect(screen.getByText('已跳過這題：扣 5 分並失去連擊。')).toBeInTheDocument();
+    expect(screen.getByText('跳過 1 次')).toBeInTheDocument();
   });
 
   it('should show a hint when the hint button is held down', async () => {
     render(<App initialVocab={defaultTestVocab} />);
     fireEvent.click(screen.getByText('開始遊戲'));
     await waitFor(() => {
-      expect(screen.getByText('⚔️')).toBeInTheDocument();
+      expect(screen.getByText('🍎')).toBeInTheDocument();
     });
 
     const hintButton = screen.getByRole('button', { name: /show hint/i });
     fireEvent.mouseDown(hintButton);
 
     await waitFor(() => {
-        expect(screen.getByText('sword')).toBeInTheDocument();
+        expect(screen.getByText('apple')).toBeInTheDocument();
     });
 
     fireEvent.mouseUp(hintButton);
 
     await waitFor(() => {
-        expect(screen.queryByText('sword')).not.toBeInTheDocument();
+        expect(screen.queryByText('apple')).not.toBeInTheDocument();
     });
   });
 
@@ -391,12 +438,12 @@ describe('<App />', () => {
       recognition.onstart?.();
       recognition.onresult?.({
         resultIndex: 0,
-        results: [{ isFinal: true, 0: { transcript: 'sword' } }],
+        results: [{ isFinal: true, 0: { transcript: 'apple' } }],
       });
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/太棒了! 對怪物造成 2 點傷害!/)).toBeInTheDocument();
+      expect(screen.getByText(/太棒了! \+10 分，對怪物造成 1 點傷害!/)).toBeInTheDocument();
     });
     expect(screen.getByText('聆聽中...')).toBeInTheDocument();
   });

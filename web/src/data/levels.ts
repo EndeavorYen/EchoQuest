@@ -7,6 +7,8 @@ export interface Level {
   requiredWords: number;
   enemyLives?: number;
   tools?: string[];
+  minDifficulty?: number;
+  maxDifficulty?: number;
 }
 
 // Define default levels so they can be exported or used as a default prop
@@ -18,7 +20,9 @@ export const defaultLevels: Level[] = [
       description: '打敗守護寶藏的巨龍！',
       imageEmoji: '🐉',
       requiredWords: 5,
-      enemyLives: 5
+      enemyLives: 5,
+      minDifficulty: 1,
+      maxDifficulty: 2
     },
     {
       id: 2,
@@ -27,7 +31,9 @@ export const defaultLevels: Level[] = [
       description: '一隻討厭的哥布林擋住了去路！',
       imageEmoji: '👺',
       requiredWords: 5,
-      enemyLives: 3
+      enemyLives: 3,
+      minDifficulty: 2,
+      maxDifficulty: 3
     },
     {
       id: 3,
@@ -36,7 +42,9 @@ export const defaultLevels: Level[] = [
       description: '巨大的石像巨人覺醒了！',
       imageEmoji: '🗿',
       requiredWords: 5,
-      enemyLives: 8
+      enemyLives: 8,
+      minDifficulty: 2,
+      maxDifficulty: 4
     },
     {
       id: 4,
@@ -45,7 +53,9 @@ export const defaultLevels: Level[] = [
       description: '最終挑戰：擊敗魔王！',
       imageEmoji: '👿',
       requiredWords: 5,
-      enemyLives: 12
+      enemyLives: 12,
+      minDifficulty: 3,
+      maxDifficulty: 5
     },
     {
       id: 5,
