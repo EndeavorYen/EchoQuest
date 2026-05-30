@@ -1,18 +1,7 @@
 import React, { useRef, useEffect } from 'react';
+import type { VocabItem } from '../types/vocab';
 
-// Type definitions moved to a central place, e.g., src/types.ts
-// For now, we redefine them here.
-export interface VocabItem {
-  id: string;
-  word: string;
-  imageDataUrl?: string;
-  imageName: string;
-  size: number;
-  type: string;
-  difficulty: number;
-  enabled: boolean;
-  pathHint?: string;
-}
+export type { VocabItem } from '../types/vocab';
 
 const MAX_IMAGE_BYTES = 1024 * 1024; // 1MB
 

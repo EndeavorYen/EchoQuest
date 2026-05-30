@@ -2,8 +2,8 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import App from './App';
-import { Level } from './data/levels';
-import { VocabItem } from './components/VocabManager';
+import type { Level } from './data/levels';
+import type { VocabItem } from './types/vocab';
 
 class MockSpeechRecognition {
   static instances: MockSpeechRecognition[] = [];
