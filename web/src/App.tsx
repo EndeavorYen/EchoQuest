@@ -218,9 +218,16 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   } = state;
 
   const handleSubmitRef = useRef<(submittedText: string) => void>(() => {});
+  const acceptSpeechResultsRef = useRef(false);
+  acceptSpeechResultsRef.current = gameState === 'playing' && practiceMode === 'voice';
   const speech = useSpeechRecognition({
     autoRestart: gameState === 'playing' && practiceMode === 'voice',
-    onResult: (result) => handleSubmitRef.current(result),
+    onResult: (result) => {
+      if (!acceptSpeechResultsRef.current) {
+        return;
+      }
+      handleSubmitRef.current(result);
+    },
   });
 
   // Load vocab on mount or when prop changes
@@ -410,7 +417,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
 
   const renderGame = () => {
     const level = levels[currentLevel];
-    const speechUnavailable = !speech.isSupported || Boolean(speech.error);
+    const speechUnavailable = !speech.isSupported;
     
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-400 to-pink-300 p-8">
@@ -499,6 +506,9 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                   <button
                     onClick={() => {
                       if (practiceMode === 'voice' || !speechUnavailable) {
+                        if (practiceMode === 'spelling') {
+                          speech.clearError();
+                        }
                         dispatch({ type: 'TOGGLE_PRACTICE_MODE' });
                       }
                     }}

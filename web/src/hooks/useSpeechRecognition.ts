@@ -36,6 +36,7 @@ interface UseSpeechRecognitionResult {
   start: (lang?: string) => void;
   stop: () => void;
   resetTranscript: () => void;
+  clearError: () => void;
 }
 
 interface UseSpeechRecognitionOptions {
@@ -77,6 +78,10 @@ export function useSpeechRecognition({
   const resetTranscript = useCallback(() => {
     setTranscript('');
     setInterimTranscript('');
+  }, []);
+
+  const clearError = useCallback(() => {
+    setError(null);
   }, []);
 
   const stop = useCallback(() => {
@@ -220,5 +225,5 @@ export function useSpeechRecognition({
     };
   }, [detachHandlers]);
 
-  return { listening, transcript, interimTranscript, isSupported, error, start, stop, resetTranscript };
+  return { listening, transcript, interimTranscript, isSupported, error, start, stop, resetTranscript, clearError };
 }
