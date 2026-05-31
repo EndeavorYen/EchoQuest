@@ -1,20 +1,17 @@
 import React, { useEffect, useMemo, useRef, useReducer, useState } from 'react';
-import { Sword, Heart, Mic, MicOff, Volume2, Star, Zap, Trophy, Skull, Sparkles, Settings, HelpCircle, SkipForward, Globe } from 'lucide-react';
 import { VocabManager } from './components/VocabManager';
-import { IconButton, Panel, QuestButton, ScreenShell, StatBadge } from './components/QuestFrame';
 import type { VocabItem } from './types/vocab';
 import { initialVocab as defaultInitialVocab } from './data/vocab';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { defaultLevels, type Level } from './data/levels';
 import { calculateBossReward, getAvailableWords, isAnswerCorrect, isLevelComplete, selectWord } from './game/gameLogic';
 import { createInitialState, gameReducer } from './game/gameReducer';
+import { loadLangFromStorage, loadVocabFromStorage, saveLangToStorage, saveVocabToStorage } from './persistence/vocabStorage';
+import { GameScreen } from './screens/GameScreen';
+import { MenuScreen } from './screens/MenuScreen';
+import { VictoryScreen } from './screens/VictoryScreen';
 
 
-// LocalStorage Utilities
-const STORAGE_KEY_VOCAB = "echoquest_vocab_v1";
-const STORAGE_KEY_LANG = "echoquest_lang_v1";
-const DEFAULT_VOCAB_BY_ID = new Map(defaultInitialVocab.map((item) => [item.id, item]));
-const DEFAULT_VOCAB_BY_WORD = new Map(defaultInitialVocab.map((item) => [item.word, item]));
 const BLOCKING_SPEECH_ERRORS = new Set(['not-allowed', 'service-not-allowed', 'audio-capture']);
 const ANSWER_EFFECT_RESET_DELAY_MS = 500;
 const ANSWER_ADVANCE_DELAY_MS = 1500;
@@ -37,41 +34,6 @@ function getSpeechErrorMessage(error: string): string {
     default:
       return `語音辨識暫時無法使用，請重試語音。 (${error})`;
   }
-}
-
-function loadVocabFromStorage(): VocabItem[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_VOCAB);
-    if (!raw) return [];
-    return hydrateDefaultVocabArtwork(JSON.parse(raw));
-  } catch {
-    return [];
-  }
-}
-
-function hydrateDefaultVocabArtwork(items: VocabItem[]): VocabItem[] {
-  return items.map((item) => {
-    if (item.imageSrc || item.imageDataUrl) {
-      return item;
-    }
-
-    const defaultById = DEFAULT_VOCAB_BY_ID.get(item.id);
-    const defaultItem = defaultById?.word === item.word ? defaultById : DEFAULT_VOCAB_BY_WORD.get(item.word);
-
-    return defaultItem?.imageSrc ? { ...item, imageSrc: defaultItem.imageSrc } : item;
-  });
-}
-
-function saveVocabToStorage(items: VocabItem[]) {
-  localStorage.setItem(STORAGE_KEY_VOCAB, JSON.stringify(items));
-}
-
-function loadLangFromStorage(): string {
-    return localStorage.getItem(STORAGE_KEY_LANG) || 'en-US';
-}
-
-function saveLangToStorage(lang: string) {
-    localStorage.setItem(STORAGE_KEY_LANG, lang);
 }
 
 interface AppProps {
@@ -119,7 +81,6 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     recognitionLang,
   } = state;
 
-  const handleSubmitRef = useRef<(submittedText: string) => void>(() => {});
   const acceptSpeechResultsRef = useRef(false);
   acceptSpeechResultsRef.current = gameState === 'playing'
     && practiceMode === 'voice'
@@ -304,10 +265,6 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   };
 
   useEffect(() => {
-    handleSubmitRef.current = handleSubmit;
-  });
-
-  useEffect(() => {
     if (!voiceSubmissionLockedRef.current) {
       return;
     }
@@ -362,340 +319,95 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     selectNewWord();
   };
 
-  const renderGame = () => {
-    const level = levels[currentLevel];
-    const speechUnavailable = !speech.isSupported;
-    const totalEnemyLives = level.enemyLives ?? enemyLives;
-    const objectiveText = level.type === 'puzzle'
-      ? `目標: 收集 ${collectedTools.length}/${level.tools?.length || level.requiredWords} 個工具`
-      : `目標: 答對 ${levelCorrectAnswers}/${level.requiredWords} 個單字，或清空生命值 ${enemyLives}/${totalEnemyLives}`;
-    const currentWordImageSrc = currentWord?.imageDataUrl ?? currentWord?.imageSrc;
-    
-    return (
-      <ScreenShell screen="playing" label="EchoQuest 遊戲進行中">
-        <div className="eq-game-shell">
-          <div className="eq-hud" aria-label="冒險狀態">
-            <StatBadge icon={<Trophy className="w-6 h-6" />} label="得分" value={`分數: ${score}`} tone="gold" />
-            <StatBadge icon={<Zap className="w-6 h-6" />} label="節奏" value={`連擊 x${combo}`} tone="green" />
-            <StatBadge icon={<SkipForward className="w-6 h-6" />} label="選擇" value={`跳過 ${skippedWords} 次`} tone="blue" />
-            <StatBadge icon={<Star className="w-6 h-6" />} label="進度" value={`關卡 ${currentLevel + 1}`} tone="red" />
-          </div>
-
-          <div className="eq-game-grid">
-            <Panel className="eq-level-panel">
-              <p className="text-sm font-extrabold uppercase text-[color:var(--eq-muted)]">Quest Log</p>
-              <h2 className="eq-display eq-level-title">{level.name}</h2>
-              <p className="mt-2 text-[color:var(--eq-muted)]">{level.description}</p>
-              <p className="eq-objective">{objectiveText}</p>
-
-              <div className={`eq-enemy-figure ${isBossShaking ? 'shake' : ''}`}>
-                {level.imageSrc ? (
-                  <img src={level.imageSrc} alt={`${level.name} artwork`} className="eq-enemy-artwork" />
-                ) : (
-                  <span aria-hidden="true">{level.imageEmoji}</span>
-                )}
-              </div>
-
-              {level.type === 'boss' && (
-                <div className="flex justify-center items-center gap-2" aria-label="Boss health">
-                  <Skull className="w-7 h-7 text-[color:var(--eq-rust)]" />
-                  <div className="flex gap-1">
-                    {[...Array(level.enemyLives ?? 0)].map((_, i) => (
-                      <Heart
-                        key={i}
-                        className={`w-7 h-7 ${i < enemyLives ? 'text-[color:var(--eq-rust)]' : 'text-stone-300'}`}
-                        fill={i < enemyLives ? 'currentColor' : 'none'}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {level.type === 'puzzle' && (
-                <div className="flex justify-center items-center gap-2 text-4xl" aria-label="Puzzle progress">
-                  {[...Array(level.tools ? level.tools.length - collectedTools.length : 0)].map((_, i) => (
-                    <span key={i}>🚪</span>
-                  ))}
-                  {[...Array(collectedTools.length)].map((_, i) => (
-                    <span key={i} className="opacity-50">🔑</span>
-                  ))}
-                </div>
-              )}
-            </Panel>
-
-            {currentWord && (
-              <Panel className="eq-challenge-panel">
-                <div className={`eq-word-stage ${showEffect ? 'eq-word-stage--success' : ''}`}>
-                  {currentWordImageSrc ? (
-                    <img src={currentWordImageSrc} alt={currentWord.word} className="eq-word-photo" />
-                  ) : (
-                    <div className="eq-word-image" aria-hidden="true">{currentWord.imageName}</div>
-                  )}
-                  <div className="mt-4 flex justify-center gap-1">
-                    {[...Array(currentWord.difficulty)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 text-[color:var(--eq-sun)]" fill="currentColor" />
-                    ))}
-                  </div>
-                  <p className="mt-1 text-sm font-bold text-[color:var(--eq-muted)]">難度等級</p>
-                  {showHint && (
-                    <div className="eq-hint-overlay">
-                      <span className="eq-display text-4xl font-extrabold">{currentWord.word}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col items-center gap-4">
-                  <div className="eq-transcript w-full">
-                    <p className="text-xl">
-                      <span className="font-extrabold text-[color:var(--eq-river)]">{speech.transcript}</span>
-                      <span className="text-[color:var(--eq-muted)]">{speech.interimTranscript}</span>
-                    </p>
-                  </div>
-
-                  {voiceReview && practiceMode === 'voice' && (
-                    <div className="eq-voice-review w-full" role="status" aria-live="polite">
-                      <p className="text-lg font-extrabold text-[color:var(--eq-river)]">聽到：{voiceReview.heardText}</p>
-                      <p className="text-sm font-bold text-[color:var(--eq-muted)]">目標：{voiceReview.targetWord}</p>
-                      <p className="text-sm text-[color:var(--eq-muted)]">
-                        {voiceReview.isMatch ? '聽起來很接近，確認後發動攻擊。' : '還沒聽準，可以重試一次。'}
-                      </p>
-                      <div className="eq-voice-review__actions">
-                        <QuestButton
-                          variant="secondary"
-                          onClick={retryVoiceReview}
-                          icon={<Mic className="w-5 h-5" />}
-                        >
-                          重試語音
-                        </QuestButton>
-                        <QuestButton
-                          variant="gold"
-                          onClick={confirmVoiceReview}
-                          icon={<Sword className="w-5 h-5" />}
-                        >
-                          確認送出
-                        </QuestButton>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="eq-control-row">
-                    <QuestButton
-                      variant={practiceMode === 'voice' ? 'secondary' : 'quiet'}
-                      onClick={() => {
-                        if (practiceMode === 'voice' || !speechUnavailable) {
-                          if (practiceMode === 'spelling') {
-                            speech.clearError();
-                          }
-                          if (practiceMode === 'voice' && speech.error) {
-                            speech.clearError();
-                          }
-                          updateVoiceReview(null);
-                          dispatch({ type: 'TOGGLE_PRACTICE_MODE' });
-                        }
-                      }}
-                      aria-label={practiceMode === 'voice' ? '切換到拼字模式' : '切換到語音模式'}
-                      disabled={practiceMode === 'spelling' && speechUnavailable}
-                      icon={practiceMode === 'voice' ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-                    >
-                      {practiceMode === 'voice' ? '語音' : '拼字'}
-                    </QuestButton>
-
-                    {practiceMode === 'voice' ? (
-                      <QuestButton
-                        variant={speech.listening ? 'danger' : 'primary'}
-                        onClick={() => {
-                          if (speech.listening) {
-                            speech.stop();
-                          } else {
-                            speech.start(recognitionLang);
-                          }
-                        }}
-                        disabled={speechUnavailable}
-                        icon={<Volume2 className="w-5 h-5" />}
-                      >
-                        {speech.listening ? '聆聽中...' : '點擊說話'}
-                      </QuestButton>
-                    ) : (
-                      <input
-                        type="text"
-                        value={userInput}
-                        onChange={(e) => dispatch({ type: 'SET_USER_INPUT', payload: e.target.value })}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSubmit(userInput)}
-                        placeholder="輸入英文單字"
-                        className="eq-input"
-                      />
-                    )}
-                    <LanguageSelector selectedLang={recognitionLang} onLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })} />
-                  </div>
-
-                  {speech.error && (
-                    <div className="flex flex-col items-center gap-3" role="alert">
-                      <p className="text-sm text-[color:var(--eq-ruby)] text-center">
-                        {getSpeechErrorMessage(speech.error)}
-                      </p>
-                      {practiceMode === 'voice' && !isBlockingSpeechError(speech.error) && (
-                        <QuestButton
-                          variant="secondary"
-                          onClick={retryVoiceReview}
-                          icon={<Mic className="w-5 h-5" />}
-                        >
-                          重試語音
-                        </QuestButton>
-                      )}
-                    </div>
-                  )}
-                  {!speech.isSupported && (
-                    <p className="text-sm text-[color:var(--eq-muted)] text-center" role="alert">
-                      Speech recognition is not supported in this browser.
-                    </p>
-                  )}
-
-                  {practiceMode === 'spelling' && (
-                    <QuestButton
-                      variant="gold"
-                      onClick={() => handleSubmit(userInput)}
-                      icon={<Sword className="w-5 h-5" />}
-                    >
-                      攻擊!
-                    </QuestButton>
-                  )}
-
-                  <div className="flex gap-3 items-center">
-                    <IconButton
-                      aria-label="Show hint"
-                      onMouseDown={() => dispatch({ type: 'SET_SHOW_HINT', payload: true })}
-                      onMouseUp={() => dispatch({ type: 'SET_SHOW_HINT', payload: false })}
-                      onTouchStart={() => dispatch({ type: 'SET_SHOW_HINT', payload: true })}
-                      onTouchEnd={() => dispatch({ type: 'SET_SHOW_HINT', payload: false })}
-                    >
-                      <HelpCircle className="w-6 h-6" />
-                    </IconButton>
-                    <IconButton aria-label="Skip word" onClick={handleSkip} variant="danger">
-                      <SkipForward className="w-6 h-6" />
-                    </IconButton>
-                  </div>
-                </div>
-
-                {message && (
-                  <div className="text-center">
-                    <p className="eq-message animate-bounce">
-                      {message}
-                    </p>
-                  </div>
-                )}
-              </Panel>
-            )}
-          </div>
-        </div>
-      </ScreenShell>
-    );
+  const handleTogglePracticeMode = () => {
+    if (practiceMode === 'voice' || speech.isSupported) {
+      if (practiceMode === 'spelling') {
+        speech.clearError();
+      }
+      if (practiceMode === 'voice' && speech.error) {
+        speech.clearError();
+      }
+      updateVoiceReview(null);
+      dispatch({ type: 'TOGGLE_PRACTICE_MODE' });
+    }
   };
 
-  const renderMenu = () => (
-    <ScreenShell screen="menu" label="EchoQuest 主選單">
-      <div className="eq-menu">
-        <section>
-          <div className="eq-menu__mark" aria-hidden="true">
-            <Sparkles className="w-12 h-12" />
-          </div>
-          <h1 className="eq-display eq-menu__title">EchoQuest</h1>
-          <p className="eq-menu__subtitle">學習英文，打敗怪物！</p>
-        </section>
-
-        <Panel className="p-6 sm:p-8">
-          <div className="mb-6 flex justify-center">
-            <LanguageSelector selectedLang={recognitionLang} onLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })} isMenu={true} />
-          </div>
-          <div className="eq-menu__actions">
-            <QuestButton onClick={startGame} className="w-full" icon={<Sword className="w-5 h-5" />}>
-              開始遊戲
-            </QuestButton>
-            <QuestButton
-              variant="quiet"
-              onClick={() => dispatch({ type: 'SET_GAME_STATE', payload: 'vocab_management' })}
-              className="w-full"
-              icon={<Settings className="w-5 h-5" />}
-            >
-              字彙管理
-            </QuestButton>
-          </div>
-          {!speech.isSupported && (
-            <p className="mt-4 text-center text-sm text-[color:var(--eq-muted)]" role="alert">
-              Speech recognition is not supported in this browser.
-            </p>
-          )}
-          {message && (
-            <p className="eq-message text-center animate-bounce">
-              {message}
-            </p>
-          )}
-        </Panel>
-      </div>
-    </ScreenShell>
-  );
-
-  const renderVictory = () => (
-    <ScreenShell screen="victory" label="EchoQuest 勝利結果" className="grid place-items-center">
-      <Panel className="w-full max-w-md p-8 text-center">
-        <Trophy className="w-20 h-20 text-[color:var(--eq-sun)] mx-auto mb-4" />
-        <h1 className="eq-display text-4xl font-extrabold text-[color:var(--eq-ink)] mb-4">勝利！</h1>
-        <p className="text-2xl font-extrabold text-[color:var(--eq-river)] mb-2">最終分數: {score}</p>
-        <p className="text-lg text-[color:var(--eq-muted)] mb-6">答對 {correctAnswers} 個單字</p>
-        <QuestButton onClick={startGame} className="w-full" variant="gold" icon={<Trophy className="w-5 h-5" />}>
-          再玩一次
-        </QuestButton>
-      </Panel>
-    </ScreenShell>
-  );
+  const handleToggleListening = () => {
+    if (speech.listening) {
+      speech.stop();
+    } else {
+      speech.start(recognitionLang);
+    }
+  };
 
   switch (gameState) {
     case 'menu':
-      return renderMenu();
+      return (
+        <MenuScreen
+          recognitionLang={recognitionLang}
+          speechSupported={speech.isSupported}
+          message={message}
+          onRecognitionLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })}
+          onStartGame={startGame}
+          onOpenVocabManagement={() => dispatch({ type: 'SET_GAME_STATE', payload: 'vocab_management' })}
+        />
+      );
     case 'playing':
-      return renderGame();
+      return (
+        <GameScreen
+          level={levels[currentLevel]}
+          currentLevel={currentLevel}
+          currentWord={currentWord}
+          userInput={userInput}
+          score={score}
+          enemyLives={enemyLives}
+          collectedTools={collectedTools}
+          message={message}
+          practiceMode={practiceMode}
+          levelCorrectAnswers={levelCorrectAnswers}
+          skippedWords={skippedWords}
+          showEffect={showEffect}
+          combo={combo}
+          showHint={showHint}
+          isBossShaking={isBossShaking}
+          recognitionLang={recognitionLang}
+          speech={speech}
+          speechErrorMessage={speech.error ? getSpeechErrorMessage(speech.error) : null}
+          canRetrySpeechError={practiceMode === 'voice' && speech.error !== null && !isBlockingSpeechError(speech.error)}
+          voiceReview={voiceReview}
+          onSubmit={handleSubmit}
+          onUserInputChange={(value) => dispatch({ type: 'SET_USER_INPUT', payload: value })}
+          onTogglePracticeMode={handleTogglePracticeMode}
+          onToggleListening={handleToggleListening}
+          onRecognitionLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })}
+          onShowHintChange={(show) => dispatch({ type: 'SET_SHOW_HINT', payload: show })}
+          onSkip={handleSkip}
+          onRetryVoiceReview={retryVoiceReview}
+          onConfirmVoiceReview={confirmVoiceReview}
+        />
+      );
     case 'victory':
-      return renderVictory();
+      return (
+        <VictoryScreen
+          score={score}
+          correctAnswers={correctAnswers}
+          onStartGame={startGame}
+        />
+      );
     case 'vocab_management':
         return <VocabManager vocab={vocab} onVocabChange={(v) => dispatch({ type: 'SET_VOCAB', payload: v })} onGoBack={() => dispatch({ type: 'SET_GAME_STATE', payload: 'menu' })} />;
     default:
-      return renderMenu();
+      return (
+        <MenuScreen
+          recognitionLang={recognitionLang}
+          speechSupported={speech.isSupported}
+          message={message}
+          onRecognitionLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })}
+          onStartGame={startGame}
+          onOpenVocabManagement={() => dispatch({ type: 'SET_GAME_STATE', payload: 'vocab_management' })}
+        />
+      );
   }
-};
-
-const LanguageSelector: React.FC<{selectedLang: string, onLangChange: (lang: string) => void, isMenu?: boolean}> = ({ selectedLang, onLangChange, isMenu = false }) => {
-    const languages = [
-        { code: 'en-US', name: 'English (US)' },
-        { code: 'en-GB', name: 'English (UK)' },
-        { code: 'zh-TW', name: '中文 (繁體)' },
-        { code: 'zh-CN', name: '中文 (简体)' },
-    ];
-
-    if (isMenu) {
-        return (
-            <div className="flex items-center gap-2">
-                <Globe className="w-6 h-6 text-[color:var(--eq-river)]" />
-                <select
-                    value={selectedLang}
-                    onChange={(e) => onLangChange(e.target.value)}
-                    aria-label="Select recognition language"
-                    className="eq-select"
-                >
-                    {languages.map(lang => <option key={lang.code} value={lang.code}>{lang.name}</option>)}
-                </select>
-            </div>
-        );
-    }
-
-    return (
-        <select
-            value={selectedLang}
-            onChange={(e) => onLangChange(e.target.value)}
-            className="eq-select"
-            aria-label="Select recognition language"
-        >
-            {languages.map(lang => <option key={lang.code} value={lang.code}>{lang.name}</option>)}
-        </select>
-    );
 };
 
 export default App;
