@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useReducer } from 'react';
+import React, { useEffect, useMemo, useRef, useReducer, useState } from 'react';
 import { Sword, Heart, Mic, MicOff, Volume2, Star, Zap, Trophy, Skull, Sparkles, Settings, HelpCircle, SkipForward, Globe } from 'lucide-react';
 import { VocabManager } from './components/VocabManager';
 import { IconButton, Panel, QuestButton, ScreenShell, StatBadge } from './components/QuestFrame';
@@ -15,20 +15,27 @@ const STORAGE_KEY_VOCAB = "echoquest_vocab_v1";
 const STORAGE_KEY_LANG = "echoquest_lang_v1";
 const DEFAULT_VOCAB_BY_ID = new Map(defaultInitialVocab.map((item) => [item.id, item]));
 const DEFAULT_VOCAB_BY_WORD = new Map(defaultInitialVocab.map((item) => [item.word, item]));
+const BLOCKING_SPEECH_ERRORS = new Set(['not-allowed', 'service-not-allowed', 'audio-capture']);
+const ANSWER_EFFECT_RESET_DELAY_MS = 500;
+const ANSWER_ADVANCE_DELAY_MS = 1500;
+
+function isBlockingSpeechError(error: string): boolean {
+  return BLOCKING_SPEECH_ERRORS.has(error);
+}
 
 function getSpeechErrorMessage(error: string): string {
   switch (error) {
     case 'not-allowed':
     case 'service-not-allowed':
       return '麥克風權限被阻擋，已切換到拼字模式。請允許麥克風後再試。';
-    case 'network':
-      return '語音辨識暫時無法連線，已切換到拼字模式。';
-    case 'no-speech':
-      return '沒有聽到聲音，已切換到拼字模式。';
     case 'audio-capture':
       return '找不到可用的麥克風，已切換到拼字模式。';
+    case 'network':
+      return '語音辨識暫時無法連線，請重試語音。';
+    case 'no-speech':
+      return '沒有聽到聲音，請再說一次。';
     default:
-      return `語音辨識暫時無法使用，已切換到拼字模式。 (${error})`;
+      return `語音辨識暫時無法使用，請重試語音。 (${error})`;
   }
 }
 
@@ -72,11 +79,24 @@ interface AppProps {
     initialLevels?: Level[];
 }
 
+type VoiceReviewResult = {
+  heardText: string;
+  targetWord: string;
+  isMatch: boolean;
+};
+
 const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels = defaultLevels }) => {
   const [state, dispatch] = useReducer(gameReducer, createInitialState({
     levels: initialLevels,
     recognitionLang: loadLangFromStorage(),
   }));
+  const [voiceReview, setVoiceReview] = useState<VoiceReviewResult | null>(null);
+  const voiceReviewRef = useRef<VoiceReviewResult | null>(null);
+  const voiceSubmissionLockedRef = useRef(false);
+  const updateVoiceReview = (nextReview: VoiceReviewResult | null) => {
+    voiceReviewRef.current = nextReview;
+    setVoiceReview(nextReview);
+  };
   const {
     vocab,
     levels,
@@ -101,14 +121,30 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
 
   const handleSubmitRef = useRef<(submittedText: string) => void>(() => {});
   const acceptSpeechResultsRef = useRef(false);
-  acceptSpeechResultsRef.current = gameState === 'playing' && practiceMode === 'voice';
+  acceptSpeechResultsRef.current = gameState === 'playing'
+    && practiceMode === 'voice'
+    && !voiceReviewRef.current
+    && !voiceSubmissionLockedRef.current;
   const speech = useSpeechRecognition({
     autoRestart: gameState === 'playing' && practiceMode === 'voice',
     onResult: (result) => {
-      if (!acceptSpeechResultsRef.current) {
+      if (!acceptSpeechResultsRef.current || voiceReviewRef.current) {
         return;
       }
-      handleSubmitRef.current(result);
+      if (!currentWord) {
+        return;
+      }
+
+      const heardText = result.trim();
+      if (!heardText) {
+        return;
+      }
+
+      updateVoiceReview({
+        heardText,
+        targetWord: currentWord.word,
+        isMatch: isAnswerCorrect(heardText, currentWord),
+      });
     },
   });
 
@@ -171,7 +207,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     correctAnswersRef.current = correctAnswers;
 
     // Reset visual effects after a short delay
-    const effectTimer = setTimeout(() => dispatch({ type: 'RESET_EFFECTS' }), 500);
+    const effectTimer = setTimeout(() => dispatch({ type: 'RESET_EFFECTS' }), ANSWER_EFFECT_RESET_DELAY_MS);
 
     const level = levels[currentLevel];
     const levelComplete = isLevelComplete(level, { enemyLives, collectedTools, levelCorrectAnswers });
@@ -187,7 +223,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
         } else {
             selectNewWord(); // Not level complete, so just get the next word.
         }
-    }, 1500);
+    }, ANSWER_ADVANCE_DELAY_MS);
 
     return () => {
         clearTimeout(effectTimer);
@@ -245,9 +281,43 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     dispatch({ type: 'SET_USER_INPUT', payload: '' });
   };
 
+  const confirmVoiceReview = () => {
+    if (!voiceReview) {
+      return;
+    }
+
+    const { heardText, isMatch } = voiceReview;
+    updateVoiceReview(null);
+    voiceSubmissionLockedRef.current = isMatch;
+    handleSubmit(heardText);
+  };
+
+  const retryVoiceReview = () => {
+    voiceSubmissionLockedRef.current = false;
+    updateVoiceReview(null);
+    speech.resetTranscript();
+    speech.clearError();
+
+    if (practiceMode === 'voice' && !speech.listening) {
+      speech.start(recognitionLang);
+    }
+  };
+
   useEffect(() => {
     handleSubmitRef.current = handleSubmit;
   });
+
+  useEffect(() => {
+    if (!voiceSubmissionLockedRef.current) {
+      return;
+    }
+
+    const unlockTimer = setTimeout(() => {
+      voiceSubmissionLockedRef.current = false;
+    }, ANSWER_ADVANCE_DELAY_MS);
+
+    return () => clearTimeout(unlockTimer);
+  }, [correctAnswers]);
 
   useEffect(() => {
     if (!speech.isSupported && practiceMode === 'voice') {
@@ -256,7 +326,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   }, [practiceMode, speech.isSupported]);
 
   useEffect(() => {
-    if (speech.error && practiceMode === 'voice') {
+    if (speech.error && practiceMode === 'voice' && isBlockingSpeechError(speech.error)) {
       dispatch({ type: 'SET_PRACTICE_MODE', payload: 'spelling' });
     }
   }, [practiceMode, speech.error]);
@@ -266,7 +336,9 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
       speech.stop();
     }
     if (practiceMode !== 'voice') {
+      voiceSubmissionLockedRef.current = false;
       speech.resetTranscript();
+      updateVoiceReview(null);
     }
   }, [practiceMode, speech.listening, speech.resetTranscript, speech.stop]);
 
@@ -283,6 +355,9 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   }, [practiceMode, recognitionLang, speech.listening, speech.start]);
 
   const handleSkip = () => {
+    voiceSubmissionLockedRef.current = false;
+    updateVoiceReview(null);
+    speech.resetTranscript();
     dispatch({ type: 'SKIP_WORD' });
     selectNewWord();
   };
@@ -377,6 +452,32 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                     </p>
                   </div>
 
+                  {voiceReview && practiceMode === 'voice' && (
+                    <div className="eq-voice-review w-full" role="status" aria-live="polite">
+                      <p className="text-lg font-extrabold text-[color:var(--eq-river)]">聽到：{voiceReview.heardText}</p>
+                      <p className="text-sm font-bold text-[color:var(--eq-muted)]">目標：{voiceReview.targetWord}</p>
+                      <p className="text-sm text-[color:var(--eq-muted)]">
+                        {voiceReview.isMatch ? '聽起來很接近，確認後發動攻擊。' : '還沒聽準，可以重試一次。'}
+                      </p>
+                      <div className="eq-voice-review__actions">
+                        <QuestButton
+                          variant="secondary"
+                          onClick={retryVoiceReview}
+                          icon={<Mic className="w-5 h-5" />}
+                        >
+                          重試語音
+                        </QuestButton>
+                        <QuestButton
+                          variant="gold"
+                          onClick={confirmVoiceReview}
+                          icon={<Sword className="w-5 h-5" />}
+                        >
+                          確認送出
+                        </QuestButton>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="eq-control-row">
                     <QuestButton
                       variant={practiceMode === 'voice' ? 'secondary' : 'quiet'}
@@ -385,6 +486,10 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                           if (practiceMode === 'spelling') {
                             speech.clearError();
                           }
+                          if (practiceMode === 'voice' && speech.error) {
+                            speech.clearError();
+                          }
+                          updateVoiceReview(null);
                           dispatch({ type: 'TOGGLE_PRACTICE_MODE' });
                         }
                       }}
@@ -424,9 +529,20 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
                   </div>
 
                   {speech.error && (
-                    <p className="text-sm text-[color:var(--eq-ruby)] text-center" role="alert">
-                      {getSpeechErrorMessage(speech.error)}
-                    </p>
+                    <div className="flex flex-col items-center gap-3" role="alert">
+                      <p className="text-sm text-[color:var(--eq-ruby)] text-center">
+                        {getSpeechErrorMessage(speech.error)}
+                      </p>
+                      {practiceMode === 'voice' && !isBlockingSpeechError(speech.error) && (
+                        <QuestButton
+                          variant="secondary"
+                          onClick={retryVoiceReview}
+                          icon={<Mic className="w-5 h-5" />}
+                        >
+                          重試語音
+                        </QuestButton>
+                      )}
+                    </div>
                   )}
                   {!speech.isSupported && (
                     <p className="text-sm text-[color:var(--eq-muted)] text-center" role="alert">
