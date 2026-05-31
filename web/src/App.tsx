@@ -6,6 +6,13 @@ import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { defaultLevels, type Level } from './data/levels';
 import { calculateBossReward, getAvailableWords, isAnswerCorrect, isLevelComplete, selectWord } from './game/gameLogic';
 import { createInitialState, gameReducer } from './game/gameReducer';
+import {
+  buildLearningSummary,
+  createAnswerFeedback,
+  getTopReviewCandidates,
+  recordPracticeAttempt,
+} from './learning/progress';
+import { loadProgressFromStorage, saveProgressToStorage } from './persistence/progressStorage';
 import { loadLangFromStorage, loadVocabFromStorage, saveLangToStorage, saveVocabToStorage } from './persistence/vocabStorage';
 import { GameScreen } from './screens/GameScreen';
 import { MenuScreen } from './screens/MenuScreen';
@@ -51,6 +58,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   const [state, dispatch] = useReducer(gameReducer, createInitialState({
     levels: initialLevels,
     recognitionLang: loadLangFromStorage(),
+    progress: loadProgressFromStorage(),
   }));
   const [voiceReview, setVoiceReview] = useState<VoiceReviewResult | null>(null);
   const voiceReviewRef = useRef<VoiceReviewResult | null>(null);
@@ -79,6 +87,8 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     showHint,
     isBossShaking,
     recognitionLang,
+    progress,
+    lastAnswerFeedback,
   } = state;
 
   const acceptSpeechResultsRef = useRef(false);
@@ -127,6 +137,10 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     }
   }, [vocab, initialVocabProp]);
 
+  useEffect(() => {
+    saveProgressToStorage(progress);
+  }, [progress]);
+
   const enabledVocab = useMemo(() => vocab.filter((v: VocabItem) => v.enabled), [vocab]);
 
   const selectNewWord = () => {
@@ -139,7 +153,8 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     const availableWords = getAvailableWords(vocab, level, collectedTools);
     
     if (availableWords.length > 0) {
-      const randomWord = selectWord(availableWords, Math.random, currentWord?.id);
+      const reviewCandidates = getTopReviewCandidates(availableWords, progress, Date.now());
+      const randomWord = selectWord(reviewCandidates, Math.random, currentWord?.id);
       dispatch({ type: 'SELECT_NEW_WORD', payload: randomWord });
     } else {
         // No more words for this level
@@ -215,7 +230,27 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   const handleSubmit = (submittedText: string) => {
     if (!currentWord) return;
     
+    const now = Date.now();
     const isCorrect = isAnswerCorrect(submittedText, currentWord);
+    const nextProgress = recordPracticeAttempt(progress, currentWord, {
+      isCorrect,
+      mode: practiceMode,
+      now,
+    });
+    const wordProgress = nextProgress[currentWord.id];
+
+    dispatch({ type: 'SET_PROGRESS', payload: nextProgress });
+    dispatch({
+      type: 'SET_LAST_ANSWER_FEEDBACK',
+      payload: createAnswerFeedback({
+        word: currentWord,
+        submitted: submittedText,
+        isCorrect,
+        mode: practiceMode,
+        progress: wordProgress,
+        now,
+      }),
+    });
     
     if (isCorrect) {
       const level = levels[currentLevel];
@@ -375,6 +410,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
           speechErrorMessage={speech.error ? getSpeechErrorMessage(speech.error) : null}
           canRetrySpeechError={practiceMode === 'voice' && speech.error !== null && !isBlockingSpeechError(speech.error)}
           voiceReview={voiceReview}
+          lastAnswerFeedback={lastAnswerFeedback}
           onSubmit={handleSubmit}
           onUserInputChange={(value) => dispatch({ type: 'SET_USER_INPUT', payload: value })}
           onTogglePracticeMode={handleTogglePracticeMode}
@@ -391,6 +427,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
         <VictoryScreen
           score={score}
           correctAnswers={correctAnswers}
+          learningSummary={buildLearningSummary(progress, Date.now())}
           onStartGame={startGame}
         />
       );

@@ -4,6 +4,7 @@ import { IconButton, Panel, QuestButton, ScreenShell, StatBadge } from '../compo
 import { LanguageSelector } from '../components/LanguageSelector';
 import type { Level } from '../data/levels';
 import type { AppState } from '../game/gameReducer';
+import type { AnswerFeedback } from '../learning/progress';
 import type { VocabItem } from '../types/vocab';
 
 type VoiceReviewResult = {
@@ -41,6 +42,7 @@ type GameScreenProps = {
   speechErrorMessage: string | null;
   canRetrySpeechError: boolean;
   voiceReview: VoiceReviewResult | null;
+  lastAnswerFeedback: AnswerFeedback | null;
   onSubmit: (submittedText: string) => void;
   onUserInputChange: (value: string) => void;
   onTogglePracticeMode: () => void;
@@ -73,6 +75,7 @@ export function GameScreen({
   speechErrorMessage,
   canRetrySpeechError,
   voiceReview,
+  lastAnswerFeedback,
   onSubmit,
   onUserInputChange,
   onTogglePracticeMode,
@@ -194,6 +197,19 @@ export function GameScreen({
                         確認送出
                       </QuestButton>
                     </div>
+                  </div>
+                )}
+
+                {lastAnswerFeedback && (
+                  <div className="eq-voice-review w-full" role="status" aria-live="polite">
+                    <p className="text-lg font-extrabold text-[color:var(--eq-river)]">
+                      {lastAnswerFeedback.isCorrect
+                        ? `答對了：${lastAnswerFeedback.word}`
+                        : `你輸入「${lastAnswerFeedback.submitted}」，目標是 ${lastAnswerFeedback.word}`}
+                    </p>
+                    <p className="text-sm font-bold text-[color:var(--eq-muted)]">
+                      {`掌握度 ${lastAnswerFeedback.mastery}/3 · 下次複習：${lastAnswerFeedback.nextReviewLabel}`}
+                    </p>
                   </div>
                 )}
 

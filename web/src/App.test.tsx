@@ -100,7 +100,7 @@ describe('<App />', () => {
     });
 
     afterEach(() => {
-        jest.spyOn(global.Math, 'random').mockRestore();
+        jest.restoreAllMocks();
         uninstallSpeechRecognitionMock();
     });
 
@@ -290,7 +290,107 @@ describe('<App />', () => {
     await waitFor(() => {
       expect(screen.getByText('再試一次! 連擊歸零，但不扣分。')).toBeInTheDocument();
     });
+    expect(screen.getByText('你輸入「wronganswer」，目標是 apple')).toBeInTheDocument();
     expect(screen.getByText('分數: 0')).toBeInTheDocument();
+  });
+
+  it('persists a miss after an incorrect spelling answer', async () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /切換到拼字模式/i }));
+    fireEvent.change(screen.getByPlaceholderText('輸入英文單字'), { target: { value: 'wronganswer' } });
+    fireEvent.click(screen.getByText('攻擊!'));
+
+    await waitFor(() => {
+      const storedProgress = JSON.parse(localStorageMock.getItem('echoquest_progress_v1') || '{}');
+      expect(storedProgress['1']).toMatchObject({
+        wordId: '1',
+        word: 'apple',
+        attempts: 1,
+        correct: 0,
+        misses: 1,
+        streak: 0,
+        mastery: 0,
+        lastMode: 'spelling',
+        dueAt: 1_700_000_000_000,
+      });
+    });
+    expect(localStorageMock.getItem('echoquest_vocab_v1')).toBeNull();
+    nowSpy.mockRestore();
+  });
+
+  it('persists a correct spelling answer', async () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /切換到拼字模式/i }));
+    fireEvent.change(screen.getByPlaceholderText('輸入英文單字'), { target: { value: 'apple' } });
+    fireEvent.click(screen.getByText('攻擊!'));
+
+    await waitFor(() => {
+      const storedProgress = JSON.parse(localStorageMock.getItem('echoquest_progress_v1') || '{}');
+      expect(storedProgress['1']).toMatchObject({
+        wordId: '1',
+        word: 'apple',
+        attempts: 1,
+        correct: 1,
+        misses: 0,
+        streak: 1,
+        mastery: 1,
+        lastMode: 'spelling',
+      });
+    });
+    nowSpy.mockRestore();
+  });
+
+  it('prioritizes a due weak word when selecting the next challenge', async () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+    localStorageMock.setItem('echoquest_progress_v1', JSON.stringify({
+      '1': {
+        wordId: '1',
+        word: 'apple',
+        attempts: 4,
+        correct: 4,
+        misses: 0,
+        streak: 4,
+        mastery: 3,
+        lastPracticedAt: 1_699_999_999_000,
+        lastMissedAt: null,
+        lastMode: 'spelling',
+        dueAt: 1_700_086_400_000,
+      },
+      '2': {
+        wordId: '2',
+        word: 'sword',
+        attempts: 1,
+        correct: 0,
+        misses: 1,
+        streak: 0,
+        mastery: 0,
+        lastPracticedAt: 1_699_999_999_000,
+        lastMissedAt: 1_699_999_999_000,
+        lastMode: 'voice',
+        dueAt: 1_700_000_000_000,
+      },
+    }));
+
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('⚔️')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('🍎')).not.toBeInTheDocument();
+    nowSpy.mockRestore();
   });
 
   it('should skip to the next word when "Skip word" is clicked', async () => {
@@ -344,6 +444,7 @@ describe('<App />', () => {
   });
 
   it('should show the victory screen after defeating the final boss', async () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
     const victoryLevels: Level[] = [{ id: 1, name: 'Test Boss', type: 'boss', enemyLives: 1, description: '', imageEmoji: 'T', requiredWords: 1 }];
     const victoryVocab: VocabItem[] = [{ id: '1', word: 'apple', difficulty: 1, enabled: true, imageName: '🍎', size: 1, type: 'image/png' }];
 
@@ -367,6 +468,10 @@ describe('<App />', () => {
       expect(screen.getByText('勝利！')).toBeInTheDocument();
     }, { timeout: 2000 });
     expect(screen.getByRole('main', { name: 'EchoQuest 勝利結果' })).toHaveAttribute('data-screen', 'victory');
+    expect(screen.getByText('練習單字: 1')).toBeInTheDocument();
+    expect(screen.getByText('精熟單字: 0')).toBeInTheDocument();
+    expect(screen.getByText('待複習: 0')).toBeInTheDocument();
+    nowSpy.mockRestore();
   });
 
   it('should handle puzzle levels correctly', async () => {

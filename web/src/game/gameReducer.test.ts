@@ -1,4 +1,5 @@
 import { Level } from '../data/levels';
+import type { AnswerFeedback, LearningProgressState } from '../learning/progress';
 import { createInitialState, gameReducer } from './gameReducer';
 
 const levels: Level[] = [
@@ -29,11 +30,38 @@ describe('gameReducer', () => {
     expect(state.gameState).toBe('menu');
     expect(state.levels).toBe(levels);
     expect(state.recognitionLang).toBe('en-GB');
+    expect(state.progress).toEqual({});
+    expect(state.lastAnswerFeedback).toBeNull();
   });
 
   it('starts a new game from the first level and resets run progress', () => {
+    const progress: LearningProgressState = {
+      apple: {
+        wordId: 'apple',
+        word: 'apple',
+        attempts: 1,
+        correct: 1,
+        misses: 0,
+        streak: 1,
+        mastery: 1,
+        lastPracticedAt: 1,
+        lastMissedAt: null,
+        lastMode: 'spelling',
+        dueAt: 2,
+      },
+    };
+    const feedback: AnswerFeedback = {
+      word: 'apple',
+      submitted: 'apple',
+      isCorrect: true,
+      mode: 'spelling',
+      mastery: 1,
+      nextReviewLabel: '約 1 天後',
+    };
     const state = {
       ...createInitialState({ levels, recognitionLang: 'en-US' }),
+      progress,
+      lastAnswerFeedback: feedback,
       currentLevel: 1,
       score: 120,
       enemyLives: 1,
@@ -56,6 +84,67 @@ describe('gameReducer', () => {
       skippedWords: 0,
       combo: 0,
       message: '',
+      progress,
+      lastAnswerFeedback: null,
+    });
+  });
+
+  it('stores loaded learning progress', () => {
+    const progress: LearningProgressState = {
+      apple: {
+        wordId: 'apple',
+        word: 'apple',
+        attempts: 1,
+        correct: 0,
+        misses: 1,
+        streak: 0,
+        mastery: 0,
+        lastPracticedAt: 1,
+        lastMissedAt: 1,
+        lastMode: 'voice',
+        dueAt: 1,
+      },
+    };
+
+    expect(gameReducer(createInitialState({ levels }), { type: 'SET_PROGRESS', payload: progress }).progress).toBe(progress);
+  });
+
+  it('stores and clears answer feedback', () => {
+    const feedback: AnswerFeedback = {
+      word: 'apple',
+      submitted: 'apl',
+      isCorrect: false,
+      mode: 'spelling',
+      mastery: 0,
+      nextReviewLabel: '現在複習',
+    };
+    const withFeedback = gameReducer(createInitialState({ levels }), {
+      type: 'SET_LAST_ANSWER_FEEDBACK',
+      payload: feedback,
+    });
+
+    expect(withFeedback.lastAnswerFeedback).toBe(feedback);
+    expect(gameReducer(withFeedback, { type: 'SET_LAST_ANSWER_FEEDBACK', payload: null }).lastAnswerFeedback).toBeNull();
+  });
+
+  it('clears answer feedback when selecting a new word', () => {
+    const state = {
+      ...createInitialState({ levels }),
+      lastAnswerFeedback: {
+        word: 'apple',
+        submitted: 'apl',
+        isCorrect: false,
+        mode: 'spelling',
+        mastery: 0,
+        nextReviewLabel: '現在複習',
+      } as AnswerFeedback,
+      userInput: 'apl',
+    };
+
+    expect(gameReducer(state, { type: 'SELECT_NEW_WORD', payload: null })).toMatchObject({
+      currentWord: null,
+      userInput: '',
+      lastAnswerFeedback: null,
     });
   });
 
