@@ -1,5 +1,6 @@
 import type { VocabItem } from '../types/vocab';
 import { defaultLevels, type Level } from '../data/levels';
+import type { AnswerFeedback, LearningProgressState } from '../learning/progress';
 
 export type GameState = 'menu' | 'playing' | 'victory' | 'vocab_management';
 
@@ -23,6 +24,8 @@ export interface AppState {
   showHint: boolean;
   isBossShaking: boolean;
   recognitionLang: string;
+  progress: LearningProgressState;
+  lastAnswerFeedback: AnswerFeedback | null;
 }
 
 export type AppAction =
@@ -41,6 +44,8 @@ export type AppAction =
   | { type: 'SET_PRACTICE_MODE'; payload: AppState['practiceMode'] }
   | { type: 'SET_SHOW_HINT'; payload: boolean }
   | { type: 'SET_RECOGNITION_LANG'; payload: string }
+  | { type: 'SET_PROGRESS'; payload: LearningProgressState }
+  | { type: 'SET_LAST_ANSWER_FEEDBACK'; payload: AnswerFeedback | null }
   | { type: 'SKIP_WORD' }
   | { type: 'SET_COMBO'; payload: number }
   | { type: 'RESET_EFFECTS' };
@@ -51,11 +56,13 @@ export const SKIP_PENALTY = 5;
 interface InitialStateOptions {
   levels?: Level[];
   recognitionLang?: string;
+  progress?: LearningProgressState;
 }
 
 export function createInitialState({
   levels = defaultLevels,
   recognitionLang = 'en-US',
+  progress = {},
 }: InitialStateOptions = {}): AppState {
   return {
     vocab: [],
@@ -77,6 +84,8 @@ export function createInitialState({
     showHint: false,
     isBossShaking: false,
     recognitionLang,
+    progress,
+    lastAnswerFeedback: null,
   };
 }
 
@@ -99,6 +108,7 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
         skippedWords: 0,
         combo: 0,
         message: '',
+        lastAnswerFeedback: null,
       };
     case 'SET_GAME_STATE':
       return {
@@ -107,7 +117,7 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
         message: action.payload === 'menu' ? '請先到字彙管理新增單字!' : '',
       };
     case 'SELECT_NEW_WORD':
-      return { ...state, currentWord: action.payload, userInput: '' };
+      return { ...state, currentWord: action.payload, userInput: '', lastAnswerFeedback: null };
     case 'HANDLE_CORRECT_ANSWER': {
       const { points, damage } = action.payload;
       const newEnemyLives = state.enemyLives - damage;
@@ -173,6 +183,10 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
       return { ...state, showHint: action.payload };
     case 'SET_RECOGNITION_LANG':
       return { ...state, recognitionLang: action.payload };
+    case 'SET_PROGRESS':
+      return { ...state, progress: action.payload };
+    case 'SET_LAST_ANSWER_FEEDBACK':
+      return { ...state, lastAnswerFeedback: action.payload };
     case 'SKIP_WORD':
       return {
         ...state,
