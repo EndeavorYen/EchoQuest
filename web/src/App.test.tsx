@@ -106,6 +106,9 @@ describe('<App />', () => {
 
   it('should render the main menu by default', () => {
     render(<App />);
+    const menu = screen.getByRole('main', { name: 'EchoQuest 主選單' });
+
+    expect(menu).toHaveAttribute('data-screen', 'menu');
     expect(screen.getByText('EchoQuest')).toBeInTheDocument();
     expect(screen.getByText('開始遊戲')).toBeInTheDocument();
     expect(screen.getByText('字彙管理')).toBeInTheDocument();
@@ -118,8 +121,57 @@ describe('<App />', () => {
     await waitFor(() => {
         expect(screen.getByText('關卡 1')).toBeInTheDocument();
     });
+    expect(screen.getByRole('main', { name: 'EchoQuest 遊戲進行中' })).toHaveAttribute('data-screen', 'playing');
     expect(screen.getByText('🍎')).toBeInTheDocument();
     expect(screen.getByText('分數: 0')).toBeInTheDocument();
+  });
+
+  it('renders bundled artwork for the level and current word when provided', async () => {
+    const artworkLevels = [
+      {
+        id: 1,
+        name: 'Goal Boss',
+        type: 'boss',
+        enemyLives: 2,
+        description: 'Test generated artwork',
+        imageEmoji: 'G',
+        imageSrc: 'assets/generated/boss-dragon.png',
+        requiredWords: 1,
+      },
+    ] as Level[];
+    const artworkVocab = [
+      {
+        id: 'apple',
+        word: 'apple',
+        difficulty: 1,
+        enabled: true,
+        imageName: '🍎',
+        imageSrc: 'assets/generated/word-apple.png',
+        size: 1,
+        type: 'image/png',
+      },
+    ] as VocabItem[];
+
+    render(<App initialVocab={artworkVocab} initialLevels={artworkLevels} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: 'Goal Boss artwork' })).toHaveAttribute('src', 'assets/generated/boss-dragon.png');
+    });
+    expect(screen.getByRole('img', { name: 'apple' })).toHaveAttribute('src', 'assets/generated/word-apple.png');
+  });
+
+  it('hydrates stored default vocabulary with bundled artwork', async () => {
+    localStorageMock.setItem('echoquest_vocab_v1', JSON.stringify([
+      { id: 'd1-1', word: 'apple', difficulty: 1, enabled: true, imageName: '🍎', size: 0, type: '' },
+    ]));
+
+    render(<App />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: 'apple' })).toHaveAttribute('src', 'assets/generated/word-apple.png');
+    });
   });
 
   it('shows a visible boss objective based on required words', async () => {
@@ -314,6 +366,7 @@ describe('<App />', () => {
     await waitFor(() => {
       expect(screen.getByText('勝利！')).toBeInTheDocument();
     }, { timeout: 2000 });
+    expect(screen.getByRole('main', { name: 'EchoQuest 勝利結果' })).toHaveAttribute('data-screen', 'victory');
   });
 
   it('should handle puzzle levels correctly', async () => {
@@ -405,8 +458,31 @@ describe('<App />', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Speech recognition error: network')).toBeInTheDocument();
+      expect(screen.getByText('語音辨識暫時無法連線，已切換到拼字模式。')).toBeInTheDocument();
     });
+    expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
+  });
+
+  it('explains microphone permission errors without exposing raw browser codes', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('點擊說話'));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() => {
+      recognition.onstart?.();
+      recognition.onerror?.({ error: 'not-allowed' });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('麥克風權限被阻擋，已切換到拼字模式。請允許麥克風後再試。')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Speech recognition error: not-allowed')).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
   });
 
@@ -427,7 +503,7 @@ describe('<App />', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Speech recognition error: network')).toBeInTheDocument();
+      expect(screen.getByText('語音辨識暫時無法連線，已切換到拼字模式。')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
     });
 
@@ -448,7 +524,7 @@ describe('<App />', () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByText('Speech recognition error: network')).not.toBeInTheDocument();
+      expect(screen.queryByText('語音辨識暫時無法連線，已切換到拼字模式。')).not.toBeInTheDocument();
     });
   });
 

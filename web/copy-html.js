@@ -2,9 +2,27 @@ const fs = require('fs');
 const path = require('path');
 
 const distDir = path.join(__dirname, 'dist');
-const publicDir = __dirname; // In our case, public/index.html is at the same level as this script. Let's adjust if needed.
-const srcHtml = path.join(publicDir, 'public', 'index.html');
+const publicDir = path.join(__dirname, 'public');
+const srcHtml = path.join(publicDir, 'index.html');
 const destHtml = path.join(distDir, 'index.html');
+const srcAssets = path.join(publicDir, 'assets');
+const destAssets = path.join(distDir, 'assets');
+
+function copyDirectory(src, dest) {
+  if (!fs.existsSync(src)) return;
+
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      copyDirectory(srcPath, destPath);
+    } else if (entry.isFile()) {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
 
 // Create dist directory if it doesn't exist
 if (!fs.existsSync(distDir)) {
@@ -13,5 +31,6 @@ if (!fs.existsSync(distDir)) {
 
 // Copy index.html
 fs.copyFileSync(srcHtml, destHtml);
+copyDirectory(srcAssets, destAssets);
 
-console.log('Copied index.html to dist/index.html');
+console.log('Copied public assets to dist');

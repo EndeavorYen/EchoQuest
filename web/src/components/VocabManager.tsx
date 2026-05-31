@@ -1,4 +1,6 @@
 import React, { useRef, useEffect } from 'react';
+import { ArrowLeft, FolderOpen, ImagePlus, Trash2 } from 'lucide-react';
+import { Panel, QuestButton, ScreenShell } from './QuestFrame';
 import type { VocabItem } from '../types/vocab';
 
 export type { VocabItem } from '../types/vocab';
@@ -33,7 +35,7 @@ function DifficultyPips({ level }: { level: number }) {
           key={i}
           className={
             "w-2 h-2 rounded-full " +
-            (i < level ? "bg-amber-500" : "bg-amber-200")
+            (i < level ? "bg-[color:var(--eq-sun)]" : "bg-stone-300")
           }
         />
       ))}
@@ -41,15 +43,15 @@ function DifficultyPips({ level }: { level: number }) {
   );
 }
 
-function ImagePreview({ src }: { src?: string }) {
+function ImagePreview({ src, label }: { src?: string; label: string }) {
   if (!src) {
-    return <div className="bg-gray-200 border-2 border-dashed rounded-xl w-16 h-16" />;
+    return <div className="eq-preview eq-preview--empty" aria-hidden="true">+</div>;
   }
   return (
     <img
       src={src}
-      alt="vocab"
-      className="w-16 h-16 rounded-xl object-cover border border-gray-200"
+      alt={`${label} artwork`}
+      className="eq-preview"
     />
   );
 }
@@ -133,70 +135,85 @@ export const VocabManager: React.FC<VocabManagerProps> = ({ vocab, onVocabChange
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-        <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-gray-800">字彙管理</h1>
-                <button onClick={onGoBack} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">返回遊戲</button>
+    <ScreenShell screen="vocab-management" label="EchoQuest 字彙庫">
+      <div className="eq-vocab-shell">
+        <Panel className="p-5 sm:p-7">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div>
+              <p className="text-sm font-extrabold uppercase text-[color:var(--eq-muted)]">Inventory</p>
+              <h1 className="eq-display text-3xl font-extrabold text-[color:var(--eq-ink)]">字彙管理</h1>
             </div>
+            <QuestButton onClick={onGoBack} variant="quiet" icon={<ArrowLeft className="w-5 h-5" />}>
+              返回遊戲
+            </QuestButton>
+          </div>
 
-            <div className="flex flex-wrap items-center gap-3 mb-4">
-              <label className="px-4 py-2 bg-sky-600 text-white rounded-lg cursor-pointer text-sm font-medium">
-                新增圖片
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => e.target.files && handleFilesSelected(e.target.files, false)}
-                />
-              </label>
-              <label className="px-4 py-2 bg-amber-500 text-white rounded-lg cursor-pointer text-sm font-medium">
-                匯入資料夾
-                <input
-                  ref={dirInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => e.target.files && handleFilesSelected(e.target.files, true)}
-                  multiple
-                />
-              </label>
-            </div>
+          <div className="flex flex-wrap items-center gap-3 mb-5">
+            <label className="eq-button eq-button--secondary cursor-pointer text-sm">
+              <ImagePlus className="w-5 h-5" />
+              <span>新增圖片</span>
+              <input
+                type="file"
+                className="hidden"
+                accept="image/*"
+                multiple
+                onChange={(e) => e.target.files && handleFilesSelected(e.target.files, false)}
+              />
+            </label>
+            <label className="eq-button eq-button--gold cursor-pointer text-sm">
+              <FolderOpen className="w-5 h-5" />
+              <span>匯入資料夾</span>
+              <input
+                ref={dirInputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => e.target.files && handleFilesSelected(e.target.files, true)}
+                multiple
+              />
+            </label>
+          </div>
 
-            <div className="max-h-96 overflow-auto border rounded-lg">
-              <ul className="divide-y divide-gray-200">
-                {vocab.map((v) => (
-                  <li key={v.id} className="p-3 flex items-center gap-4">
-                    <ImagePreview src={v.imageDataUrl} />
-                    <div className="flex-1">
-                      <span className="font-semibold">{v.word}</span>
-                      <DifficultyPips level={v.difficulty} />
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <select
-                        className="border-gray-300 rounded-md"
-                        value={v.difficulty}
-                        onChange={(e) =>
-                          onVocabChange(vocab.map((i) => i.id === v.id ? { ...i, difficulty: Number(e.target.value) } : i))
-                        }
-                      >
-                        {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
-                      </select>
-                      <input
-                        type="checkbox"
-                        className="form-checkbox h-5 w-5"
-                        checked={v.enabled}
-                        onChange={(e) =>
-                          onVocabChange(vocab.map((i) => i.id === v.id ? { ...i, enabled: e.target.checked } : i))
-                        }
-                      />
-                      <button onClick={() => onVocabChange(vocab.filter(i => i.id !== v.id))} className="text-red-500 hover:text-red-700">刪除</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-        </div>
-    </div>
+          <div className="eq-vocab-list">
+            <ul>
+              {vocab.map((v) => (
+                <li key={v.id} className="eq-vocab-row">
+                  <ImagePreview src={v.imageDataUrl ?? v.imageSrc} label={v.word} />
+                  <div className="min-w-0">
+                    <span className="font-extrabold text-[color:var(--eq-ink)]">{v.word}</span>
+                    <DifficultyPips level={v.difficulty} />
+                  </div>
+                  <div className="eq-vocab-actions flex flex-wrap items-center gap-3">
+                    <select
+                      className="eq-select"
+                      value={v.difficulty}
+                      onChange={(e) =>
+                        onVocabChange(vocab.map((i) => i.id === v.id ? { ...i, difficulty: Number(e.target.value) } : i))
+                      }
+                    >
+                      {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 accent-[color:var(--eq-forest)]"
+                      checked={v.enabled}
+                      onChange={(e) =>
+                        onVocabChange(vocab.map((i) => i.id === v.id ? { ...i, enabled: e.target.checked } : i))
+                      }
+                    />
+                    <QuestButton
+                      onClick={() => onVocabChange(vocab.filter(i => i.id !== v.id))}
+                      variant="danger"
+                      icon={<Trash2 className="w-4 h-4" />}
+                    >
+                      刪除
+                    </QuestButton>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Panel>
+      </div>
+    </ScreenShell>
   );
 };
