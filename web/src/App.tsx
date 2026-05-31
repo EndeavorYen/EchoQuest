@@ -16,6 +16,8 @@ const STORAGE_KEY_LANG = "echoquest_lang_v1";
 const DEFAULT_VOCAB_BY_ID = new Map(defaultInitialVocab.map((item) => [item.id, item]));
 const DEFAULT_VOCAB_BY_WORD = new Map(defaultInitialVocab.map((item) => [item.word, item]));
 const BLOCKING_SPEECH_ERRORS = new Set(['not-allowed', 'service-not-allowed', 'audio-capture']);
+const ANSWER_EFFECT_RESET_DELAY_MS = 500;
+const ANSWER_ADVANCE_DELAY_MS = 1500;
 
 function isBlockingSpeechError(error: string): boolean {
   return BLOCKING_SPEECH_ERRORS.has(error);
@@ -90,6 +92,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   }));
   const [voiceReview, setVoiceReview] = useState<VoiceReviewResult | null>(null);
   const voiceReviewRef = useRef<VoiceReviewResult | null>(null);
+  const voiceSubmissionLockedRef = useRef(false);
   const updateVoiceReview = (nextReview: VoiceReviewResult | null) => {
     voiceReviewRef.current = nextReview;
     setVoiceReview(nextReview);
@@ -118,7 +121,10 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
 
   const handleSubmitRef = useRef<(submittedText: string) => void>(() => {});
   const acceptSpeechResultsRef = useRef(false);
-  acceptSpeechResultsRef.current = gameState === 'playing' && practiceMode === 'voice' && !voiceReviewRef.current;
+  acceptSpeechResultsRef.current = gameState === 'playing'
+    && practiceMode === 'voice'
+    && !voiceReviewRef.current
+    && !voiceSubmissionLockedRef.current;
   const speech = useSpeechRecognition({
     autoRestart: gameState === 'playing' && practiceMode === 'voice',
     onResult: (result) => {
@@ -201,7 +207,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     correctAnswersRef.current = correctAnswers;
 
     // Reset visual effects after a short delay
-    const effectTimer = setTimeout(() => dispatch({ type: 'RESET_EFFECTS' }), 500);
+    const effectTimer = setTimeout(() => dispatch({ type: 'RESET_EFFECTS' }), ANSWER_EFFECT_RESET_DELAY_MS);
 
     const level = levels[currentLevel];
     const levelComplete = isLevelComplete(level, { enemyLives, collectedTools, levelCorrectAnswers });
@@ -217,7 +223,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
         } else {
             selectNewWord(); // Not level complete, so just get the next word.
         }
-    }, 1500);
+    }, ANSWER_ADVANCE_DELAY_MS);
 
     return () => {
         clearTimeout(effectTimer);
@@ -280,12 +286,14 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
       return;
     }
 
-    const { heardText } = voiceReview;
+    const { heardText, isMatch } = voiceReview;
     updateVoiceReview(null);
+    voiceSubmissionLockedRef.current = isMatch;
     handleSubmit(heardText);
   };
 
   const retryVoiceReview = () => {
+    voiceSubmissionLockedRef.current = false;
     updateVoiceReview(null);
     speech.resetTranscript();
     speech.clearError();
@@ -298,6 +306,18 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   useEffect(() => {
     handleSubmitRef.current = handleSubmit;
   });
+
+  useEffect(() => {
+    if (!voiceSubmissionLockedRef.current) {
+      return;
+    }
+
+    const unlockTimer = setTimeout(() => {
+      voiceSubmissionLockedRef.current = false;
+    }, ANSWER_ADVANCE_DELAY_MS);
+
+    return () => clearTimeout(unlockTimer);
+  }, [correctAnswers]);
 
   useEffect(() => {
     if (!speech.isSupported && practiceMode === 'voice') {
@@ -316,6 +336,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
       speech.stop();
     }
     if (practiceMode !== 'voice') {
+      voiceSubmissionLockedRef.current = false;
       speech.resetTranscript();
       updateVoiceReview(null);
     }
@@ -334,6 +355,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   }, [practiceMode, recognitionLang, speech.listening, speech.start]);
 
   const handleSkip = () => {
+    voiceSubmissionLockedRef.current = false;
     updateVoiceReview(null);
     speech.resetTranscript();
     dispatch({ type: 'SKIP_WORD' });

@@ -558,6 +558,43 @@ describe('<App />', () => {
     expect(screen.getByText('分數: 10')).toBeInTheDocument();
   });
 
+  it('ignores duplicate speech results after confirming a correct voice review', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('點擊說話'));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() => {
+      recognition.onstart?.();
+      recognition.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: ' apple ' } }],
+      });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /確認送出/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('分數: 10')).toBeInTheDocument();
+    });
+
+    act(() => {
+      recognition.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: ' apple ' } }],
+      });
+    });
+
+    expect(screen.queryByText('聽到：apple')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /確認送出/i })).not.toBeInTheDocument();
+    expect(screen.getByText('分數: 10')).toBeInTheDocument();
+  });
+
   it('retries a pending voice review without submitting the previous result', async () => {
     render(<App initialVocab={defaultTestVocab} />);
     fireEvent.click(screen.getByText('開始遊戲'));
