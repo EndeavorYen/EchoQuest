@@ -126,6 +126,54 @@ describe('<App />', () => {
     expect(screen.getByText('分數: 0')).toBeInTheDocument();
   });
 
+  it('renders bundled artwork for the level and current word when provided', async () => {
+    const artworkLevels = [
+      {
+        id: 1,
+        name: 'Goal Boss',
+        type: 'boss',
+        enemyLives: 2,
+        description: 'Test generated artwork',
+        imageEmoji: 'G',
+        imageSrc: 'assets/generated/boss-dragon.png',
+        requiredWords: 1,
+      },
+    ] as Level[];
+    const artworkVocab = [
+      {
+        id: 'apple',
+        word: 'apple',
+        difficulty: 1,
+        enabled: true,
+        imageName: '🍎',
+        imageSrc: 'assets/generated/word-apple.png',
+        size: 1,
+        type: 'image/png',
+      },
+    ] as VocabItem[];
+
+    render(<App initialVocab={artworkVocab} initialLevels={artworkLevels} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: 'Goal Boss artwork' })).toHaveAttribute('src', 'assets/generated/boss-dragon.png');
+    });
+    expect(screen.getByRole('img', { name: 'apple' })).toHaveAttribute('src', 'assets/generated/word-apple.png');
+  });
+
+  it('hydrates stored default vocabulary with bundled artwork', async () => {
+    localStorageMock.setItem('echoquest_vocab_v1', JSON.stringify([
+      { id: 'd1-1', word: 'apple', difficulty: 1, enabled: true, imageName: '🍎', size: 0, type: '' },
+    ]));
+
+    render(<App />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: 'apple' })).toHaveAttribute('src', 'assets/generated/word-apple.png');
+    });
+  });
+
   it('shows a visible boss objective based on required words', async () => {
     const objectiveLevels: Level[] = [
       { id: 1, name: 'Goal Boss', type: 'boss', enemyLives: 10, description: '', imageEmoji: 'G', requiredWords: 2 },

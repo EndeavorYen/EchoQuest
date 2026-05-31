@@ -43,14 +43,14 @@ function DifficultyPips({ level }: { level: number }) {
   );
 }
 
-function ImagePreview({ src }: { src?: string }) {
+function ImagePreview({ src, label }: { src?: string; label: string }) {
   if (!src) {
     return <div className="eq-preview eq-preview--empty" aria-hidden="true">+</div>;
   }
   return (
     <img
       src={src}
-      alt="vocab"
+      alt={`${label} artwork`}
       className="eq-preview"
     />
   );
@@ -177,7 +177,7 @@ export const VocabManager: React.FC<VocabManagerProps> = ({ vocab, onVocabChange
             <ul>
               {vocab.map((v) => (
                 <li key={v.id} className="eq-vocab-row">
-                  <ImagePreview src={v.imageDataUrl} />
+                  <ImagePreview src={v.imageDataUrl ?? v.imageSrc} label={v.word} />
                   <div className="min-w-0">
                     <span className="font-extrabold text-[color:var(--eq-ink)]">{v.word}</span>
                     <DifficultyPips level={v.difficulty} />

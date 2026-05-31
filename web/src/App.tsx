@@ -13,6 +13,8 @@ import { createInitialState, gameReducer } from './game/gameReducer';
 // LocalStorage Utilities
 const STORAGE_KEY_VOCAB = "echoquest_vocab_v1";
 const STORAGE_KEY_LANG = "echoquest_lang_v1";
+const DEFAULT_VOCAB_BY_ID = new Map(defaultInitialVocab.map((item) => [item.id, item]));
+const DEFAULT_VOCAB_BY_WORD = new Map(defaultInitialVocab.map((item) => [item.word, item]));
 
 function getSpeechErrorMessage(error: string): string {
   switch (error) {
@@ -34,10 +36,23 @@ function loadVocabFromStorage(): VocabItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_VOCAB);
     if (!raw) return [];
-    return JSON.parse(raw);
+    return hydrateDefaultVocabArtwork(JSON.parse(raw));
   } catch {
     return [];
   }
+}
+
+function hydrateDefaultVocabArtwork(items: VocabItem[]): VocabItem[] {
+  return items.map((item) => {
+    if (item.imageSrc || item.imageDataUrl) {
+      return item;
+    }
+
+    const defaultById = DEFAULT_VOCAB_BY_ID.get(item.id);
+    const defaultItem = defaultById?.word === item.word ? defaultById : DEFAULT_VOCAB_BY_WORD.get(item.word);
+
+    return defaultItem?.imageSrc ? { ...item, imageSrc: defaultItem.imageSrc } : item;
+  });
 }
 
 function saveVocabToStorage(items: VocabItem[]) {
@@ -279,6 +294,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     const objectiveText = level.type === 'puzzle'
       ? `目標: 收集 ${collectedTools.length}/${level.tools?.length || level.requiredWords} 個工具`
       : `目標: 答對 ${levelCorrectAnswers}/${level.requiredWords} 個單字，或清空生命值 ${enemyLives}/${totalEnemyLives}`;
+    const currentWordImageSrc = currentWord?.imageDataUrl ?? currentWord?.imageSrc;
     
     return (
       <ScreenShell screen="playing" label="EchoQuest 遊戲進行中">
@@ -297,8 +313,12 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
               <p className="mt-2 text-[color:var(--eq-muted)]">{level.description}</p>
               <p className="eq-objective">{objectiveText}</p>
 
-              <div className={`eq-enemy-figure ${isBossShaking ? 'shake' : ''}`} aria-hidden="true">
-                {level.imageEmoji}
+              <div className={`eq-enemy-figure ${isBossShaking ? 'shake' : ''}`}>
+                {level.imageSrc ? (
+                  <img src={level.imageSrc} alt={`${level.name} artwork`} className="eq-enemy-artwork" />
+                ) : (
+                  <span aria-hidden="true">{level.imageEmoji}</span>
+                )}
               </div>
 
               {level.type === 'boss' && (
@@ -331,8 +351,8 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
             {currentWord && (
               <Panel className="eq-challenge-panel">
                 <div className={`eq-word-stage ${showEffect ? 'eq-word-stage--success' : ''}`}>
-                  {currentWord.imageDataUrl ? (
-                    <img src={currentWord.imageDataUrl} alt={currentWord.word} className="eq-word-photo" />
+                  {currentWordImageSrc ? (
+                    <img src={currentWordImageSrc} alt={currentWord.word} className="eq-word-photo" />
                   ) : (
                     <div className="eq-word-image" aria-hidden="true">{currentWord.imageName}</div>
                   )}

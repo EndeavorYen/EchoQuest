@@ -4,6 +4,7 @@ export interface Level {
   type: 'boss' | 'puzzle';
   description: string;
   imageEmoji: string;
+  imageSrc?: string;
   requiredWords: number;
   enemyLives?: number;
   tools?: string[];
@@ -19,6 +20,7 @@ export const defaultLevels: Level[] = [
       type: 'boss',
       description: '打敗守護寶藏的巨龍！',
       imageEmoji: '🐉',
+      imageSrc: 'assets/generated/boss-dragon.png',
       requiredWords: 5,
       enemyLives: 5,
       minDifficulty: 1,
@@ -30,6 +32,7 @@ export const defaultLevels: Level[] = [
       type: 'boss',
       description: '一隻討厭的哥布林擋住了去路！',
       imageEmoji: '👺',
+      imageSrc: 'assets/generated/boss-goblin.png',
       requiredWords: 5,
       enemyLives: 3,
       minDifficulty: 2,
@@ -41,6 +44,7 @@ export const defaultLevels: Level[] = [
       type: 'boss',
       description: '巨大的石像巨人覺醒了！',
       imageEmoji: '🗿',
+      imageSrc: 'assets/generated/boss-golem.png',
       requiredWords: 5,
       enemyLives: 8,
       minDifficulty: 2,
@@ -52,6 +56,7 @@ export const defaultLevels: Level[] = [
       type: 'boss',
       description: '最終挑戰：擊敗魔王！',
       imageEmoji: '👿',
+      imageSrc: 'assets/generated/boss-wizard.png',
       requiredWords: 5,
       enemyLives: 12,
       minDifficulty: 3,
@@ -63,6 +68,7 @@ export const defaultLevels: Level[] = [
       type: 'puzzle',
       description: '收集三個魔法工具來開啟大門！',
       imageEmoji: '🚪✨',
+      imageSrc: 'assets/generated/level-magic-gate.png',
       requiredWords: 3,
       tools: ['key', 'hammer', 'magic'] // These should map to words in vocab
     }

@@ -222,9 +222,19 @@
 
       .eq-enemy-figure {
         margin: 20px 0 16px;
+        min-height: 224px;
+        display: grid;
+        place-items: center;
         text-align: center;
         font-size: 7rem;
         line-height: 1;
+      }
+
+      .eq-enemy-artwork {
+        width: min(232px, 70vw);
+        height: 224px;
+        object-fit: contain;
+        filter: drop-shadow(0 18px 18px rgba(92, 61, 28, 0.22));
       }
 
       .eq-word-stage {
@@ -247,11 +257,14 @@
       }
 
       .eq-word-photo {
-        width: 168px;
-        height: 168px;
-        object-fit: cover;
-        border: 2px solid var(--eq-line);
+        width: min(218px, 70vw);
+        height: 196px;
+        object-fit: contain;
+        padding: 10px;
+        border: 1px solid color-mix(in srgb, var(--eq-line) 58%, transparent);
         border-radius: 8px;
+        background: radial-gradient(circle at 50% 58%, rgba(255, 244, 205, 0.92), rgba(255, 255, 255, 0.22) 62%, transparent 72%);
+        filter: drop-shadow(0 14px 13px rgba(92, 61, 28, 0.16));
       }
 
       .eq-hint-overlay {
@@ -417,7 +430,8 @@
         height: 64px;
         border-radius: 8px;
         border: 1px solid rgba(139, 110, 49, 0.34);
-        object-fit: cover;
+        object-fit: contain;
+        padding: 5px;
         background: rgba(255, 255, 255, 0.42);
       }
 

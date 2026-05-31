@@ -6,7 +6,7 @@ import type { VocabItem } from '../types/vocab';
 
 // Mock data for testing the component
 const mockVocab: VocabItem[] = [
-  { id: '1', word: 'apple', difficulty: 1, enabled: true, imageName: 'apple.png', size: 1, type: 'image/png' },
+  { id: '1', word: 'apple', difficulty: 1, enabled: true, imageName: 'apple.png', imageSrc: 'assets/generated/word-apple.png', size: 1, type: 'image/png' },
   { id: '2', word: 'banana', difficulty: 3, enabled: false, imageName: 'banana.png', size: 1, type: 'image/png' },
 ];
 
@@ -86,6 +86,10 @@ describe('<VocabManager /> Component', () => {
     expect(screen.getByText('apple')).toBeInTheDocument();
     expect(screen.getByText('banana')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem').length).toBe(2);
+  });
+
+  it('should render bundled artwork previews when imageSrc is available', () => {
+    expect(screen.getByRole('img', { name: 'apple artwork' })).toHaveAttribute('src', 'assets/generated/word-apple.png');
   });
 
   it('should call onGoBack when the "返回遊戲" button is clicked', () => {
