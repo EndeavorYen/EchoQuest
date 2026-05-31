@@ -441,7 +441,7 @@ describe('<App />', () => {
     expect(screen.getByText('攻擊!')).toBeInTheDocument();
   });
 
-  it('shows a user-facing speech recognition error and switches to spelling mode', async () => {
+  it('keeps transient speech recognition errors in voice mode with a retry action', async () => {
     render(<App initialVocab={defaultTestVocab} />);
     fireEvent.click(screen.getByText('開始遊戲'));
 
@@ -458,9 +458,21 @@ describe('<App />', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('語音辨識暫時無法連線，已切換到拼字模式。')).toBeInTheDocument();
+      expect(screen.getByText('語音辨識暫時無法連線，請重試語音。')).toBeInTheDocument();
     });
-    expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('輸入英文單字')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /切換到拼字模式/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /重試語音/i }));
+    expect(recognition.start).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      recognition.onstart?.();
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('語音辨識暫時無法連線，請重試語音。')).not.toBeInTheDocument();
+    });
   });
 
   it('explains microphone permission errors without exposing raw browser codes', async () => {
@@ -486,7 +498,7 @@ describe('<App />', () => {
     expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
   });
 
-  it('allows retrying voice mode after a transient speech recognition error', async () => {
+  it('can still switch to spelling mode after a transient speech recognition error', async () => {
     render(<App initialVocab={defaultTestVocab} />);
     fireEvent.click(screen.getByText('開始遊戲'));
 
@@ -503,32 +515,18 @@ describe('<App />', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('語音辨識暫時無法連線，已切換到拼字模式。')).toBeInTheDocument();
+      expect(screen.getByText('語音辨識暫時無法連線，請重試語音。')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /切換到拼字模式/i }));
+
+    await waitFor(() => {
       expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
     });
-
-    const voiceModeButton = screen.getByRole('button', { name: /切換到語音模式/i });
-    expect(voiceModeButton).not.toBeDisabled();
-
-    fireEvent.click(voiceModeButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('點擊說話')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('點擊說話'));
-    expect(recognition.start).toHaveBeenCalledTimes(2);
-
-    act(() => {
-      recognition.onstart?.();
-    });
-
-    await waitFor(() => {
-      expect(screen.queryByText('語音辨識暫時無法連線，已切換到拼字模式。')).not.toBeInTheDocument();
-    });
+    expect(screen.queryByText('語音辨識暫時無法連線，請重試語音。')).not.toBeInTheDocument();
   });
 
-  it('submits final speech recognition results immediately while still listening', async () => {
+  it('reviews final speech recognition results before submitting them', async () => {
     render(<App initialVocab={defaultTestVocab} />);
     fireEvent.click(screen.getByText('開始遊戲'));
 
@@ -543,14 +541,152 @@ describe('<App />', () => {
       recognition.onstart?.();
       recognition.onresult?.({
         resultIndex: 0,
-        results: [{ isFinal: true, 0: { transcript: 'apple' } }],
+        results: [{ isFinal: true, 0: { transcript: ' apple ' } }],
       });
     });
+
+    expect(screen.getByText('聽到：apple')).toBeInTheDocument();
+    expect(screen.getByText('目標：apple')).toBeInTheDocument();
+    expect(screen.getByText('分數: 0')).toBeInTheDocument();
+    expect(screen.queryByText(/太棒了!/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /確認送出/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/太棒了! \+10 分，對怪物造成 1 點傷害!/)).toBeInTheDocument();
     });
-    expect(screen.getByText('聆聽中...')).toBeInTheDocument();
+    expect(screen.getByText('分數: 10')).toBeInTheDocument();
+  });
+
+  it('retries a pending voice review without submitting the previous result', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('點擊說話'));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() => {
+      recognition.onstart?.();
+      recognition.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: ' sword ' } }],
+      });
+    });
+
+    expect(screen.getByText('聽到：sword')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /重試語音/i }));
+
+    expect(screen.queryByText('聽到：sword')).not.toBeInTheDocument();
+    expect(screen.getByText('分數: 0')).toBeInTheDocument();
+
+    act(() => {
+      recognition.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: ' apple ' } }],
+      });
+    });
+
+    expect(screen.getByText('聽到：apple')).toBeInTheDocument();
+  });
+
+  it('keeps the first pending voice review when later recognition results arrive before confirmation', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('點擊說話'));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() => {
+      recognition.onstart?.();
+      recognition.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: ' sword ' } }],
+      });
+      recognition.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: ' apple ' } }],
+      });
+    });
+
+    expect(screen.getByText('聽到：sword')).toBeInTheDocument();
+    expect(screen.queryByText('聽到：apple')).not.toBeInTheDocument();
+    expect(screen.getByText('分數: 0')).toBeInTheDocument();
+  });
+
+  it('clears a pending voice review when switching out of voice mode', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('點擊說話'));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() => {
+      recognition.onstart?.();
+      recognition.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: ' sword ' } }],
+      });
+    });
+
+    expect(screen.getByText('聽到：sword')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /切換到拼字模式/i }));
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
+    });
+
+    act(() => {
+      recognition.onend?.();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /切換到語音模式/i }));
+
+    expect(screen.getByRole('button', { name: /切換到拼字模式/i })).toBeInTheDocument();
+    expect(screen.queryByText('聽到：sword')).not.toBeInTheDocument();
+  });
+
+  it('clears a pending voice review when skipping to another word', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('點擊說話'));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() => {
+      recognition.onstart?.();
+      recognition.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: ' banana ' } }],
+      });
+    });
+
+    expect(screen.getByText('聽到：banana')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /skip word/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('⚔️')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('聽到：banana')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /確認送出/i })).not.toBeInTheDocument();
   });
 
   it('ignores late speech recognition results after switching to spelling mode', async () => {
