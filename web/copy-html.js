@@ -19,7 +19,9 @@ function copyDirectory(src, dest) {
     if (entry.isDirectory()) {
       copyDirectory(srcPath, destPath);
     } else if (entry.isFile()) {
-      fs.copyFileSync(srcPath, destPath);
+      if (!fs.existsSync(destPath) || !fs.readFileSync(srcPath).equals(fs.readFileSync(destPath))) {
+        fs.copyFileSync(srcPath, destPath);
+      }
     }
   }
 }

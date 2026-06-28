@@ -1,6 +1,8 @@
 import type { VocabItem } from '../types/vocab';
 import { defaultLevels, type Level } from '../data/levels';
+import type { FeedbackEvent } from '../feedback/feedbackEvents';
 import type { AnswerFeedback, LearningProgressState } from '../learning/progress';
+import type { LearnerProfile } from './challenges';
 
 export type GameState = 'menu' | 'playing' | 'victory' | 'vocab_management';
 
@@ -15,17 +17,17 @@ export interface AppState {
   collectedTools: string[];
   message: string;
   practiceMode: 'voice' | 'spelling';
+  learnerProfile: LearnerProfile;
   gameState: GameState;
   correctAnswers: number;
   levelCorrectAnswers: number;
   skippedWords: number;
-  showEffect: boolean;
   combo: number;
   showHint: boolean;
-  isBossShaking: boolean;
   recognitionLang: string;
   progress: LearningProgressState;
   lastAnswerFeedback: AnswerFeedback | null;
+  feedbackEvent: FeedbackEvent | null;
 }
 
 export type AppAction =
@@ -42,10 +44,13 @@ export type AppAction =
   | { type: 'SET_MESSAGE'; payload: string }
   | { type: 'TOGGLE_PRACTICE_MODE' }
   | { type: 'SET_PRACTICE_MODE'; payload: AppState['practiceMode'] }
+  | { type: 'SET_LEARNER_PROFILE'; payload: LearnerProfile }
   | { type: 'SET_SHOW_HINT'; payload: boolean }
   | { type: 'SET_RECOGNITION_LANG'; payload: string }
   | { type: 'SET_PROGRESS'; payload: LearningProgressState }
   | { type: 'SET_LAST_ANSWER_FEEDBACK'; payload: AnswerFeedback | null }
+  | { type: 'SET_FEEDBACK_EVENT'; payload: FeedbackEvent }
+  | { type: 'CLEAR_FEEDBACK_EVENT' }
   | { type: 'SKIP_WORD' }
   | { type: 'SET_COMBO'; payload: number }
   | { type: 'RESET_EFFECTS' };
@@ -56,12 +61,14 @@ export const SKIP_PENALTY = 5;
 interface InitialStateOptions {
   levels?: Level[];
   recognitionLang?: string;
+  learnerProfile?: LearnerProfile;
   progress?: LearningProgressState;
 }
 
 export function createInitialState({
   levels = defaultLevels,
   recognitionLang = 'en-US',
+  learnerProfile = 'kid',
   progress = {},
 }: InitialStateOptions = {}): AppState {
   return {
@@ -75,17 +82,17 @@ export function createInitialState({
     collectedTools: [],
     message: '',
     practiceMode: 'voice',
+    learnerProfile,
     gameState: 'menu',
     correctAnswers: 0,
     levelCorrectAnswers: 0,
     skippedWords: 0,
-    showEffect: false,
     combo: 0,
     showHint: false,
-    isBossShaking: false,
     recognitionLang,
     progress,
     lastAnswerFeedback: null,
+    feedbackEvent: null,
   };
 }
 
@@ -109,6 +116,7 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
         combo: 0,
         message: '',
         lastAnswerFeedback: null,
+        feedbackEvent: null,
       };
     case 'SET_GAME_STATE':
       return {
@@ -117,7 +125,7 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
         message: action.payload === 'menu' ? '請先到字彙管理新增單字!' : '',
       };
     case 'SELECT_NEW_WORD':
-      return { ...state, currentWord: action.payload, userInput: '', lastAnswerFeedback: null };
+      return { ...state, currentWord: action.payload, userInput: '', lastAnswerFeedback: null, feedbackEvent: null };
     case 'HANDLE_CORRECT_ANSWER': {
       const { points, damage } = action.payload;
       const newEnemyLives = state.enemyLives - damage;
@@ -126,10 +134,8 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
         ...state,
         score: state.score + points,
         combo: state.combo + 1,
-        showEffect: true,
         enemyLives: newEnemyLives,
         message: `太棒了! +${points} 分，對怪物造成 ${damage} 點傷害!`,
-        isBossShaking: true,
         correctAnswers: state.correctAnswers + 1,
         levelCorrectAnswers: state.levelCorrectAnswers + 1,
       };
@@ -141,7 +147,6 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
         ...state,
         score: state.score + POINTS_PER_PUZZLE,
         combo: state.combo + 1,
-        showEffect: true,
         collectedTools: newCollectedTools,
         message: `獲得了 ${action.payload.word}!`,
         correctAnswers: state.correctAnswers + 1,
@@ -179,6 +184,8 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
       return { ...state, practiceMode: state.practiceMode === 'voice' ? 'spelling' : 'voice' };
     case 'SET_PRACTICE_MODE':
       return { ...state, practiceMode: action.payload };
+    case 'SET_LEARNER_PROFILE':
+      return { ...state, learnerProfile: action.payload };
     case 'SET_SHOW_HINT':
       return { ...state, showHint: action.payload };
     case 'SET_RECOGNITION_LANG':
@@ -187,6 +194,10 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
       return { ...state, progress: action.payload };
     case 'SET_LAST_ANSWER_FEEDBACK':
       return { ...state, lastAnswerFeedback: action.payload };
+    case 'SET_FEEDBACK_EVENT':
+      return { ...state, feedbackEvent: action.payload };
+    case 'CLEAR_FEEDBACK_EVENT':
+      return { ...state, feedbackEvent: null };
     case 'SKIP_WORD':
       return {
         ...state,
@@ -198,7 +209,7 @@ export function gameReducer(state: AppState, action: AppAction): AppState {
     case 'SET_COMBO':
       return { ...state, combo: action.payload };
     case 'RESET_EFFECTS':
-      return { ...state, showEffect: false, isBossShaking: false };
+      return { ...state, feedbackEvent: null };
     default:
       return state;
   }

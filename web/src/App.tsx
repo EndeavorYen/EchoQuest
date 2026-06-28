@@ -4,6 +4,9 @@ import type { VocabItem } from './types/vocab';
 import { initialVocab as defaultInitialVocab } from './data/vocab';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { defaultLevels, type Level } from './data/levels';
+import { createSpeechInstruction, type SpeechInstruction } from './feedback/feedbackAudio';
+import { createFeedbackEvent, type FeedbackEvent } from './feedback/feedbackEvents';
+import { createChallenge } from './game/challenges';
 import { calculateBossReward, getAvailableWords, isAnswerCorrect, isLevelComplete, selectWord } from './game/gameLogic';
 import { createInitialState, gameReducer } from './game/gameReducer';
 import {
@@ -13,14 +16,20 @@ import {
   recordPracticeAttempt,
 } from './learning/progress';
 import { loadProgressFromStorage, saveProgressToStorage } from './persistence/progressStorage';
-import { loadLangFromStorage, loadVocabFromStorage, saveLangToStorage, saveVocabToStorage } from './persistence/vocabStorage';
+import {
+  loadLangFromStorage,
+  loadProfileFromStorage,
+  loadVocabFromStorage,
+  saveLangToStorage,
+  saveProfileToStorage,
+  saveVocabToStorage,
+} from './persistence/vocabStorage';
 import { GameScreen } from './screens/GameScreen';
 import { MenuScreen } from './screens/MenuScreen';
 import { VictoryScreen } from './screens/VictoryScreen';
 
 
 const BLOCKING_SPEECH_ERRORS = new Set(['not-allowed', 'service-not-allowed', 'audio-capture']);
-const ANSWER_EFFECT_RESET_DELAY_MS = 500;
 const ANSWER_ADVANCE_DELAY_MS = 1500;
 
 function isBlockingSpeechError(error: string): boolean {
@@ -58,6 +67,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   const [state, dispatch] = useReducer(gameReducer, createInitialState({
     levels: initialLevels,
     recognitionLang: loadLangFromStorage(),
+    learnerProfile: loadProfileFromStorage(),
     progress: loadProgressFromStorage(),
   }));
   const [voiceReview, setVoiceReview] = useState<VoiceReviewResult | null>(null);
@@ -78,17 +88,17 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     collectedTools,
     message,
     practiceMode,
+    learnerProfile,
     gameState,
     correctAnswers,
     levelCorrectAnswers,
     skippedWords,
-    showEffect,
     combo,
     showHint,
-    isBossShaking,
     recognitionLang,
     progress,
     lastAnswerFeedback,
+    feedbackEvent,
   } = state;
 
   const acceptSpeechResultsRef = useRef(false);
@@ -116,6 +126,15 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
         targetWord: currentWord.word,
         isMatch: isAnswerCorrect(heardText, currentWord),
       });
+      dispatch({
+        type: 'SET_FEEDBACK_EVENT',
+        payload: createFeedbackEvent('voiceHeard', {
+          message: '已聽到語音，請確認。',
+          targetWord: currentWord.word,
+          submitted: heardText,
+          now: Date.now(),
+        }),
+      });
     },
   });
 
@@ -142,6 +161,29 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   }, [progress]);
 
   const enabledVocab = useMemo(() => vocab.filter((v: VocabItem) => v.enabled), [vocab]);
+  const currentChallenge = useMemo(() => {
+    if (!currentWord) {
+      return null;
+    }
+
+    return createChallenge({
+      profile: learnerProfile,
+      practiceMode,
+      currentWord,
+      availableWords: getAvailableWords(vocab, levels[currentLevel], collectedTools),
+      wordProgress: progress[currentWord.id],
+    });
+  }, [collectedTools, currentLevel, currentWord, learnerProfile, levels, practiceMode, progress, vocab]);
+
+  const speakFeedback = (instruction: SpeechInstruction | null) => {
+    if (!instruction || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(instruction.text);
+    utterance.lang = instruction.lang;
+    window.speechSynthesis.speak(utterance);
+  };
 
   const selectNewWord = () => {
     if (enabledVocab.length === 0) {
@@ -182,11 +224,18 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     }
     correctAnswersRef.current = correctAnswers;
 
-    // Reset visual effects after a short delay
-    const effectTimer = setTimeout(() => dispatch({ type: 'RESET_EFFECTS' }), ANSWER_EFFECT_RESET_DELAY_MS);
-
     const level = levels[currentLevel];
     const levelComplete = isLevelComplete(level, { enemyLives, collectedTools, levelCorrectAnswers });
+
+    if (levelComplete) {
+      dispatch({
+        type: 'SET_FEEDBACK_EVENT',
+        payload: createFeedbackEvent('levelComplete', {
+          message: level.type === 'puzzle' ? '謎題已解開，準備前往下一關。' : '關卡目標完成，準備前往下一關。',
+          now: Date.now(),
+        }),
+      });
+    }
 
     // After a longer delay, advance the game
     const gameFlowTimer = setTimeout(() => {
@@ -202,7 +251,6 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     }, ANSWER_ADVANCE_DELAY_MS);
 
     return () => {
-        clearTimeout(effectTimer);
         clearTimeout(gameFlowTimer);
     };
   }, [correctAnswers, gameState, enemyLives, collectedTools, levelCorrectAnswers, currentLevel, levels]);
@@ -211,6 +259,10 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
   useEffect(() => {
     saveLangToStorage(recognitionLang);
   }, [recognitionLang]);
+
+  useEffect(() => {
+    saveProfileToStorage(learnerProfile);
+  }, [learnerProfile]);
 
   // Effect to clear messages after a delay
   useEffect(() => {
@@ -257,21 +309,39 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
       
       if (level.type === 'boss') {
         const { damage, points } = calculateBossReward(currentWord, combo);
+        dispatch({
+          type: 'SET_FEEDBACK_EVENT',
+          payload: createFeedbackEvent('correct', {
+            message: '命中！學習進度已更新。',
+            targetWord: currentWord.word,
+            submitted: submittedText,
+            now,
+          }),
+        });
         dispatch({ type: 'HANDLE_CORRECT_ANSWER', payload: { points, damage, word: currentWord.word } });
       } else if (level.type === 'puzzle') {
+        dispatch({
+          type: 'SET_FEEDBACK_EVENT',
+          payload: createFeedbackEvent('correct', {
+            message: '工具已收集，學習進度已更新。',
+            targetWord: currentWord.word,
+            submitted: submittedText,
+            now,
+          }),
+        });
         dispatch({ type: 'HANDLE_PUZZLE_CORRECT', payload: { word: currentWord.word } });
       }
     } else {
+      const nextFeedbackEvent: FeedbackEvent = createFeedbackEvent('incorrect', {
+        message: '這題會優先複習。',
+        targetWord: currentWord.word,
+        submitted: submittedText,
+        now,
+      });
+
+      dispatch({ type: 'SET_FEEDBACK_EVENT', payload: nextFeedbackEvent });
       dispatch({ type: 'HANDLE_INCORRECT_ANSWER' });
-      if ('speechSynthesis' in window && currentWord) {
-        const utterance = new SpeechSynthesisUtterance(currentWord.word);
-        if (recognitionLang.startsWith('en-')) {
-            utterance.lang = recognitionLang;
-        } else {
-            utterance.lang = 'en-US';
-        }
-        window.speechSynthesis.speak(utterance);
-      }
+      speakFeedback(createSpeechInstruction(nextFeedbackEvent, recognitionLang));
     }
     
     dispatch({ type: 'SET_USER_INPUT', payload: '' });
@@ -293,6 +363,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     updateVoiceReview(null);
     speech.resetTranscript();
     speech.clearError();
+    dispatch({ type: 'CLEAR_FEEDBACK_EVENT' });
 
     if (practiceMode === 'voice' && !speech.listening) {
       speech.start(recognitionLang);
@@ -322,6 +393,20 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
       dispatch({ type: 'SET_PRACTICE_MODE', payload: 'spelling' });
     }
   }, [practiceMode, speech.error]);
+
+  useEffect(() => {
+    if (!speech.error) {
+      return;
+    }
+
+    dispatch({
+      type: 'SET_FEEDBACK_EVENT',
+      payload: createFeedbackEvent('voiceError', {
+        message: '語音需要重試或切換模式。',
+        now: Date.now(),
+      }),
+    });
+  }, [speech.error]);
 
   useEffect(() => {
     if (practiceMode !== 'voice' && speech.listening) {
@@ -380,9 +465,11 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
       return (
         <MenuScreen
           recognitionLang={recognitionLang}
+          learnerProfile={learnerProfile}
           speechSupported={speech.isSupported}
           message={message}
           onRecognitionLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })}
+          onLearnerProfileChange={(profile) => dispatch({ type: 'SET_LEARNER_PROFILE', payload: profile })}
           onStartGame={startGame}
           onOpenVocabManagement={() => dispatch({ type: 'SET_GAME_STATE', payload: 'vocab_management' })}
         />
@@ -393,6 +480,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
           level={levels[currentLevel]}
           currentLevel={currentLevel}
           currentWord={currentWord}
+          challenge={currentChallenge}
           userInput={userInput}
           score={score}
           enemyLives={enemyLives}
@@ -401,11 +489,10 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
           practiceMode={practiceMode}
           levelCorrectAnswers={levelCorrectAnswers}
           skippedWords={skippedWords}
-          showEffect={showEffect}
           combo={combo}
           showHint={showHint}
-          isBossShaking={isBossShaking}
           recognitionLang={recognitionLang}
+          feedbackEvent={feedbackEvent}
           speech={speech}
           speechErrorMessage={speech.error ? getSpeechErrorMessage(speech.error) : null}
           canRetrySpeechError={practiceMode === 'voice' && speech.error !== null && !isBlockingSpeechError(speech.error)}
@@ -437,9 +524,11 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
       return (
         <MenuScreen
           recognitionLang={recognitionLang}
+          learnerProfile={learnerProfile}
           speechSupported={speech.isSupported}
           message={message}
           onRecognitionLangChange={(lang) => dispatch({ type: 'SET_RECOGNITION_LANG', payload: lang })}
+          onLearnerProfileChange={(profile) => dispatch({ type: 'SET_LEARNER_PROFILE', payload: profile })}
           onStartGame={startGame}
           onOpenVocabManagement={() => dispatch({ type: 'SET_GAME_STATE', payload: 'vocab_management' })}
         />

@@ -26,6 +26,7 @@
         --eq-sun: #d7a43b;
         --eq-focus: #174f7a;
         --eq-shadow: 0 18px 50px rgba(37, 50, 44, 0.16);
+        --eq-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
       }
 
       html,
@@ -220,6 +221,42 @@
         font-weight: 800;
       }
 
+      .eq-intent-chip {
+        margin-top: 10px;
+        display: grid;
+        gap: 3px;
+        padding: 10px 12px;
+        border: 1px solid rgba(47, 114, 136, 0.24);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.48);
+      }
+
+      .eq-intent-chip span {
+        color: var(--eq-muted);
+        font-size: 0.78rem;
+        font-weight: 900;
+      }
+
+      .eq-intent-chip strong {
+        color: var(--eq-ink);
+        font-size: 0.95rem;
+        line-height: 1.25;
+      }
+
+      .eq-intent-chip--flame,
+      .eq-intent-chip--trick {
+        border-color: color-mix(in srgb, var(--eq-rust) 34%, white);
+      }
+
+      .eq-intent-chip--guard,
+      .eq-intent-chip--seal {
+        border-color: color-mix(in srgb, var(--eq-forest) 34%, white);
+      }
+
+      .eq-intent-chip--spell {
+        border-color: color-mix(in srgb, var(--eq-river) 34%, white);
+      }
+
       .eq-enemy-figure {
         margin: 20px 0 16px;
         min-height: 224px;
@@ -243,12 +280,26 @@
         display: grid;
         place-items: center;
         text-align: center;
-        transition: transform 180ms ease, filter 180ms ease;
+        transition: transform 180ms var(--eq-ease-out), filter 180ms var(--eq-ease-out);
       }
 
-      .eq-word-stage--success {
+      .eq-word-stage--feedback-success {
         transform: translateY(-3px) rotate(-1deg) scale(1.03);
         filter: saturate(1.12);
+      }
+
+      .eq-word-stage--feedback-caution {
+        transform: translateX(-2px);
+        filter: saturate(0.92);
+      }
+
+      .eq-word-stage--feedback-celebration {
+        transform: translateY(-5px) scale(1.04);
+        filter: saturate(1.18) brightness(1.03);
+      }
+
+      .eq-word-stage--feedback-voice {
+        filter: drop-shadow(0 0 12px rgba(47, 114, 136, 0.18));
       }
 
       .eq-word-image {
@@ -265,6 +316,24 @@
         border-radius: 8px;
         background: radial-gradient(circle at 50% 58%, rgba(255, 244, 205, 0.92), rgba(255, 255, 255, 0.22) 62%, transparent 72%);
         filter: drop-shadow(0 14px 13px rgba(92, 61, 28, 0.16));
+      }
+
+      .eq-challenge-prompt {
+        margin-top: 8px;
+        color: var(--eq-river);
+        font-size: 1rem;
+        font-weight: 900;
+      }
+
+      .eq-guided-hint {
+        margin-top: 6px;
+        padding: 6px 10px;
+        border: 1px dashed rgba(47, 114, 136, 0.35);
+        border-radius: 8px;
+        color: var(--eq-forest);
+        background: rgba(255, 255, 255, 0.48);
+        font-size: 1.15rem;
+        font-weight: 900;
       }
 
       .eq-hint-overlay {
@@ -300,6 +369,43 @@
         text-align: center;
       }
 
+      .eq-choice-grid {
+        width: min(100%, 430px);
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .eq-choice-card {
+        min-height: 142px;
+        display: grid;
+        place-items: center;
+        border: 2px solid color-mix(in srgb, var(--eq-line) 66%, white);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.58);
+        box-shadow: 0 8px 18px rgba(37, 50, 44, 0.1);
+        transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
+      }
+
+      .eq-choice-card:hover,
+      .eq-choice-card:focus-visible {
+        transform: translateY(-2px);
+        border-color: var(--eq-river);
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .eq-choice-card__image {
+        width: 120px;
+        height: 110px;
+        object-fit: contain;
+        filter: drop-shadow(0 10px 10px rgba(92, 61, 28, 0.14));
+      }
+
+      .eq-choice-card__emoji {
+        font-size: 4rem;
+        line-height: 1;
+      }
+
       .eq-voice-review p {
         margin: 0;
         max-width: 100%;
@@ -312,6 +418,46 @@
         justify-content: center;
         gap: 10px;
         margin-top: 4px;
+      }
+
+      .eq-feedback-status {
+        min-height: 44px;
+        display: grid;
+        place-items: center;
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid rgba(47, 114, 136, 0.22);
+        border-radius: 8px;
+        color: var(--eq-ink);
+        background: rgba(255, 255, 255, 0.5);
+        text-align: center;
+      }
+
+      .eq-feedback-status p {
+        margin: 0;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        font-weight: 800;
+      }
+
+      .eq-feedback-status--success {
+        border-color: color-mix(in srgb, var(--eq-forest) 42%, white);
+        background: color-mix(in srgb, var(--eq-forest) 12%, white);
+      }
+
+      .eq-feedback-status--caution {
+        border-color: color-mix(in srgb, var(--eq-rust) 44%, white);
+        background: color-mix(in srgb, var(--eq-rust) 12%, white);
+      }
+
+      .eq-feedback-status--celebration {
+        border-color: color-mix(in srgb, var(--eq-sun) 54%, white);
+        background: color-mix(in srgb, var(--eq-sun) 18%, white);
+      }
+
+      .eq-feedback-status--voice {
+        border-color: color-mix(in srgb, var(--eq-river) 42%, white);
+        background: color-mix(in srgb, var(--eq-river) 12%, white);
       }
 
       .eq-control-row {
@@ -426,6 +572,22 @@
         font-weight: 900;
       }
 
+      .eq-message--feedback {
+        animation: eq-feedback-rise 240ms var(--eq-ease-out);
+      }
+
+      .eq-message--feedback-success {
+        color: var(--eq-forest);
+      }
+
+      .eq-message--feedback-caution {
+        color: var(--eq-rust);
+      }
+
+      .eq-message--feedback-celebration {
+        color: var(--eq-river);
+      }
+
       .eq-vocab-shell {
         width: min(100%, 1040px);
         margin: 0 auto;
@@ -468,21 +630,36 @@
         color: var(--eq-muted);
       }
 
-      @keyframes shake {
-        0% { transform: translate(1px, 1px) rotate(0deg); }
-        10% { transform: translate(-1px, -2px) rotate(-1deg); }
-        20% { transform: translate(-3px, 0px) rotate(1deg); }
-        30% { transform: translate(3px, 2px) rotate(0deg); }
-        40% { transform: translate(1px, -1px) rotate(1deg); }
-        50% { transform: translate(-1px, 2px) rotate(-1deg); }
-        60% { transform: translate(-3px, 1px) rotate(0deg); }
-        70% { transform: translate(3px, 1px) rotate(-1deg); }
-        80% { transform: translate(-1px, -1px) rotate(1deg); }
-        90% { transform: translate(1px, 2px) rotate(0deg); }
-        100% { transform: translate(1px, -2px) rotate(-1deg); }
+      @keyframes eq-feedback-rise {
+        from {
+          opacity: 0.35;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
-      .shake {
-        animation: shake 0.5s;
+
+      @keyframes eq-impact-focus {
+        0% {
+          transform: translateY(0) scale(1);
+        }
+        45% {
+          transform: translateY(-3px) scale(1.015);
+        }
+        100% {
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .eq-enemy-figure--feedback-success,
+      .eq-enemy-figure--feedback-celebration {
+        animation: eq-impact-focus 360ms var(--eq-ease-out);
+      }
+
+      .eq-enemy-figure--feedback-caution {
+        filter: saturate(0.9);
       }
 
       @media (max-width: 820px) {
@@ -521,6 +698,10 @@
           grid-template-columns: 1fr;
         }
 
+        .eq-choice-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+
         .eq-control-row > * {
           width: 100%;
         }
@@ -543,6 +724,20 @@
           animation-iteration-count: 1 !important;
           scroll-behavior: auto !important;
           transition-duration: 0.01ms !important;
+        }
+
+        .eq-word-stage--feedback-success,
+        .eq-word-stage--feedback-caution,
+        .eq-word-stage--feedback-celebration,
+        .eq-word-stage--feedback-voice,
+        .eq-feedback-status,
+        .eq-message--feedback,
+        .eq-enemy-figure--feedback-success,
+        .eq-enemy-figure--feedback-caution,
+        .eq-enemy-figure--feedback-celebration {
+          animation: none !important;
+          transform: none !important;
+          filter: none !important;
         }
       }
     </style>

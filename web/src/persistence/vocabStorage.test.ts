@@ -1,11 +1,14 @@
 import type { VocabItem } from '../types/vocab';
 import {
   STORAGE_KEY_LANG,
+  STORAGE_KEY_PROFILE,
   STORAGE_KEY_VOCAB,
   hydrateDefaultVocabArtwork,
   loadLangFromStorage,
+  loadProfileFromStorage,
   loadVocabFromStorage,
   saveLangToStorage,
+  saveProfileToStorage,
   saveVocabToStorage,
 } from './vocabStorage';
 
@@ -65,5 +68,20 @@ describe('vocabStorage', () => {
 
     expect(localStorage.getItem(STORAGE_KEY_LANG)).toBe('en-GB');
     expect(loadLangFromStorage()).toBe('en-GB');
+  });
+
+  it('loads the default learner profile and saves selected profile', () => {
+    expect(loadProfileFromStorage()).toBe('kid');
+
+    saveProfileToStorage('toddler');
+
+    expect(localStorage.getItem(STORAGE_KEY_PROFILE)).toBe('toddler');
+    expect(loadProfileFromStorage()).toBe('toddler');
+  });
+
+  it('falls back to kid profile when stored profile is unknown', () => {
+    localStorage.setItem(STORAGE_KEY_PROFILE, 'wizard');
+
+    expect(loadProfileFromStorage()).toBe('kid');
   });
 });

@@ -2,21 +2,26 @@ import React from 'react';
 import { Settings, Sparkles, Sword } from 'lucide-react';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { Panel, QuestButton, ScreenShell } from '../components/QuestFrame';
+import { learnerProfileOptions, type LearnerProfile } from '../game/challenges';
 
 type MenuScreenProps = {
   recognitionLang: string;
+  learnerProfile: LearnerProfile;
   speechSupported: boolean;
   message: string;
   onRecognitionLangChange: (lang: string) => void;
+  onLearnerProfileChange: (profile: LearnerProfile) => void;
   onStartGame: () => void;
   onOpenVocabManagement: () => void;
 };
 
 export function MenuScreen({
   recognitionLang,
+  learnerProfile,
   speechSupported,
   message,
   onRecognitionLangChange,
+  onLearnerProfileChange,
   onStartGame,
   onOpenVocabManagement,
 }: MenuScreenProps) {
@@ -32,8 +37,23 @@ export function MenuScreen({
         </section>
 
         <Panel className="p-6 sm:p-8">
-          <div className="mb-6 flex justify-center">
+          <div className="mb-6 grid gap-3">
             <LanguageSelector selectedLang={recognitionLang} onLangChange={onRecognitionLangChange} isMenu />
+            <label className="flex items-center gap-2">
+              <span className="text-sm font-extrabold text-[color:var(--eq-muted)]">玩家模式</span>
+              <select
+                value={learnerProfile}
+                onChange={(event) => onLearnerProfileChange(event.target.value as LearnerProfile)}
+                aria-label="Select learner profile"
+                className="eq-select flex-1"
+              >
+                {learnerProfileOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label} · {option.description}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           <div className="eq-menu__actions">
             <QuestButton onClick={onStartGame} className="w-full" icon={<Sword className="w-5 h-5" />}>
@@ -54,7 +74,7 @@ export function MenuScreen({
             </p>
           )}
           {message && (
-            <p className="eq-message text-center animate-bounce">
+            <p className="eq-message text-center">
               {message}
             </p>
           )}

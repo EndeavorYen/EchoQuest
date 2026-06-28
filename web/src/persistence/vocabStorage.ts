@@ -1,8 +1,10 @@
 import { initialVocab as defaultInitialVocab } from '../data/vocab';
+import type { LearnerProfile } from '../game/challenges';
 import type { VocabItem } from '../types/vocab';
 
 export const STORAGE_KEY_VOCAB = 'echoquest_vocab_v1';
 export const STORAGE_KEY_LANG = 'echoquest_lang_v1';
+export const STORAGE_KEY_PROFILE = 'echoquest_profile_v1';
 
 const DEFAULT_VOCAB_BY_ID = new Map(defaultInitialVocab.map((item) => [item.id, item]));
 const DEFAULT_VOCAB_BY_WORD = new Map(defaultInitialVocab.map((item) => [item.word, item]));
@@ -40,4 +42,13 @@ export function loadLangFromStorage(): string {
 
 export function saveLangToStorage(lang: string) {
   localStorage.setItem(STORAGE_KEY_LANG, lang);
+}
+
+export function loadProfileFromStorage(): LearnerProfile {
+  const stored = localStorage.getItem(STORAGE_KEY_PROFILE);
+  return stored === 'toddler' || stored === 'adult' ? stored : 'kid';
+}
+
+export function saveProfileToStorage(profile: LearnerProfile) {
+  localStorage.setItem(STORAGE_KEY_PROFILE, profile);
 }

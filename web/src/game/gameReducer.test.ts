@@ -1,4 +1,5 @@
 import { Level } from '../data/levels';
+import type { FeedbackEvent } from '../feedback/feedbackEvents';
 import type { AnswerFeedback, LearningProgressState } from '../learning/progress';
 import { createInitialState, gameReducer } from './gameReducer';
 
@@ -30,8 +31,12 @@ describe('gameReducer', () => {
     expect(state.gameState).toBe('menu');
     expect(state.levels).toBe(levels);
     expect(state.recognitionLang).toBe('en-GB');
+    expect(state.learnerProfile).toBe('kid');
     expect(state.progress).toEqual({});
     expect(state.lastAnswerFeedback).toBeNull();
+    expect(state.feedbackEvent).toBeNull();
+    expect(state).not.toHaveProperty('showEffect');
+    expect(state).not.toHaveProperty('isBossShaking');
   });
 
   it('starts a new game from the first level and resets run progress', () => {
@@ -62,6 +67,13 @@ describe('gameReducer', () => {
       ...createInitialState({ levels, recognitionLang: 'en-US' }),
       progress,
       lastAnswerFeedback: feedback,
+      feedbackEvent: {
+        id: 'incorrect-1',
+        kind: 'incorrect',
+        tone: 'caution',
+        message: 'Try again',
+        createdAt: 1,
+      } as FeedbackEvent,
       currentLevel: 1,
       score: 120,
       enemyLives: 1,
@@ -86,6 +98,7 @@ describe('gameReducer', () => {
       message: '',
       progress,
       lastAnswerFeedback: null,
+      feedbackEvent: null,
     });
   });
 
@@ -109,6 +122,15 @@ describe('gameReducer', () => {
     expect(gameReducer(createInitialState({ levels }), { type: 'SET_PROGRESS', payload: progress }).progress).toBe(progress);
   });
 
+  it('stores the selected learner profile', () => {
+    const state = gameReducer(createInitialState({ levels }), {
+      type: 'SET_LEARNER_PROFILE',
+      payload: 'toddler',
+    });
+
+    expect(state.learnerProfile).toBe('toddler');
+  });
+
   it('stores and clears answer feedback', () => {
     const feedback: AnswerFeedback = {
       word: 'apple',
@@ -127,9 +149,33 @@ describe('gameReducer', () => {
     expect(gameReducer(withFeedback, { type: 'SET_LAST_ANSWER_FEEDBACK', payload: null }).lastAnswerFeedback).toBeNull();
   });
 
+  it('stores and clears feedback events', () => {
+    const feedbackEvent: FeedbackEvent = {
+      id: 'correct-1',
+      kind: 'correct',
+      tone: 'success',
+      message: 'Nice hit',
+      createdAt: 1,
+    };
+    const withFeedback = gameReducer(createInitialState({ levels }), {
+      type: 'SET_FEEDBACK_EVENT',
+      payload: feedbackEvent,
+    });
+
+    expect(withFeedback.feedbackEvent).toBe(feedbackEvent);
+    expect(gameReducer(withFeedback, { type: 'CLEAR_FEEDBACK_EVENT' }).feedbackEvent).toBeNull();
+  });
+
   it('clears answer feedback when selecting a new word', () => {
     const state = {
       ...createInitialState({ levels }),
+      feedbackEvent: {
+        id: 'incorrect-1',
+        kind: 'incorrect',
+        tone: 'caution',
+        message: 'Try again',
+        createdAt: 1,
+      } as FeedbackEvent,
       lastAnswerFeedback: {
         word: 'apple',
         submitted: 'apl',
@@ -145,6 +191,7 @@ describe('gameReducer', () => {
       currentWord: null,
       userInput: '',
       lastAnswerFeedback: null,
+      feedbackEvent: null,
     });
   });
 
@@ -168,12 +215,25 @@ describe('gameReducer', () => {
       score: 50,
       combo: 2,
       enemyLives: 2,
-      showEffect: true,
-      isBossShaking: true,
       correctAnswers: 3,
       levelCorrectAnswers: 2,
       message: '太棒了! +40 分，對怪物造成 2 點傷害!',
     });
+  });
+
+  it('clears feedback events when resetting effects', () => {
+    const state = {
+      ...createInitialState({ levels, recognitionLang: 'en-US' }),
+      feedbackEvent: {
+        id: 'correct-1',
+        kind: 'correct',
+        tone: 'success',
+        message: 'Nice hit',
+        createdAt: 1,
+      } as FeedbackEvent,
+    };
+
+    expect(gameReducer(state, { type: 'RESET_EFFECTS' }).feedbackEvent).toBeNull();
   });
 
   it('resets the current level progress when moving to the next level', () => {

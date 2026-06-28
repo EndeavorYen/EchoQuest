@@ -126,6 +126,59 @@ describe('<App />', () => {
     expect(screen.getByText('分數: 0')).toBeInTheDocument();
   });
 
+  it('lets toddler players answer by choosing a picture', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.change(screen.getByLabelText('Select learner profile'), { target: { value: 'toddler' } });
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('找一樣的圖片')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('點擊說話')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '選擇 apple' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/太棒了!/)).toBeInTheDocument();
+    });
+    expect(screen.getByText('分數: 10')).toBeInTheDocument();
+  });
+
+  it('uses gentler encounter copy for toddler players', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.change(screen.getByLabelText('Select learner profile'), { target: { value: 'toddler' } });
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('小龍準備吹熱風，找對圖片就會停下來。')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Dragon is charging flame. Correct answers interrupt the cast.')).not.toBeInTheDocument();
+  });
+
+  it('uses tactical encounter copy for adult players', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.change(screen.getByLabelText('Select learner profile'), { target: { value: 'adult' } });
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Dragon is charging flame. Correct answers interrupt the cast.')).toBeInTheDocument();
+    });
+  });
+
+  it('shows a first-letter typing hint for kid spelling practice', async () => {
+    render(<App initialVocab={defaultTestVocab} />);
+    fireEvent.click(screen.getByText('開始遊戲'));
+
+    await waitFor(() => {
+      expect(screen.getByText('關卡 1')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /切換到拼字模式/i }));
+
+    expect(screen.getByText('提示：a____')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('輸入英文單字')).toBeInTheDocument();
+  });
+
   it('renders bundled artwork for the level and current word when provided', async () => {
     const artworkLevels = [
       {
@@ -266,6 +319,7 @@ describe('<App />', () => {
     await waitFor(() => {
       expect(screen.getByText(/太棒了!/)).toBeInTheDocument();
     });
+    expect(document.querySelector('[data-feedback-kind="correct"]')).toBeInTheDocument();
     expect(screen.getByText('分數: 10')).toBeInTheDocument();
     expect(screen.getByText(/對怪物造成 1 點傷害!/)).toBeInTheDocument();
     expect(screen.getByText('目標: 答對 1/5 個單字，或清空生命值 4/5')).toBeInTheDocument();
@@ -290,6 +344,7 @@ describe('<App />', () => {
     await waitFor(() => {
       expect(screen.getByText('再試一次! 連擊歸零，但不扣分。')).toBeInTheDocument();
     });
+    expect(document.querySelector('[data-feedback-kind="incorrect"]')).toBeInTheDocument();
     expect(screen.getByText('你輸入「wronganswer」，目標是 apple')).toBeInTheDocument();
     expect(screen.getByText('分數: 0')).toBeInTheDocument();
   });
@@ -465,6 +520,10 @@ describe('<App />', () => {
     fireEvent.click(attackButton);
 
     await waitFor(() => {
+      expect(document.querySelector('[data-feedback-kind="levelComplete"]')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
       expect(screen.getByText('勝利！')).toBeInTheDocument();
     }, { timeout: 2000 });
     expect(screen.getByRole('main', { name: 'EchoQuest 勝利結果' })).toHaveAttribute('data-screen', 'victory');
@@ -565,6 +624,7 @@ describe('<App />', () => {
     await waitFor(() => {
       expect(screen.getByText('語音辨識暫時無法連線，請重試語音。')).toBeInTheDocument();
     });
+    expect(document.querySelector('[data-feedback-kind="voiceError"]')).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('輸入英文單字')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /切換到拼字模式/i })).toBeInTheDocument();
 
@@ -651,6 +711,7 @@ describe('<App />', () => {
     });
 
     expect(screen.getByText('聽到：apple')).toBeInTheDocument();
+    expect(document.querySelector('[data-feedback-kind="voiceHeard"]')).toBeInTheDocument();
     expect(screen.getByText('目標：apple')).toBeInTheDocument();
     expect(screen.getByText('分數: 0')).toBeInTheDocument();
     expect(screen.queryByText(/太棒了!/)).not.toBeInTheDocument();

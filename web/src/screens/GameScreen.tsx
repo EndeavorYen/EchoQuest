@@ -3,6 +3,9 @@ import { Heart, HelpCircle, Mic, MicOff, Skull, SkipForward, Star, Sword, Trophy
 import { IconButton, Panel, QuestButton, ScreenShell, StatBadge } from '../components/QuestFrame';
 import { LanguageSelector } from '../components/LanguageSelector';
 import type { Level } from '../data/levels';
+import { getFeedbackPresentation, type FeedbackEvent } from '../feedback/feedbackEvents';
+import type { Challenge } from '../game/challenges';
+import { getEncounterIntent } from '../game/encounters';
 import type { AppState } from '../game/gameReducer';
 import type { AnswerFeedback } from '../learning/progress';
 import type { VocabItem } from '../types/vocab';
@@ -25,6 +28,7 @@ type GameScreenProps = {
   level: Level;
   currentLevel: number;
   currentWord: VocabItem | null;
+  challenge: Challenge | null;
   userInput: string;
   score: number;
   enemyLives: number;
@@ -33,11 +37,10 @@ type GameScreenProps = {
   practiceMode: AppState['practiceMode'];
   levelCorrectAnswers: number;
   skippedWords: number;
-  showEffect: boolean;
   combo: number;
   showHint: boolean;
-  isBossShaking: boolean;
   recognitionLang: string;
+  feedbackEvent: FeedbackEvent | null;
   speech: SpeechViewModel;
   speechErrorMessage: string | null;
   canRetrySpeechError: boolean;
@@ -58,6 +61,7 @@ export function GameScreen({
   level,
   currentLevel,
   currentWord,
+  challenge,
   userInput,
   score,
   enemyLives,
@@ -66,11 +70,10 @@ export function GameScreen({
   practiceMode,
   levelCorrectAnswers,
   skippedWords,
-  showEffect,
   combo,
   showHint,
-  isBossShaking,
   recognitionLang,
+  feedbackEvent,
   speech,
   speechErrorMessage,
   canRetrySpeechError,
@@ -88,6 +91,12 @@ export function GameScreen({
 }: GameScreenProps) {
   const speechUnavailable = !speech.isSupported;
   const totalEnemyLives = level.enemyLives ?? enemyLives;
+  const feedbackPresentation = getFeedbackPresentation(feedbackEvent);
+  const challengeMode = challenge?.mode ?? (practiceMode === 'voice' ? 'voice' : 'free_typing');
+  const usesVoice = challengeMode === 'voice';
+  const usesTyping = challengeMode === 'guided_typing' || challengeMode === 'free_typing';
+  const usesImageChoice = challengeMode === 'image_choice';
+  const encounterIntent = getEncounterIntent(level, challenge?.profile ?? 'kid');
   const objectiveText = level.type === 'puzzle'
     ? `目標: 收集 ${collectedTools.length}/${level.tools?.length || level.requiredWords} 個工具`
     : `目標: 答對 ${levelCorrectAnswers}/${level.requiredWords} 個單字，或清空生命值 ${enemyLives}/${totalEnemyLives}`;
@@ -109,8 +118,12 @@ export function GameScreen({
             <h2 className="eq-display eq-level-title">{level.name}</h2>
             <p className="mt-2 text-[color:var(--eq-muted)]">{level.description}</p>
             <p className="eq-objective">{objectiveText}</p>
+            <div className={`eq-intent-chip eq-intent-chip--${encounterIntent.kind}`} role="status">
+              <span>{encounterIntent.label}</span>
+              <strong>{encounterIntent.text}</strong>
+            </div>
 
-            <div className={`eq-enemy-figure ${isBossShaking ? 'shake' : ''}`}>
+            <div className={`eq-enemy-figure ${feedbackPresentation.enemyClassName}`}>
               {level.imageSrc ? (
                 <img src={level.imageSrc} alt={`${level.name} artwork`} className="eq-enemy-artwork" />
               ) : (
@@ -147,7 +160,7 @@ export function GameScreen({
 
           {currentWord && (
             <Panel className="eq-challenge-panel">
-              <div className={`eq-word-stage ${showEffect ? 'eq-word-stage--success' : ''}`}>
+              <div className={`eq-word-stage ${feedbackPresentation.wordClassName}`}>
                 {currentWordImageSrc ? (
                   <img src={currentWordImageSrc} alt={currentWord.word} className="eq-word-photo" />
                 ) : (
@@ -159,6 +172,12 @@ export function GameScreen({
                   ))}
                 </div>
                 <p className="mt-1 text-sm font-bold text-[color:var(--eq-muted)]">難度等級</p>
+                {challenge && (
+                  <p className="eq-challenge-prompt">{challenge.prompt}</p>
+                )}
+                {challenge?.hintText && (
+                  <p className="eq-guided-hint">提示：{challenge.hintText}</p>
+                )}
                 {showHint && (
                   <div className="eq-hint-overlay">
                     <span className="eq-display text-4xl font-extrabold">{currentWord.word}</span>
@@ -167,12 +186,14 @@ export function GameScreen({
               </div>
 
               <div className="flex flex-col items-center gap-4">
-                <div className="eq-transcript w-full">
-                  <p className="text-xl">
-                    <span className="font-extrabold text-[color:var(--eq-river)]">{speech.transcript}</span>
-                    <span className="text-[color:var(--eq-muted)]">{speech.interimTranscript}</span>
-                  </p>
-                </div>
+                {usesVoice && (
+                  <div className="eq-transcript w-full">
+                    <p className="text-xl">
+                      <span className="font-extrabold text-[color:var(--eq-river)]">{speech.transcript}</span>
+                      <span className="text-[color:var(--eq-muted)]">{speech.interimTranscript}</span>
+                    </p>
+                  </div>
+                )}
 
                 {voiceReview && practiceMode === 'voice' && (
                   <div className="eq-voice-review w-full" role="status" aria-live="polite">
@@ -200,6 +221,17 @@ export function GameScreen({
                   </div>
                 )}
 
+                {feedbackEvent && (
+                  <div
+                    className={feedbackPresentation.statusClassName}
+                    data-feedback-kind={feedbackPresentation.dataFeedbackKind}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <p>{feedbackEvent.message}</p>
+                  </div>
+                )}
+
                 {lastAnswerFeedback && (
                   <div className="eq-voice-review w-full" role="status" aria-live="polite">
                     <p className="text-lg font-extrabold text-[color:var(--eq-river)]">
@@ -213,38 +245,63 @@ export function GameScreen({
                   </div>
                 )}
 
-                <div className="eq-control-row">
-                  <QuestButton
-                    variant={practiceMode === 'voice' ? 'secondary' : 'quiet'}
-                    onClick={onTogglePracticeMode}
-                    aria-label={practiceMode === 'voice' ? '切換到拼字模式' : '切換到語音模式'}
-                    disabled={practiceMode === 'spelling' && speechUnavailable}
-                    icon={practiceMode === 'voice' ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-                  >
-                    {practiceMode === 'voice' ? '語音' : '拼字'}
-                  </QuestButton>
+                {usesImageChoice && challenge && (
+                  <div className="eq-choice-grid" aria-label="Picture choices">
+                    {challenge.choices.map((choice) => {
+                      const choiceImageSrc = choice.imageDataUrl ?? choice.imageSrc;
+                      return (
+                        <button
+                          key={choice.id}
+                          type="button"
+                          className="eq-choice-card"
+                          onClick={() => onSubmit(choice.word)}
+                          aria-label={`選擇 ${choice.word}`}
+                        >
+                          {choiceImageSrc ? (
+                            <img src={choiceImageSrc} alt="" className="eq-choice-card__image" />
+                          ) : (
+                            <span aria-hidden="true" className="eq-choice-card__emoji">{choice.imageName}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-                  {practiceMode === 'voice' ? (
+                {!usesImageChoice && (
+                  <div className="eq-control-row">
                     <QuestButton
-                      variant={speech.listening ? 'danger' : 'primary'}
-                      onClick={onToggleListening}
-                      disabled={speechUnavailable}
-                      icon={<Volume2 className="w-5 h-5" />}
+                      variant={practiceMode === 'voice' ? 'secondary' : 'quiet'}
+                      onClick={onTogglePracticeMode}
+                      aria-label={practiceMode === 'voice' ? '切換到拼字模式' : '切換到語音模式'}
+                      disabled={practiceMode === 'spelling' && speechUnavailable}
+                      icon={practiceMode === 'voice' ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                     >
-                      {speech.listening ? '聆聽中...' : '點擊說話'}
+                      {practiceMode === 'voice' ? '語音' : '拼字'}
                     </QuestButton>
-                  ) : (
-                    <input
-                      type="text"
-                      value={userInput}
-                      onChange={(e) => onUserInputChange(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && onSubmit(userInput)}
-                      placeholder="輸入英文單字"
-                      className="eq-input"
-                    />
-                  )}
-                  <LanguageSelector selectedLang={recognitionLang} onLangChange={onRecognitionLangChange} />
-                </div>
+
+                    {usesVoice ? (
+                      <QuestButton
+                        variant={speech.listening ? 'danger' : 'primary'}
+                        onClick={onToggleListening}
+                        disabled={speechUnavailable}
+                        icon={<Volume2 className="w-5 h-5" />}
+                      >
+                        {speech.listening ? '聆聽中...' : '點擊說話'}
+                      </QuestButton>
+                    ) : usesTyping ? (
+                      <input
+                        type="text"
+                        value={userInput}
+                        onChange={(e) => onUserInputChange(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && onSubmit(userInput)}
+                        placeholder="輸入英文單字"
+                        className="eq-input"
+                      />
+                    ) : null}
+                    {usesVoice && <LanguageSelector selectedLang={recognitionLang} onLangChange={onRecognitionLangChange} />}
+                  </div>
+                )}
 
                 {speech.error && speechErrorMessage && (
                   <div className="flex flex-col items-center gap-3" role="alert">
@@ -268,7 +325,7 @@ export function GameScreen({
                   </p>
                 )}
 
-                {practiceMode === 'spelling' && (
+                {usesTyping && (
                   <QuestButton
                     variant="gold"
                     onClick={() => onSubmit(userInput)}
@@ -296,7 +353,7 @@ export function GameScreen({
 
               {message && (
                 <div className="text-center">
-                  <p className="eq-message animate-bounce">
+                  <p className={`eq-message ${feedbackPresentation.messageClassName}`}>
                     {message}
                   </p>
                 </div>
