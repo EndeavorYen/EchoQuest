@@ -3,7 +3,7 @@ import type { LearningProgressState, WordProgress } from '../learning/progress';
 export const STORAGE_KEY_PROGRESS = 'echoquest_progress_v1';
 
 const VALID_MASTERY_LEVELS = new Set([0, 1, 2, 3]);
-const VALID_PRACTICE_MODES = new Set(['voice', 'spelling']);
+const VALID_PRACTICE_MODES = new Set(['voice', 'spelling', 'image_choice']);
 
 function isNullableNumber(value: unknown): boolean {
   return value === null || typeof value === 'number';

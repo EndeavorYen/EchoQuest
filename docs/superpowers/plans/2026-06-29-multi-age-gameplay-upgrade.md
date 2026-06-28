@@ -78,6 +78,12 @@
 
 This branch executes Phase 2 and the first compact part of Phase 3. Image2 assets are deliberately deferred until rules and UI states stop moving.
 
+## Review Follow-Up
+
+- Toddler image-choice attempts are tracked as `image_choice`, not `voice`, so learning progress reflects the actual interaction.
+- `progressStorage` accepts `image_choice` as a valid persisted practice mode.
+- Root `README.md` documents learner profiles, development commands, verification, and the next roadmap slices.
+
 ## Self-Review
 
 - Spec coverage: 2y, 5y, and adult modes are represented by one shared challenge layer.

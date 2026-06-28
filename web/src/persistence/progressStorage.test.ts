@@ -58,6 +58,28 @@ describe('progressStorage', () => {
     expect(loadProgressFromStorage()).toEqual(progress);
   });
 
+  it('accepts image choice as a valid stored practice mode', () => {
+    const progress: LearningProgressState = {
+      apple: {
+        wordId: 'apple',
+        word: 'apple',
+        attempts: 1,
+        correct: 1,
+        misses: 0,
+        streak: 1,
+        mastery: 1,
+        lastPracticedAt: 1_700_000_000_000,
+        lastMissedAt: null,
+        lastMode: 'image_choice',
+        dueAt: 1_700_086_400_000,
+      },
+    };
+
+    localStorage.setItem(STORAGE_KEY_PROGRESS, JSON.stringify(progress));
+
+    expect(loadProgressFromStorage()).toEqual(progress);
+  });
+
   it('does not overwrite vocabulary storage when saving progress', () => {
     localStorage.setItem(STORAGE_KEY_VOCAB, '[{"word":"apple"}]');
 

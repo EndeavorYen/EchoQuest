@@ -43,3 +43,7 @@ Next improvements:
 - Reduced kid hints for mastered words from first-letter blanks to first letter only.
 - Added encounter intents with toddler/kid/adult copy and a compact UI chip.
 - Self-review: intents are presentational only; the next slice should connect them to real battle mechanics.
+
+Review follow-up:
+- Fixed toddler image-choice attempts so progress stores lastMode as image_choice instead of voice.
+- Added README.md with profile, development, verification, and roadmap notes.

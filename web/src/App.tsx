@@ -13,6 +13,7 @@ import {
   buildLearningSummary,
   createAnswerFeedback,
   getTopReviewCandidates,
+  type PracticeMode,
   recordPracticeAttempt,
 } from './learning/progress';
 import { loadProgressFromStorage, saveProgressToStorage } from './persistence/progressStorage';
@@ -284,9 +285,10 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
     
     const now = Date.now();
     const isCorrect = isAnswerCorrect(submittedText, currentWord);
+    const attemptMode: PracticeMode = currentChallenge?.mode === 'image_choice' ? 'image_choice' : practiceMode;
     const nextProgress = recordPracticeAttempt(progress, currentWord, {
       isCorrect,
-      mode: practiceMode,
+      mode: attemptMode,
       now,
     });
     const wordProgress = nextProgress[currentWord.id];
@@ -298,7 +300,7 @@ const App: React.FC<AppProps> = ({ initialVocab: initialVocabProp, initialLevels
         word: currentWord,
         submitted: submittedText,
         isCorrect,
-        mode: practiceMode,
+        mode: attemptMode,
         progress: wordProgress,
         now,
       }),

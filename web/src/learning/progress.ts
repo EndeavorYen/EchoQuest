@@ -1,6 +1,6 @@
 import type { VocabItem } from '../types/vocab';
 
-export type PracticeMode = 'voice' | 'spelling';
+export type PracticeMode = 'voice' | 'spelling' | 'image_choice';
 export type MasteryLevel = 0 | 1 | 2 | 3;
 
 export type WordProgress = {

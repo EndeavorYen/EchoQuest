@@ -127,6 +127,7 @@ describe('<App />', () => {
   });
 
   it('lets toddler players answer by choosing a picture', async () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
     render(<App initialVocab={defaultTestVocab} />);
     fireEvent.change(screen.getByLabelText('Select learner profile'), { target: { value: 'toddler' } });
     fireEvent.click(screen.getByText('開始遊戲'));
@@ -142,6 +143,11 @@ describe('<App />', () => {
       expect(screen.getByText(/太棒了!/)).toBeInTheDocument();
     });
     expect(screen.getByText('分數: 10')).toBeInTheDocument();
+    expect(JSON.parse(localStorageMock.getItem('echoquest_progress_v1') || '{}')['1']).toMatchObject({
+      word: 'apple',
+      lastMode: 'image_choice',
+    });
+    nowSpy.mockRestore();
   });
 
   it('uses gentler encounter copy for toddler players', async () => {

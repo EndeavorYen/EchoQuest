@@ -65,6 +65,18 @@ describe('learning progress', () => {
     });
   });
 
+  it('records image choice attempts separately from voice and spelling', () => {
+    const now = 1_700_000_000_000;
+
+    const progress = recordPracticeAttempt({}, word('apple'), {
+      isCorrect: true,
+      mode: 'image_choice',
+      now,
+    });
+
+    expect(progress.apple.lastMode).toBe('image_choice');
+  });
+
   it('caps mastery at three after consecutive correct attempts', () => {
     const apple = word('apple');
     const first = recordPracticeAttempt({}, apple, { isCorrect: true, mode: 'spelling', now: 1 });
