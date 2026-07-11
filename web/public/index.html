@@ -1,750 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EchoQuest</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23f4efe1'/%3E%3Cpath d='M32 9l5 17 17 6-17 6-5 17-6-17-16-6 16-6z' fill='none' stroke='%233f7659' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Noto+Sans+TC:wght@400;500;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-      :root {
-        --eq-ink: #25322c;
-        --eq-muted: #687264;
-        --eq-paper: #f4efe1;
-        --eq-paper-strong: #fff8e8;
-        --eq-panel: rgba(255, 250, 235, 0.91);
-        --eq-panel-solid: #fff7e6;
-        --eq-line: #bfa66a;
-        --eq-line-strong: #8b6e31;
-        --eq-forest: #3f7659;
-        --eq-river: #2f7288;
-        --eq-rust: #b4563c;
-        --eq-ruby: #a83d4a;
-        --eq-sun: #d7a43b;
-        --eq-focus: #174f7a;
-        --eq-shadow: 0 18px 50px rgba(37, 50, 44, 0.16);
-        --eq-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-      }
-
-      html,
-      body,
-      #root {
-        min-height: 100%;
-      }
-
-      body {
-        margin: 0;
-        font-family: 'Noto Sans TC', 'Trebuchet MS', sans-serif;
-        color: var(--eq-ink);
-        background: var(--eq-paper);
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-      }
-
-      button,
-      input,
-      select {
-        font: inherit;
-      }
-
-      .eq-screen {
-        position: relative;
-        isolation: isolate;
-        min-height: 100vh;
-        overflow: hidden;
-        padding: 28px;
-        background:
-          linear-gradient(135deg, rgba(63, 118, 89, 0.18), transparent 34%),
-          linear-gradient(315deg, rgba(47, 114, 136, 0.2), transparent 38%),
-          var(--eq-paper);
-      }
-
-      .eq-screen::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        z-index: -1;
-        opacity: 0.55;
-        background-image:
-          linear-gradient(rgba(139, 110, 49, 0.13) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(139, 110, 49, 0.1) 1px, transparent 1px);
-        background-size: 42px 42px;
-        mask-image: linear-gradient(to bottom, black, rgba(0, 0, 0, 0.18));
-      }
-
-      .eq-screen--playing {
-        background-color: #eef3e5;
-      }
-
-      .eq-screen--victory {
-        background-color: #f5ead4;
-      }
-
-      .eq-screen--vocab-management {
-        background-color: #edf2e8;
-      }
-
-      .eq-panel {
-        border: 1px solid color-mix(in srgb, var(--eq-line) 72%, white);
-        border-radius: 8px;
-        background: var(--eq-panel);
-        box-shadow: var(--eq-shadow);
-      }
-
-      .eq-display {
-        font-family: 'Baloo 2', 'Noto Sans TC', sans-serif;
-        letter-spacing: 0;
-      }
-
-      .eq-menu {
-        width: min(100%, 980px);
-        min-height: calc(100vh - 56px);
-        margin: 0 auto;
-        display: grid;
-        grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
-        gap: 28px;
-        align-items: center;
-      }
-
-      .eq-menu__mark {
-        width: 96px;
-        height: 96px;
-        display: grid;
-        place-items: center;
-        border: 2px solid var(--eq-line-strong);
-        border-radius: 8px;
-        background: color-mix(in srgb, var(--eq-paper-strong) 82%, var(--eq-sun));
-        color: var(--eq-forest);
-        box-shadow: 8px 8px 0 rgba(63, 118, 89, 0.18);
-      }
-
-      .eq-menu__title {
-        margin-top: 20px;
-        color: var(--eq-ink);
-        font-size: 3.25rem;
-        line-height: 0.95;
-      }
-
-      .eq-menu__subtitle {
-        margin-top: 12px;
-        color: var(--eq-muted);
-        font-size: 1.125rem;
-        font-weight: 700;
-      }
-
-      .eq-menu__actions {
-        display: grid;
-        gap: 12px;
-      }
-
-      .eq-game-shell {
-        width: min(100%, 1160px);
-        margin: 0 auto;
-      }
-
-      .eq-hud {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 12px;
-        margin-bottom: 18px;
-      }
-
-      .eq-stat {
-        min-height: 68px;
-        display: grid;
-        grid-template-columns: auto 1fr;
-        grid-template-areas:
-          "icon label"
-          "icon value";
-        align-items: center;
-        column-gap: 10px;
-        padding: 12px 14px;
-        border: 1px solid color-mix(in srgb, var(--eq-line) 62%, white);
-        border-radius: 8px;
-        background: rgba(255, 250, 235, 0.78);
-      }
-
-      .eq-stat__icon {
-        grid-area: icon;
-        display: grid;
-        place-items: center;
-      }
-
-      .eq-stat__label {
-        grid-area: label;
-        color: var(--eq-muted);
-        font-size: 0.78rem;
-        font-weight: 800;
-      }
-
-      .eq-stat__value {
-        grid-area: value;
-        color: var(--eq-ink);
-        font-size: 1.25rem;
-        font-weight: 800;
-        line-height: 1.1;
-      }
-
-      .eq-stat--gold .eq-stat__icon { color: var(--eq-sun); }
-      .eq-stat--green .eq-stat__icon { color: var(--eq-forest); }
-      .eq-stat--blue .eq-stat__icon { color: var(--eq-river); }
-      .eq-stat--red .eq-stat__icon { color: var(--eq-rust); }
-
-      .eq-game-grid {
-        display: grid;
-        grid-template-columns: minmax(280px, 0.86fr) minmax(330px, 1.14fr);
-        gap: 18px;
-        align-items: stretch;
-      }
-
-      .eq-level-panel,
-      .eq-challenge-panel {
-        padding: 22px;
-      }
-
-      .eq-level-title {
-        color: var(--eq-forest);
-        font-size: 2rem;
-        line-height: 1.1;
-      }
-
-      .eq-objective {
-        margin-top: 14px;
-        padding: 10px 12px;
-        border: 1px dashed color-mix(in srgb, var(--eq-line-strong) 72%, white);
-        border-radius: 8px;
-        color: var(--eq-river);
-        background: rgba(255, 255, 255, 0.46);
-        font-weight: 800;
-      }
-
-      .eq-intent-chip {
-        margin-top: 10px;
-        display: grid;
-        gap: 3px;
-        padding: 10px 12px;
-        border: 1px solid rgba(47, 114, 136, 0.24);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.48);
-      }
-
-      .eq-intent-chip span {
-        color: var(--eq-muted);
-        font-size: 0.78rem;
-        font-weight: 900;
-      }
-
-      .eq-intent-chip strong {
-        color: var(--eq-ink);
-        font-size: 0.95rem;
-        line-height: 1.25;
-      }
-
-      .eq-intent-chip--flame,
-      .eq-intent-chip--trick {
-        border-color: color-mix(in srgb, var(--eq-rust) 34%, white);
-      }
-
-      .eq-intent-chip--guard,
-      .eq-intent-chip--seal {
-        border-color: color-mix(in srgb, var(--eq-forest) 34%, white);
-      }
-
-      .eq-intent-chip--spell {
-        border-color: color-mix(in srgb, var(--eq-river) 34%, white);
-      }
-
-      .eq-enemy-figure {
-        margin: 20px 0 16px;
-        min-height: 224px;
-        display: grid;
-        place-items: center;
-        text-align: center;
-        font-size: 7rem;
-        line-height: 1;
-      }
-
-      .eq-enemy-artwork {
-        width: min(232px, 70vw);
-        height: 224px;
-        object-fit: contain;
-        filter: drop-shadow(0 18px 18px rgba(92, 61, 28, 0.22));
-      }
-
-      .eq-word-stage {
-        position: relative;
-        min-height: 224px;
-        display: grid;
-        place-items: center;
-        text-align: center;
-        transition: transform 180ms var(--eq-ease-out), filter 180ms var(--eq-ease-out);
-      }
-
-      .eq-word-stage--feedback-success {
-        transform: translateY(-3px) rotate(-1deg) scale(1.03);
-        filter: saturate(1.12);
-      }
-
-      .eq-word-stage--feedback-caution {
-        transform: translateX(-2px);
-        filter: saturate(0.92);
-      }
-
-      .eq-word-stage--feedback-celebration {
-        transform: translateY(-5px) scale(1.04);
-        filter: saturate(1.18) brightness(1.03);
-      }
-
-      .eq-word-stage--feedback-voice {
-        filter: drop-shadow(0 0 12px rgba(47, 114, 136, 0.18));
-      }
-
-      .eq-word-image {
-        font-size: 7rem;
-        line-height: 1;
-      }
-
-      .eq-word-photo {
-        width: min(218px, 70vw);
-        height: 196px;
-        object-fit: contain;
-        padding: 10px;
-        border: 1px solid color-mix(in srgb, var(--eq-line) 58%, transparent);
-        border-radius: 8px;
-        background: radial-gradient(circle at 50% 58%, rgba(255, 244, 205, 0.92), rgba(255, 255, 255, 0.22) 62%, transparent 72%);
-        filter: drop-shadow(0 14px 13px rgba(92, 61, 28, 0.16));
-      }
-
-      .eq-challenge-prompt {
-        margin-top: 8px;
-        color: var(--eq-river);
-        font-size: 1rem;
-        font-weight: 900;
-      }
-
-      .eq-guided-hint {
-        margin-top: 6px;
-        padding: 6px 10px;
-        border: 1px dashed rgba(47, 114, 136, 0.35);
-        border-radius: 8px;
-        color: var(--eq-forest);
-        background: rgba(255, 255, 255, 0.48);
-        font-size: 1.15rem;
-        font-weight: 900;
-      }
-
-      .eq-hint-overlay {
-        position: absolute;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        border-radius: 8px;
-        color: var(--eq-paper-strong);
-        background: rgba(37, 50, 44, 0.84);
-      }
-
-      .eq-transcript {
-        min-height: 52px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 8px 12px;
-        border: 1px solid rgba(47, 114, 136, 0.25);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.44);
-      }
-
-      .eq-voice-review {
-        min-height: 136px;
-        display: grid;
-        justify-items: center;
-        gap: 8px;
-        padding: 14px;
-        border: 1px solid rgba(47, 114, 136, 0.25);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.56);
-        text-align: center;
-      }
-
-      .eq-choice-grid {
-        width: min(100%, 430px);
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-      }
-
-      .eq-choice-card {
-        min-height: 142px;
-        display: grid;
-        place-items: center;
-        border: 2px solid color-mix(in srgb, var(--eq-line) 66%, white);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.58);
-        box-shadow: 0 8px 18px rgba(37, 50, 44, 0.1);
-        transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
-      }
-
-      .eq-choice-card:hover,
-      .eq-choice-card:focus-visible {
-        transform: translateY(-2px);
-        border-color: var(--eq-river);
-        background: rgba(255, 255, 255, 0.78);
-      }
-
-      .eq-choice-card__image {
-        width: 120px;
-        height: 110px;
-        object-fit: contain;
-        filter: drop-shadow(0 10px 10px rgba(92, 61, 28, 0.14));
-      }
-
-      .eq-choice-card__emoji {
-        font-size: 4rem;
-        line-height: 1;
-      }
-
-      .eq-voice-review p {
-        margin: 0;
-        max-width: 100%;
-        overflow-wrap: anywhere;
-      }
-
-      .eq-voice-review__actions {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 10px;
-        margin-top: 4px;
-      }
-
-      .eq-feedback-status {
-        min-height: 44px;
-        display: grid;
-        place-items: center;
-        width: 100%;
-        padding: 10px 12px;
-        border: 1px solid rgba(47, 114, 136, 0.22);
-        border-radius: 8px;
-        color: var(--eq-ink);
-        background: rgba(255, 255, 255, 0.5);
-        text-align: center;
-      }
-
-      .eq-feedback-status p {
-        margin: 0;
-        max-width: 100%;
-        overflow-wrap: anywhere;
-        font-weight: 800;
-      }
-
-      .eq-feedback-status--success {
-        border-color: color-mix(in srgb, var(--eq-forest) 42%, white);
-        background: color-mix(in srgb, var(--eq-forest) 12%, white);
-      }
-
-      .eq-feedback-status--caution {
-        border-color: color-mix(in srgb, var(--eq-rust) 44%, white);
-        background: color-mix(in srgb, var(--eq-rust) 12%, white);
-      }
-
-      .eq-feedback-status--celebration {
-        border-color: color-mix(in srgb, var(--eq-sun) 54%, white);
-        background: color-mix(in srgb, var(--eq-sun) 18%, white);
-      }
-
-      .eq-feedback-status--voice {
-        border-color: color-mix(in srgb, var(--eq-river) 42%, white);
-        background: color-mix(in srgb, var(--eq-river) 12%, white);
-      }
-
-      .eq-control-row {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 10px;
-      }
-
-      .eq-button {
-        min-height: 46px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        border: 1px solid transparent;
-        border-radius: 8px;
-        padding: 10px 16px;
-        font-weight: 800;
-        transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease;
-      }
-
-      .eq-button:hover:not(:disabled),
-      .eq-icon-button:hover:not(:disabled) {
-        transform: translateY(-1px);
-      }
-
-      .eq-button:disabled,
-      .eq-icon-button:disabled {
-        opacity: 0.48;
-        cursor: not-allowed;
-        transform: none;
-      }
-
-      .eq-button--primary {
-        color: #fffaf0;
-        background: var(--eq-forest);
-      }
-
-      .eq-button--primary:hover:not(:disabled) {
-        background: #315f47;
-      }
-
-      .eq-button--secondary {
-        color: #fffaf0;
-        background: var(--eq-river);
-      }
-
-      .eq-button--danger {
-        color: #fffaf0;
-        background: var(--eq-rust);
-      }
-
-      .eq-button--quiet {
-        color: var(--eq-ink);
-        border-color: rgba(139, 110, 49, 0.34);
-        background: rgba(255, 255, 255, 0.42);
-      }
-
-      .eq-button--gold {
-        color: #352817;
-        background: var(--eq-sun);
-      }
-
-      .eq-icon-button {
-        width: 48px;
-        height: 48px;
-        display: inline-grid;
-        place-items: center;
-        border: 1px solid rgba(139, 110, 49, 0.36);
-        border-radius: 8px;
-        color: var(--eq-ink);
-        background: rgba(255, 255, 255, 0.46);
-        transition: transform 140ms ease, background-color 140ms ease;
-      }
-
-      .eq-icon-button--danger {
-        color: #fffaf0;
-        background: var(--eq-rust);
-      }
-
-      .eq-select,
-      .eq-input {
-        min-height: 46px;
-        border: 1px solid rgba(47, 114, 136, 0.36);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.62);
-        color: var(--eq-ink);
-        font-weight: 700;
-      }
-
-      .eq-select {
-        padding: 10px 12px;
-      }
-
-      .eq-input {
-        width: min(100%, 320px);
-        padding: 10px 14px;
-      }
-
-      .eq-button:focus-visible,
-      .eq-icon-button:focus-visible,
-      .eq-select:focus-visible,
-      .eq-input:focus-visible {
-        outline: 3px solid var(--eq-focus);
-        outline-offset: 3px;
-      }
-
-      .eq-message {
-        margin-top: 16px;
-        color: var(--eq-ruby);
-        font-weight: 900;
-      }
-
-      .eq-message--feedback {
-        animation: eq-feedback-rise 240ms var(--eq-ease-out);
-      }
-
-      .eq-message--feedback-success {
-        color: var(--eq-forest);
-      }
-
-      .eq-message--feedback-caution {
-        color: var(--eq-rust);
-      }
-
-      .eq-message--feedback-celebration {
-        color: var(--eq-river);
-      }
-
-      .eq-vocab-shell {
-        width: min(100%, 1040px);
-        margin: 0 auto;
-      }
-
-      .eq-vocab-list {
-        max-height: 520px;
-        overflow: auto;
-        border: 1px solid rgba(139, 110, 49, 0.26);
-        border-radius: 8px;
-      }
-
-      .eq-vocab-row {
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        gap: 14px;
-        align-items: center;
-        padding: 12px;
-        border-bottom: 1px solid rgba(139, 110, 49, 0.16);
-      }
-
-      .eq-vocab-row:last-child {
-        border-bottom: 0;
-      }
-
-      .eq-preview {
-        width: 64px;
-        height: 64px;
-        border-radius: 8px;
-        border: 1px solid rgba(139, 110, 49, 0.34);
-        object-fit: contain;
-        padding: 5px;
-        background: rgba(255, 255, 255, 0.42);
-      }
-
-      .eq-preview--empty {
-        display: grid;
-        place-items: center;
-        border-style: dashed;
-        color: var(--eq-muted);
-      }
-
-      @keyframes eq-feedback-rise {
-        from {
-          opacity: 0.35;
-          transform: translateY(4px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      @keyframes eq-impact-focus {
-        0% {
-          transform: translateY(0) scale(1);
-        }
-        45% {
-          transform: translateY(-3px) scale(1.015);
-        }
-        100% {
-          transform: translateY(0) scale(1);
-        }
-      }
-
-      .eq-enemy-figure--feedback-success,
-      .eq-enemy-figure--feedback-celebration {
-        animation: eq-impact-focus 360ms var(--eq-ease-out);
-      }
-
-      .eq-enemy-figure--feedback-caution {
-        filter: saturate(0.9);
-      }
-
-      @media (max-width: 820px) {
-        .eq-screen {
-          padding: 12px;
-        }
-
-        .eq-menu {
-          min-height: calc(100vh - 24px);
-          grid-template-columns: 1fr;
-          align-content: center;
-        }
-
-        .eq-menu__title {
-          font-size: 2.6rem;
-        }
-
-        .eq-hud {
-          position: sticky;
-          top: 8px;
-          z-index: 3;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .eq-game-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .eq-level-panel,
-        .eq-challenge-panel {
-          padding: 16px;
-        }
-
-        .eq-control-row {
-          display: grid;
-          grid-template-columns: 1fr;
-        }
-
-        .eq-choice-grid {
-          grid-template-columns: 1fr 1fr;
-        }
-
-        .eq-control-row > * {
-          width: 100%;
-        }
-
-        .eq-vocab-row {
-          grid-template-columns: auto 1fr;
-        }
-
-        .eq-vocab-actions {
-          grid-column: 1 / -1;
-          justify-content: flex-start;
-        }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        *,
-        *::before,
-        *::after {
-          animation-duration: 0.01ms !important;
-          animation-iteration-count: 1 !important;
-          scroll-behavior: auto !important;
-          transition-duration: 0.01ms !important;
-        }
-
-        .eq-word-stage--feedback-success,
-        .eq-word-stage--feedback-caution,
-        .eq-word-stage--feedback-celebration,
-        .eq-word-stage--feedback-voice,
-        .eq-feedback-status,
-        .eq-message--feedback,
-        .eq-enemy-figure--feedback-success,
-        .eq-enemy-figure--feedback-caution,
-        .eq-enemy-figure--feedback-celebration {
-          animation: none !important;
-          transform: none !important;
-          filter: none !important;
-        }
-      }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EchoQuest</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%23f4efe1'/%3E%3Cpath d='M32 9l5 17 17 6-17 6-5 17-6-17-16-6 16-6z' fill='none' stroke='%233f7659' stroke-width='5' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Noto+Sans+TC:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --forest-ink: #17233b;
+      --forest-leaf: #2f8f67;
+      --forest-sun: #ffcf5a;
+      --forest-coral: #ef624d;
+      --forest-sky: #99d8df;
+      --eq-ink: var(--forest-ink);
+      --eq-muted: #496078;
+      --eq-paper: #dff0dd;
+      --eq-panel: rgba(255, 255, 255, .92);
+      --eq-forest: var(--forest-leaf);
+      --eq-river: #30778f;
+      --eq-rust: var(--forest-coral);
+      --eq-sun: var(--forest-sun);
+      --eq-focus: #173d78;
+    }
+
+    * { box-sizing: border-box; }
+    html, body, #root { min-height: 100%; }
+    body {
+      margin: 0;
+      font-family: 'Noto Sans TC', 'Trebuchet MS', sans-serif;
+      color: var(--forest-ink);
+      background: var(--eq-paper);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 3px solid var(--eq-focus);
+      outline-offset: 3px;
+    }
+
+    .eq-adventure { min-height:100dvh; color:var(--forest-ink); background:#dff0dd; overflow:hidden; }
+    .eq-adventure-hud { position:fixed; z-index:20; inset:16px 16px auto; display:flex; justify-content:space-between; align-items:flex-start; gap:16px; pointer-events:none; }
+    .eq-adventure-hud > * { pointer-events:auto; }
+    .eq-adventure-hud > div:first-child {
+      display: grid;
+      gap: 2px;
+      padding: 9px 12px;
+      border: 1px solid rgba(255,255,255,.58);
+      border-radius: 8px;
+      color: #fff;
+      background: rgba(23,35,59,.38);
+      box-shadow: 0 6px 18px rgba(23,35,59,.18);
+      text-shadow: 0 1px 3px rgba(23,35,59,.65);
+    }
+    .eq-adventure-hud span { font-size: .8rem; font-weight: 800; }
+    .eq-adventure-hud strong { font-family: 'Baloo 2', sans-serif; font-size: 1.2rem; line-height: 1; }
+    .eq-adventure-hud-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
+    .eq-adventure-hud nav { display:flex; gap:6px; padding:4px; border:1px solid rgba(255,255,255,.58); border-radius:8px; background:rgba(255,255,255,.9); box-shadow:0 6px 18px rgba(23,35,59,.16); }
+    .eq-adventure-hud nav button {
+      min-height: 36px;
+      border: 0;
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: var(--forest-ink);
+      background: transparent;
+      font-size: .82rem;
+      font-weight: 900;
+    }
+    .eq-adventure-hud nav button[aria-pressed='true'] { color: #fff; background: var(--forest-leaf); }
+
+    .eq-adventure-scene { position:relative; min-height:100dvh; padding:104px clamp(20px,5vw,72px) 136px; background:center/cover no-repeat url('/assets/generated/level-magic-gate.png'); }
+    .eq-adventure--rescue .eq-adventure-scene { background-image: url('/assets/generated/boss-wizard.png'); background-color: var(--forest-sky); }
+    .eq-adventure--complete .eq-adventure-scene { background-image: url('/assets/generated/boss-wizard.png'); background-color: var(--forest-leaf); }
+    .eq-scene-copy { position:relative; z-index:2; max-width:430px; color:#fff; text-shadow:0 2px 12px rgba(23,35,59,.72); }
+    .eq-scene-copy p { margin:0 0 10px; font-weight:800; }
+    .eq-scene-copy p:first-child { font-size:.82rem; letter-spacing:0; }
+    .eq-scene-copy h1 { margin:0; font-family:'Baloo 2','Noto Sans TC',sans-serif; font-size:clamp(2.1rem,4.6vw,4.2rem); line-height:.95; letter-spacing:0; }
+    .eq-boss-intent { max-width: 320px; padding: 8px 10px; border-left: 4px solid var(--forest-sun); background: rgba(23,35,59,.38); }
+    .eq-scene-character { position:absolute; right:4vw; bottom:110px; width:min(44vw,560px); }
+    .eq-scene-character img { display:block; width:100%; max-height:68dvh; object-fit:contain; object-position:bottom right; filter:drop-shadow(0 12px 18px rgba(23,35,59,.3)); }
+
+    .eq-world-challenge { position:absolute; z-index:3; left:5vw; bottom:120px; width:min(520px,90vw); max-width:min(520px,90vw); padding:16px; border:1px solid rgba(255,255,255,.72); border-radius:8px; background:rgba(255,255,255,.94); box-shadow:0 14px 30px rgba(23,35,59,.24); }
+    .eq-target-card { display:flex; align-items:center; gap:14px; }
+    .eq-target-card img { width:92px; height:82px; object-fit:contain; }
+    .eq-target-card span { display:grid; width:92px; height:82px; place-items:center; color:var(--forest-leaf); font-size:2rem; font-weight:900; }
+    .eq-word-clue { margin:8px 0 12px; }
+    .eq-word-clue p { margin:0; color:var(--forest-leaf); font-size:.8rem; font-weight:900; }
+    .eq-word-clue h2 { margin:2px 0; font-family:'Baloo 2','Noto Sans TC',sans-serif; font-size:1.55rem; letter-spacing:0; line-height:1.1; }
+    .eq-word-clue span { color:#496078; font-size:.88rem; font-weight:700; }
+    .eq-choice-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .eq-picture-choice { min-height:96px; border:2px solid #c8e0d2; border-radius:8px; background:#f9fffb; box-shadow:inset 0 -3px rgba(47,143,103,.1); }
+    .eq-picture-choice:hover { border-color:var(--forest-leaf); background:#eaf8ef; }
+    .eq-picture-choice img { width:100%; height:78px; object-fit:contain; }
+    .eq-picture-choice span { color:var(--forest-leaf); font-size:2rem; font-weight:900; }
+    .eq-letter-game, .eq-typing-game, .eq-voice-panel { display:grid; gap:10px; }
+    .eq-letter-answer, .eq-transcript-line { min-height:42px; margin:0; display:flex; align-items:center; padding:8px 10px; border:1px solid #c8e0d2; border-radius:6px; background:#f8fffa; font-weight:800; }
+    .eq-letter-bank { display:flex; flex-wrap:wrap; gap:7px; }
+    .eq-letter-tile { width:42px; height:42px; border:0; border-radius:6px; color:#fff; background:var(--forest-leaf); font-family:'Baloo 2',sans-serif; font-size:1.2rem; font-weight:900; box-shadow:inset 0 -3px rgba(0,0,0,.15); }
+    .eq-letter-tile:disabled { opacity:.35; cursor:not-allowed; }
+    .eq-row-actions, .eq-voice-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+    .eq-typing-game { grid-template-columns:minmax(0,1fr) auto; }
+    .eq-typing-game input, .eq-select { min-height:44px; border:1px solid #89b7b5; border-radius:6px; padding:9px 11px; color:var(--forest-ink); background:#fff; font-weight:700; }
+    .eq-voice-panel { margin-top:12px; padding-top:12px; border-top:1px solid #d9e8dd; }
+    .eq-voice-review { display:grid; gap:7px; padding:10px; border:1px solid #9bc7c8; border-radius:6px; background:#edfafa; }
+    .eq-voice-note { margin:0; color:#496078; font-size:.9rem; font-weight:700; }
+    .eq-adventure-message { margin:12px 0 0; font-weight:900; }
+    .eq-adventure-message--correct { color:var(--forest-leaf); }
+    .eq-adventure-message--wrong { color:#b84537; }
+    .eq-adventure-message--voice { color:#276e86; }
+
+    .eq-arcade-primary, .eq-arcade-secondary, .eq-arcade-danger, .eq-arcade-small-button, .eq-button {
+      min-height:42px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:7px;
+      border:0;
+      border-radius:6px;
+      padding:9px 12px;
+      font-weight:900;
+      box-shadow:inset 0 -3px rgba(0,0,0,.16);
+    }
+    .eq-arcade-primary, .eq-button--primary { color:#17233b; background:var(--forest-sun); }
+    .eq-arcade-secondary, .eq-button--secondary { color:#fff; background:#30778f; }
+    .eq-arcade-danger, .eq-button--danger { color:#fff; background:var(--forest-coral); }
+    .eq-arcade-small-button, .eq-button--quiet { color:#17233b; background:#fff; }
+    .eq-button--gold { color:#17233b; background:var(--forest-sun); }
+    .eq-arcade-primary:disabled, .eq-arcade-secondary:disabled, .eq-arcade-danger:disabled, .eq-arcade-small-button:disabled { opacity:.45; cursor:not-allowed; }
+
+    .eq-spell-dock { position:fixed; z-index:30; inset:auto 50% 18px auto; transform:translateX(50%); display:grid; grid-template-columns:repeat(3,minmax(92px,150px)); gap:10px; }
+    .eq-spell-dock button { min-height:64px; border:0; border-radius:12px; color:#17233b; background:var(--forest-sun); font-weight:900; box-shadow:inset 0 -5px rgba(0,0,0,.18),0 8px 20px rgba(23,35,59,.25); }
+    .eq-spell-dock button:nth-child(2) { background:var(--forest-sky); }
+    .eq-spell-dock button:nth-child(3) { background:#b9e4be; }
+    .eq-spell-dock button:disabled { opacity:.55; cursor:not-allowed; }
+
+    .eq-adventure-vocab { min-height:100dvh; padding:20px; }
+    .eq-screen { min-height:100%; padding:16px 0; }
+    .eq-vocab-shell { width:min(100%,980px); margin:0 auto; }
+    .eq-panel { border:1px solid #c8e0d2; border-radius:8px; background:var(--eq-panel); box-shadow:0 14px 30px rgba(23,35,59,.16); }
+    .eq-display { font-family:'Baloo 2','Noto Sans TC',sans-serif; letter-spacing:0; }
+    .eq-vocab-list { max-height:520px; overflow:auto; border:1px solid #c8e0d2; border-radius:6px; }
+    .eq-vocab-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:center; padding:12px; border-bottom:1px solid #d9e8dd; }
+    .eq-vocab-row:last-child { border-bottom:0; }
+    .eq-preview { width:64px; height:64px; border:1px solid #c8e0d2; border-radius:6px; object-fit:contain; background:#fff; }
+    .eq-preview--empty { display:grid; place-items:center; color:var(--forest-leaf); font-weight:900; }
+
+    @media (max-width:640px) {
+      .eq-adventure-hud { inset:8px; gap:6px; }
+      .eq-adventure-hud > div:first-child { padding:7px 9px; }
+      .eq-adventure-hud-actions { gap:4px; }
+      .eq-adventure-hud nav { gap:2px; }
+      .eq-adventure-hud nav button { min-height:32px; padding:5px 6px; font-size:.72rem; }
+      .eq-adventure-hud .eq-arcade-small-button { min-height:32px; padding:6px 8px; font-size:.76rem; }
+      .eq-adventure-scene { padding:82px 14px 164px; }
+      .eq-scene-character { right:-14vw; bottom:190px; width:78vw; opacity:.9; }
+      .eq-world-challenge { left:14px; right:14px; bottom:92px; width:auto; max-width:none; }
+      .eq-spell-dock { inset:auto 8px 8px; transform:none; grid-template-columns:repeat(3,1fr); }
+      .eq-spell-dock button, .eq-picture-choice { min-height:72px; }
+      .eq-vocab-row { grid-template-columns:auto minmax(0,1fr); }
+      .eq-vocab-actions { grid-column:1 / -1; }
+    }
+
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; } }
+  </style>
 </head>
 <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-    <script src="index.js"></script>
+  <div id="root"></div>
+  <script type="module" src="/index.js"></script>
 </body>
 </html>
