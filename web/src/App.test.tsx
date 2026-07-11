@@ -243,6 +243,36 @@ describe('EchoQuest arcade game', () => {
     await expectRoom('修復魔法橋');
   });
 
+  it('prioritizes the pending microphone permission label while keeping the request cancelable', async () => {
+    setProfile('adult');
+    installSpeechRecognitionMock();
+    renderGame();
+
+    fireEvent.click(await screen.findByRole('button', { name: '說出單字' }));
+    const voiceControl = screen.getByRole('button', { name: '等待麥克風權限' });
+    expect(voiceControl).toBeEnabled();
+
+    fireEvent.click(voiceControl);
+    const recognition = MockSpeechRecognition.instances[0];
+    expect(recognition.stop).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      recognition.onend?.();
+    });
+    expect(screen.getByRole('button', { name: '說出單字' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '說出單字' }));
+    act(() => {
+      recognition.onstart?.();
+    });
+    expect(screen.getByRole('button', { name: '聆聽中' })).toBeInTheDocument();
+
+    act(() => {
+      recognition.onend?.();
+    });
+    expect(screen.getByRole('button', { name: '說出單字' })).toBeInTheDocument();
+  });
+
   it('ignores an active voice result after switching players', async () => {
     setProfile('adult');
     installSpeechRecognitionMock();
