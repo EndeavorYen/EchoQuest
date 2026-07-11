@@ -42,6 +42,20 @@ describe('family relay adventure', () => {
       .toEqual(['escort', 'build', 'scout', 'boss']);
   });
 
+  it('creates equal plans when eligible vocabulary arrives in a different order', () => {
+    const vocab = ['zebra', 'äther', 'apple', 'ball', 'cat', 'dog', 'fish'].map((word) => makeWord(word));
+    const localeCompare = jest.spyOn(String.prototype, 'localeCompare').mockImplementation(() => 0);
+
+    try {
+      const first = createAdventure({ seed: 42, vocab, progress: {}, now: options.now });
+      const second = createAdventure({ seed: 42, vocab: [...vocab].reverse(), progress: {}, now: options.now });
+
+      expect(first).toEqual(second);
+    } finally {
+      localeCompare.mockRestore();
+    }
+  });
+
   it('finishes three shared events and all Boss turns', () => {
     let state = createAdventure(options);
 

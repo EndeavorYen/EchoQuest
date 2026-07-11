@@ -77,8 +77,23 @@ function shuffle<T>(items: T[], random: () => number): T[] {
   return shuffled;
 }
 
+function compareCodePoints(left: string, right: string): number {
+  const leftPoints = Array.from(left);
+  const rightPoints = Array.from(right);
+  const sharedLength = Math.min(leftPoints.length, rightPoints.length);
+
+  for (let index = 0; index < sharedLength; index += 1) {
+    const difference = leftPoints[index].codePointAt(0)! - rightPoints[index].codePointAt(0)!;
+    if (difference !== 0) return difference;
+  }
+
+  return leftPoints.length - rightPoints.length;
+}
+
 function sortWords(words: VocabItem[]): VocabItem[] {
-  return [...words].sort((left, right) => left.id.localeCompare(right.id) || left.word.localeCompare(right.word));
+  return [...words].sort((left, right) => (
+    compareCodePoints(left.id, right.id) || compareCodePoints(left.word, right.word)
+  ));
 }
 
 function getMissionWordSelection({
