@@ -19,7 +19,7 @@ export type Challenge = {
 export const learnerProfileOptions: Array<{ value: LearnerProfile; label: string; description: string }> = [
   { value: 'toddler', label: '2y 圖像', description: '看圖點選' },
   { value: 'kid', label: '5y 單字', description: '提示打字' },
-  { value: 'adult', label: 'Adult', description: '自由練習' },
+  { value: 'adult', label: '成人/家長', description: '快速打字' },
 ];
 
 function hashText(text: string): number {

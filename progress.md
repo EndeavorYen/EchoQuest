@@ -47,3 +47,35 @@ Next improvements:
 Review follow-up:
 - Fixed toddler image-choice attempts so progress stores lastMode as image_choice instead of voice.
 - Added README.md with profile, development, verification, and roadmap notes.
+
+2026-06-29 rebuild:
+- Root cause review: the old default voice path used continuous listening plus auto-restart, which is fragile for browser permissions and React lifecycle state.
+- Replaced the default App entry with a no-blocking arcade learning loop: toddler picture match, kid letter assembly, adult typing, and optional confirmed voice for kid/adult.
+- Simplified voice behavior to one explicit listen action followed by review/confirm; typing and spelling remain available even when speech recognition is unsupported.
+- Added new App regression tests for toddler picture matching, kid spelling, adult typing, adult voice review, and unsupported-voice fallback.
+
+Art polish:
+- Added level-themed scene palettes, terrain texture, staged boss/word presentation, richer button/tile materials, and simple hit feedback animation.
+- Kept it CSS-only for now; no new image pipeline or dependencies.
+
+Age-review follow-up:
+- Subagents reviewed toddler, kid, and adult/parent flows.
+- Fixed mobile order so word/input appear before boss/status.
+- Toddler now starts with two choices and has a wrong-then-correct regression test.
+- Kid spelling now shows the first letter and clears used tiles after a wrong attack.
+- Unsupported speech now shows a fallback note instead of a disabled primary voice control.
+
+2026-07-11 Task 1:
+- Tracking issue: https://github.com/EndeavorYen/EchoQuest/issues/69
+- Added pure adventure domain functions: createAdventure, completeRoomChallenge, getBossTurn, and castSpell.
+- Focused test result: `npm test -- src/game/adventure.test.ts --runInBand` passed 2 tests.
+- Self-review: three fixed boss turns are sufficient for the first vertical slice.
+
+2026-07-11 family magic adventure rebuild:
+- Replaced the dashboard/boss-HP loop with orchard, bridge, and rescue rooms plus a shared family victory.
+- Rescue requires a correct learning answer before each spell; wrong spells preserve the room and charge.
+- Removed speech auto-restart, fixed React Strict Mode replay, and stopped active recognition before player/room transitions.
+- Browser QA completed the full mission at 1365x900 and 390x844. Mobile challenge bottom was 752px in an 844px viewport; toddler choices were 81.56px high and spell buttons 72px high; no horizontal overflow or console errors were found.
+- Chrome exposed Web Speech API and the permission/fallback path worked without blocking typing. Physical spoken recognition could not be supplied by automation and remains a hardware smoke test on the player's machine.
+- Visual review found fixed-word copy, duplicate transparent art, and black asset backgrounds. Orchard copy is now target-neutral and transparent PNGs render once over room colors instead of as full-screen backgrounds.
+- Final verification passed 16 suites / 106 tests and a 176.9kb production build. Post-fix desktop/mobile screenshots show no large black fields or duplicate scene art; console errors remain zero.

@@ -89,3 +89,27 @@ This branch executes Phase 2 and the first compact part of Phase 3. Image2 asset
 - Spec coverage: 2y, 5y, and adult modes are represented by one shared challenge layer.
 - YAGNI check: no account system, no Phaser rewrite, no new dependency.
 - Known ceiling: toddler mastery currently uses stored word mastery, not separate child-specific progress. Add per-profile progress only if family use shows mastery conflicts.
+
+## 2026-06-29 Rebuild Override
+
+The old menu/screen/reducer gameplay was replaced after playtest feedback that the game was not fun and speech recognition felt unusable.
+
+Current source of truth:
+
+- `web/src/App.tsx` now owns the default arcade learning loop directly.
+- `2y 圖像` uses picture matching with no heart loss.
+- `5y 單字` uses letter tiles plus optional confirmed voice.
+- `成人/家長` uses typing plus optional confirmed voice.
+- Voice recognition is no longer continuous by default. The player clicks `說出單字`, reviews `聽到：...`, then confirms or retries.
+- `web/src/hooks/useSpeechRecognition.ts` uses one-shot recognition only; the unused automatic-restart branch was removed.
+- `web/src/App.test.tsx` is the current regression contract for the default game loop.
+
+Verification added for the rebuild:
+
+- toddler picture clear
+- kid letter assembly clear
+- adult typing clear
+- adult voice review clear
+- unsupported speech fallback still allows typing
+
+Next slices should build on the arcade loop instead of restoring the old `MenuScreen` / `GameScreen` default flow.
