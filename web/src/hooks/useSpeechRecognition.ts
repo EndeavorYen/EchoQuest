@@ -41,14 +41,12 @@ interface UseSpeechRecognitionResult {
 
 interface UseSpeechRecognitionOptions {
   onResult?: (transcript: string) => void;
-  autoRestart?: boolean;
 }
 
 const UNSUPPORTED_ERROR_MESSAGE = 'Speech recognition is not supported in this browser.';
 
 export function useSpeechRecognition({
   onResult,
-  autoRestart = false,
 }: UseSpeechRecognitionOptions = {}): UseSpeechRecognitionResult {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -56,10 +54,10 @@ export function useSpeechRecognition({
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const listeningRef = useRef(false);
-  const manualStopRef = useRef(false);
   const langRef = useRef('en-US');
   const onResultRef = useRef(onResult);
-  const autoRestartRef = useRef(autoRestart);
+  const activeRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const [isSupported] = useState(() => {
     if (typeof window === 'undefined') {
@@ -85,12 +83,12 @@ export function useSpeechRecognition({
   }, []);
 
   const stop = useCallback(() => {
+    activeRef.current = false;
     const recognition = recognitionRef.current;
     if (!recognition) {
       return;
     }
 
-    manualStopRef.current = true;
     listeningRef.current = false;
     try {
       recognition.stop();
@@ -101,7 +99,6 @@ export function useSpeechRecognition({
 
   const start = useCallback((lang: string = 'en-US') => {
     langRef.current = lang;
-    manualStopRef.current = false;
 
     if (!isSupported) {
       setError(UNSUPPORTED_ERROR_MESSAGE);
@@ -122,7 +119,7 @@ export function useSpeechRecognition({
     }
 
     const newRecognition = recognitionRef.current ?? new SpeechRecognition();
-    newRecognition.continuous = true; // Process multiple results
+    newRecognition.continuous = false;
     newRecognition.lang = langRef.current;
     newRecognition.interimResults = true; // Get results as the user speaks
     if ('maxAlternatives' in newRecognition) {
@@ -130,6 +127,7 @@ export function useSpeechRecognition({
     }
 
     newRecognition.onstart = () => {
+      if (!mountedRef.current || !activeRef.current) return;
       listeningRef.current = true;
       setListening(true);
       setError(null);
@@ -138,26 +136,13 @@ export function useSpeechRecognition({
     };
 
     newRecognition.onend = () => {
+      activeRef.current = false;
       listeningRef.current = false;
-      setListening(false);
-      setInterimTranscript('');
-      if (autoRestartRef.current && !manualStopRef.current && recognitionRef.current === newRecognition) {
-        newRecognition.lang = langRef.current;
-        try {
-          newRecognition.start();
-          listeningRef.current = true;
-          setListening(true);
-        } catch (err) {
-          const domError = err as DOMException;
-          if (domError?.name !== 'InvalidStateError') {
-            setError(domError?.message || 'Failed to restart speech recognition.');
-          }
-        }
-      }
+      if (mountedRef.current) setListening(false);
     };
 
     newRecognition.onerror = (event) => {
-      manualStopRef.current = true;
+      activeRef.current = false;
       listeningRef.current = false;
       setListening(false);
       setInterimTranscript('');
@@ -165,6 +150,7 @@ export function useSpeechRecognition({
     };
 
     newRecognition.onresult = (event) => {
+      if (!mountedRef.current || !activeRef.current) return;
       let finalTranscript = '';
       let interim = '';
 
@@ -190,6 +176,7 @@ export function useSpeechRecognition({
     recognitionRef.current = newRecognition;
 
     try {
+      activeRef.current = true;
       newRecognition.start();
     } catch (err) {
       const domError = err as DOMException;
@@ -204,12 +191,10 @@ export function useSpeechRecognition({
   }, [onResult]);
 
   useEffect(() => {
-    autoRestartRef.current = autoRestart;
-  }, [autoRestart]);
-
-  useEffect(() => {
     return () => {
       const recognition = recognitionRef.current;
+      mountedRef.current = false;
+      activeRef.current = false;
       if (!recognition) {
         return;
       }

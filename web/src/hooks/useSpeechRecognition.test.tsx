@@ -53,16 +53,6 @@ function ResultHarness({ onResult }: { onResult: (result: string) => void }) {
   return (
     <div>
       <button onClick={() => speech.start('en-US')}>start</button>
-    </div>
-  );
-}
-
-function AutoRestartHarness() {
-  const speech = useSpeechRecognition({ autoRestart: true });
-
-  return (
-    <div>
-      <button onClick={() => speech.start('en-US')}>start</button>
       <button onClick={speech.stop}>stop</button>
     </div>
   );
@@ -128,26 +118,36 @@ describe('useSpeechRecognition', () => {
     expect(latestResult).toHaveBeenCalledWith('apple');
   });
 
-  it('keeps the active recognition instance when automatically restarting', () => {
+  it('does not restart after no-speech or after unmount', () => {
     setMockSpeechRecognition();
 
-    render(<AutoRestartHarness />);
+    const { unmount } = render(<ResultHarness onResult={jest.fn()} />);
     fireEvent.click(screen.getByText('start'));
     const recognition = MockSpeechRecognition.instances[0];
 
     act(() => {
-      recognition.onstart?.();
-      recognition.onend?.();
+      recognition.onerror?.({ error: 'no-speech' });
     });
-
-    expect(MockSpeechRecognition.instances).toHaveLength(1);
-    expect(recognition.start).toHaveBeenCalledTimes(2);
-
+    expect(recognition.start).toHaveBeenCalledTimes(1);
+    const ended = recognition.onend;
+    unmount();
     act(() => {
-      recognition.onstart?.();
+      ended?.();
     });
-    fireEvent.click(screen.getByText('stop'));
+    expect(recognition.start).toHaveBeenCalledTimes(1);
+  });
 
-    expect(recognition.stop).toHaveBeenCalledTimes(1);
+  it('ignores a final result produced after stop', () => {
+    setMockSpeechRecognition();
+    const onResult = jest.fn();
+    render(<ResultHarness onResult={onResult} />);
+    fireEvent.click(screen.getByText('start'));
+    const recognition = MockSpeechRecognition.instances[0];
+    fireEvent.click(screen.getByText('stop'));
+    act(() => recognition.onresult?.({
+      resultIndex: 0,
+      results: [{ isFinal: true, 0: { transcript: 'apple' } }],
+    }));
+    expect(onResult).not.toHaveBeenCalled();
   });
 });
