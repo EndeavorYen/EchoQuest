@@ -191,6 +191,7 @@ export function useSpeechRecognition({
   }, [onResult]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       const recognition = recognitionRef.current;
       mountedRef.current = false;

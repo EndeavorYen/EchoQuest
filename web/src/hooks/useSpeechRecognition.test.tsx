@@ -58,6 +58,17 @@ function ResultHarness({ onResult }: { onResult: (result: string) => void }) {
   );
 }
 
+function StrictModeHarness({ onResult }: { onResult: (result: string) => void }) {
+  const speech = useSpeechRecognition({ onResult });
+
+  return (
+    <div>
+      <div data-testid="strict-listening">{String(speech.listening)}</div>
+      <button onClick={() => speech.start('en-US')}>strict start</button>
+    </div>
+  );
+}
+
 describe('useSpeechRecognition', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -116,6 +127,30 @@ describe('useSpeechRecognition', () => {
 
     expect(firstResult).not.toHaveBeenCalled();
     expect(latestResult).toHaveBeenCalledWith('apple');
+  });
+
+  it('works after the Strict Mode effect replay', () => {
+    setMockSpeechRecognition();
+    const onResult = jest.fn();
+
+    render(
+      <React.StrictMode>
+        <StrictModeHarness onResult={onResult} />
+      </React.StrictMode>
+    );
+    fireEvent.click(screen.getByText('strict start'));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() => {
+      recognition.onstart?.();
+      recognition.onresult?.({
+        resultIndex: 0,
+        results: [{ isFinal: true, 0: { transcript: 'apple' } }],
+      });
+    });
+
+    expect(screen.getByTestId('strict-listening')).toHaveTextContent('true');
+    expect(onResult).toHaveBeenCalledWith('apple');
   });
 
   it('does not restart after no-speech or after unmount', () => {
