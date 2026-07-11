@@ -121,6 +121,42 @@ describe('EchoQuest arcade game', () => {
     expect(screen.getByRole('heading', { name: '救援成功' })).toBeInTheDocument();
   });
 
+  it('keeps a rescue charge after a wrong spell and consumes it after the correct spell', () => {
+    renderGame();
+
+    fireEvent.click(screen.getByRole('button', { name: /選擇 apple/i }));
+    fireEvent.click(screen.getByRole('button', { name: '5y 單字' }));
+    for (const letter of ['a', 'p', 'p', 'l', 'e']) {
+      const tile = screen.getAllByRole('button', { name: `letter ${letter}` })
+        .find((button) => !(button as HTMLButtonElement).disabled);
+      fireEvent.click(tile!);
+    }
+    fireEvent.click(screen.getByRole('button', { name: '修好橋梁' }));
+    fireEvent.click(screen.getByRole('button', { name: '成人/家長' }));
+
+    const spells = ['火球', '護盾', '治療'];
+    for (const spell of spells) {
+      expect(screen.getByRole('button', { name: spell })).toBeDisabled();
+    }
+
+    fireEvent.change(screen.getByLabelText('Type answer'), { target: { value: 'apple' } });
+    fireEvent.click(screen.getByRole('button', { name: '魔法充能' }));
+    for (const spell of spells) {
+      expect(screen.getByRole('button', { name: spell })).toBeEnabled();
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: '護盾' }));
+    expect(screen.getByRole('heading', { name: '森林救援' })).toBeInTheDocument();
+    for (const spell of spells) {
+      expect(screen.getByRole('button', { name: spell })).toBeEnabled();
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: '火球' }));
+    for (const spell of spells) {
+      expect(screen.getByRole('button', { name: spell })).toBeDisabled();
+    }
+  });
+
   it('starts toddler rounds with two choices and allows a wrong tap before the match', async () => {
     setProfile('toddler');
     const { container } = render(<App initialVocab={[apple, ball, cat]} initialLevels={testLevels} />);
