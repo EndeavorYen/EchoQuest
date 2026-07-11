@@ -74,9 +74,10 @@
     }
     .eq-adventure-hud nav button[aria-pressed='true'] { color: #fff; background: var(--forest-leaf); }
 
-    .eq-adventure-scene { position:relative; min-height:100dvh; padding:104px clamp(20px,5vw,72px) 136px; background:center/cover no-repeat url('/assets/generated/level-magic-gate.png'); }
-    .eq-adventure--rescue .eq-adventure-scene { background-image: url('/assets/generated/boss-wizard.png'); background-color: var(--forest-sky); }
-    .eq-adventure--complete .eq-adventure-scene { background-image: url('/assets/generated/boss-wizard.png'); background-color: var(--forest-leaf); }
+    .eq-adventure-scene { position:relative; min-height:100dvh; padding:104px clamp(20px,5vw,72px) 136px; background:#b9dfc2; }
+    .eq-adventure--bridge .eq-adventure-scene { background:#88c9d1; }
+    .eq-adventure--rescue .eq-adventure-scene { background:var(--forest-sky); }
+    .eq-adventure--complete .eq-adventure-scene { background:var(--forest-leaf); }
     .eq-scene-copy { position:relative; z-index:2; max-width:430px; color:#fff; text-shadow:0 2px 12px rgba(23,35,59,.72); }
     .eq-scene-copy p { margin:0 0 10px; font-weight:800; }
     .eq-scene-copy p:first-child { font-size:.82rem; letter-spacing:0; }
@@ -166,7 +167,16 @@
       .eq-vocab-actions { grid-column:1 / -1; }
     }
 
-    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; } }
+    @media (prefers-reduced-motion: reduce) {
+      *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; }
+      .eq-word-stage--feedback-success,
+      .eq-word-stage--feedback-caution,
+      .eq-word-stage--feedback-celebration,
+      .eq-word-stage--feedback-voice,
+      .eq-enemy-figure--feedback-success,
+      .eq-enemy-figure--feedback-caution,
+      .eq-enemy-figure--feedback-celebration { animation: none !important; }
+    }
   </style>
 </head>
 <body>

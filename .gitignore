@@ -4,3 +4,4 @@ web/dist/
 web/esbuild.log
 web/jules-scratch/
 .playwright-mcp/
+.superpowers/

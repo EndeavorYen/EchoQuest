@@ -52,7 +52,7 @@ const profileHints: Record<LearnerProfile, { mode: string; goal: string }> = {
 };
 
 const roomViews: Record<AdventureRoom, { number: number; kicker: string; title: string; instruction: string }> = {
-  orchard: { number: 1, kicker: 'ROOM 1 · 探索', title: '果園探索', instruction: '找到蘋果，取得治療魔法。' },
+  orchard: { number: 1, kicker: 'ROOM 1 · 探索', title: '果園探索', instruction: '找到畫面中的目標，取得治療魔法。' },
   bridge: { number: 2, kicker: 'ROOM 2 · 修復', title: '修復魔法橋', instruction: '完成單字，讓每個字母變成橋板。' },
   rescue: { number: 3, kicker: 'ROOM 3 · 救援', title: '森林救援', instruction: '先完成學習挑戰充能，再觀察意圖選魔法。' },
   complete: { number: 3, kicker: 'QUEST CLEAR', title: '救援成功', instruction: '森林巫師加入家庭收藏。' },
@@ -355,7 +355,7 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
           {bossTurn && <p className="eq-boss-intent">森林危機：{bossTurn.hint}</p>}
         </div>
         <div className="eq-scene-character">
-          <img src={adventure.room === 'rescue' ? '/assets/generated/boss-wizard.png' : '/assets/generated/level-magic-gate.png'} alt="" />
+          <img src={adventure.room === 'rescue' || adventure.room === 'complete' ? '/assets/generated/boss-wizard.png' : '/assets/generated/level-magic-gate.png'} alt="" />
         </div>
         {adventure.room !== 'complete' && (
           <div className="eq-world-challenge">

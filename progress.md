@@ -70,3 +70,12 @@ Age-review follow-up:
 - Added pure adventure domain functions: createAdventure, completeRoomChallenge, getBossTurn, and castSpell.
 - Focused test result: `npm test -- src/game/adventure.test.ts --runInBand` passed 2 tests.
 - Self-review: three fixed boss turns are sufficient for the first vertical slice.
+
+2026-07-11 family magic adventure rebuild:
+- Replaced the dashboard/boss-HP loop with orchard, bridge, and rescue rooms plus a shared family victory.
+- Rescue requires a correct learning answer before each spell; wrong spells preserve the room and charge.
+- Removed speech auto-restart, fixed React Strict Mode replay, and stopped active recognition before player/room transitions.
+- Browser QA completed the full mission at 1365x900 and 390x844. Mobile challenge bottom was 752px in an 844px viewport; toddler choices were 81.56px high and spell buttons 72px high; no horizontal overflow or console errors were found.
+- Chrome exposed Web Speech API and the permission/fallback path worked without blocking typing. Physical spoken recognition could not be supplied by automation and remains a hardware smoke test on the player's machine.
+- Visual review found fixed-word copy, duplicate transparent art, and black asset backgrounds. Orchard copy is now target-neutral and transparent PNGs render once over room colors instead of as full-screen backgrounds.
+- Final verification passed 16 suites / 106 tests and a 176.9kb production build. Post-fix desktop/mobile screenshots show no large black fields or duplicate scene art; console errors remain zero.

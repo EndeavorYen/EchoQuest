@@ -100,6 +100,7 @@ describe('EchoQuest arcade game', () => {
     render(<App initialVocab={testVocab} initialLevels={testLevels} />);
 
     expect(screen.getByRole('heading', { name: '果園探索' })).toBeInTheDocument();
+    expect(screen.getByText('找到畫面中的目標，取得治療魔法。')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /選擇 apple/i }));
 
     expect(screen.getByRole('heading', { name: '修復魔法橋' })).toBeInTheDocument();
