@@ -41,7 +41,7 @@
 
 **Interfaces:**
 - Consumes: VocabItem, LearningProgressState, getTopReviewCandidates, LearnerProfile.
-- Produces: createAdventure(options), getCurrentEvent(state), getCurrentWordId(state), completeChallenge(state), castSpell(state, spell), recordMissionProfile(state, profile), getMissionWordIds(state), repairAdventureWords(state, vocab, progress, now).
+- Produces: createAdventure(options), getCurrentEvent(state), getCurrentWordId(state), completeChallenge(state), advanceEvent(state), castSpell(state, spell), recordMissionProfile(state, profile), getMissionWordIds(state), repairAdventureWords(state, vocab, progress, now).
 
 - [ ] **Step 1: Replace fixed-room tests with failing seed and relay tests**
 
@@ -60,8 +60,11 @@ it('creates an equal mission from an equal seed', () => {
 it('finishes three shared events and all Boss turns', () => {
   let state = createAdventure(options);
   state = completeChallenge(state);
+  state = advanceEvent(state);
   state = completeChallenge(state);
+  state = advanceEvent(state);
   state = completeChallenge(state);
+  state = advanceEvent(state);
   for (const spell of ['fire', 'shield', 'heal'] as const) {
     state = completeChallenge(state);
     state = castSpell(state, spell).state;
@@ -93,13 +96,14 @@ export type AdventureState = {
   eventIndex: number;
   bossTurn: number;
   spellReady: boolean;
+  completedEventIds: string[];
   rescued: boolean;
   rewards: string[];
   modesUsed: LearnerProfile[];
 };
 ~~~
 
-Keep a local seeded 32-bit random generator in adventure.ts. Shuffle scout/build/escort/evade, take three, choose six word ids from review candidates then fallback vocabulary, and append a Boss event containing fire, shield, and heal turns. completeChallenge advances ordinary events and charges a Boss spell; castSpell keeps charge on a wrong spell and advances Boss turns on a correct spell. repairAdventureWords must keep event order and replace only invalid ids.
+Keep a local seeded 32-bit random generator in adventure.ts. Shuffle scout/build/escort/evade, take three, choose six word ids from review candidates then fallback vocabulary, and append a Boss event containing fire, shield, and heal turns. completeChallenge adds the current non-Boss id to completedEventIds and charges a Boss spell; advanceEvent moves eventIndex only when the current id is complete. castSpell keeps charge on a wrong spell and advances Boss turns on a correct spell. repairAdventureWords must keep event order and replace only invalid ids.
 
 - [ ] **Step 4: Run focused engine verification**
 
@@ -121,7 +125,7 @@ git commit -m "feat: generate deterministic relay missions"
 - Create: web/src/persistence/adventureStorage.test.ts
 
 **Interfaces:**
-- Consumes: AdventureState from game/adventure.ts.
+- Consumes: AdventureState from game/adventure.ts, including completedEventIds.
 - Produces: STORAGE_KEY_ADVENTURE, loadAdventureFromStorage(), saveAdventureToStorage(state), clearAdventureFromStorage().
 
 - [ ] **Step 1: Write failing storage tests**
@@ -380,9 +384,11 @@ const eventTitle = currentEvent?.kind === 'build' ? '魔法建造'
 useEffect(() => {
   saveAdventureToStorage(adventure);
 }, [adventure]);
+
+const [celebratingEventId, setCelebratingEventId] = useState<string | null>(null);
 ~~~
 
-Remove currentWord, pickWord, and moveToNextWord state transitions. Correct non-Boss answers call completeChallenge. Correct Boss answers charge a spell; castSpell changes the Boss turn. changeProfile records the selected profile, stops speech, and resets only transient fields. startNewMission creates a new seed while passing getMissionWordIds(adventure) as recentWordIds.
+Remove currentWord, pickWord, and moveToNextWord state transitions. A correct non-Boss answer calls completeChallenge, sets celebratingEventId to the current id, then uses one 600ms timeout to call advanceEvent and clear celebratingEventId. Correct Boss answers charge a spell; castSpell changes the Boss turn. On load, immediately call advanceEvent for a stored mission whose current event is already in completedEventIds, because animation itself is never persisted. changeProfile records the selected profile, stops speech, and resets only transient fields. startNewMission creates a new seed while passing getMissionWordIds(adventure) as recentWordIds.
 
 Render a resume overlay with 繼續救援 and 新的救援. Render the stable scene-first skeleton below:
 
@@ -399,7 +405,7 @@ Render a resume overlay with 繼續救援 and 新的救援. Render the stable sc
       ))}
     </nav>
   </header>
-  <section className="eq-relay-world" data-testid="relay-world" data-event={currentEvent?.kind} data-complete={String(eventWasCompleted)}>
+  <section className="eq-relay-world" data-testid="relay-world" data-event={currentEvent?.kind} data-complete={String(celebratingEventId === currentEvent?.id)}>
     <img className="eq-relay-backdrop" src={sceneForEvent(currentEvent)} alt="" />
     <div className="eq-relay-world-change" aria-hidden="true" />
     <img className="eq-relay-companion" src="/assets/generated/companion-scout.png" alt="" />
