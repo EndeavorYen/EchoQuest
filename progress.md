@@ -47,3 +47,26 @@ Next improvements:
 Review follow-up:
 - Fixed toddler image-choice attempts so progress stores lastMode as image_choice instead of voice.
 - Added README.md with profile, development, verification, and roadmap notes.
+
+2026-06-29 rebuild:
+- Root cause review: the old default voice path used continuous listening plus auto-restart, which is fragile for browser permissions and React lifecycle state.
+- Replaced the default App entry with a no-blocking arcade learning loop: toddler picture match, kid letter assembly, adult typing, and optional confirmed voice for kid/adult.
+- Simplified voice behavior to one explicit listen action followed by review/confirm; typing and spelling remain available even when speech recognition is unsupported.
+- Added new App regression tests for toddler picture matching, kid spelling, adult typing, adult voice review, and unsupported-voice fallback.
+
+Art polish:
+- Added level-themed scene palettes, terrain texture, staged boss/word presentation, richer button/tile materials, and simple hit feedback animation.
+- Kept it CSS-only for now; no new image pipeline or dependencies.
+
+Age-review follow-up:
+- Subagents reviewed toddler, kid, and adult/parent flows.
+- Fixed mobile order so word/input appear before boss/status.
+- Toddler now starts with two choices and has a wrong-then-correct regression test.
+- Kid spelling now shows the first letter and clears used tiles after a wrong attack.
+- Unsupported speech now shows a fallback note instead of a disabled primary voice control.
+
+2026-07-11 Task 1:
+- Tracking issue: https://github.com/EndeavorYen/EchoQuest/issues/69
+- Added pure adventure domain functions: createAdventure, completeRoomChallenge, getBossTurn, and castSpell.
+- Focused test result: `npm test -- src/game/adventure.test.ts --runInBand` passed 2 tests.
+- Self-review: three fixed boss turns are sufficient for the first vertical slice.
