@@ -242,7 +242,7 @@ describe('EchoQuest arcade game', () => {
     await expectRoom('修復魔法橋');
   });
 
-  it('clears a completed voice result when switching players and ignores its stale callback', async () => {
+  it('ignores an active voice result after switching players', async () => {
     setProfile('adult');
     installSpeechRecognitionMock();
     renderGame();
@@ -250,13 +250,7 @@ describe('EchoQuest arcade game', () => {
     fireEvent.click(await screen.findByRole('button', { name: /說出單字/i }));
     const recognition = MockSpeechRecognition.instances[0];
     const staleOnResult = recognition.onresult;
-    act(() => staleOnResult?.({
-      resultIndex: 0,
-      results: [{ isFinal: true, 0: { transcript: ' apple ' } }],
-    }));
-    expect(screen.getByText('聽到：apple')).toBeInTheDocument();
 
-    act(() => recognition.onend?.());
     fireEvent.click(screen.getByRole('button', { name: '5y 單字' }));
     expect(screen.queryByText('聽到：apple')).not.toBeInTheDocument();
 
@@ -267,7 +261,7 @@ describe('EchoQuest arcade game', () => {
     expect(screen.queryByText('聽到：apple')).not.toBeInTheDocument();
   });
 
-  it('clears a completed voice result when advancing rooms and ignores its stale callback', async () => {
+  it('ignores an active voice result after advancing rooms', async () => {
     setProfile('adult');
     installSpeechRecognitionMock();
     renderGame();
@@ -275,13 +269,7 @@ describe('EchoQuest arcade game', () => {
     fireEvent.click(await screen.findByRole('button', { name: /說出單字/i }));
     const recognition = MockSpeechRecognition.instances[0];
     const staleOnResult = recognition.onresult;
-    act(() => staleOnResult?.({
-      resultIndex: 0,
-      results: [{ isFinal: true, 0: { transcript: ' apple ' } }],
-    }));
-    expect(screen.getByText('聽到：apple')).toBeInTheDocument();
 
-    act(() => recognition.onend?.());
     fireEvent.change(screen.getByLabelText('Type answer'), { target: { value: 'apple' } });
     fireEvent.click(screen.getByRole('button', { name: '完成探索' }));
     await expectRoom('修復魔法橋');

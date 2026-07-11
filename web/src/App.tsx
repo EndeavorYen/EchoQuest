@@ -221,6 +221,7 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
   }, [speech.error]);
 
   const moveToNextWord = (nextProgress: LearningProgressState, previousWordId?: string) => {
+    speech.stop();
     const nextWord = pickWord(nextProgress, previousWordId);
     setCurrentWord(nextWord);
     resetRoundInputs(nextWord);
@@ -313,6 +314,7 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
   };
 
   const changeProfile = (nextProfile: LearnerProfile) => {
+    speech.stop();
     setProfile(nextProfile);
     setVoiceReview(null);
     speech.resetTranscript();
