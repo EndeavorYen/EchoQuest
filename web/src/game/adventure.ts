@@ -4,6 +4,7 @@ import type { VocabItem } from '../types/vocab';
 
 export type BossIntent = 'thorns' | 'falling_branch' | 'curse';
 export type Spell = 'fire' | 'shield' | 'heal';
+export type AdventureRoom = 'orchard' | 'bridge' | 'rescue' | 'complete';
 export type MissionEventKind = 'scout' | 'build' | 'escort' | 'evade' | 'boss';
 
 export type MissionEvent = {
@@ -24,6 +25,8 @@ export type AdventureState = {
   rescued: boolean;
   rewards: string[];
   modesUsed: LearnerProfile[];
+  room: AdventureRoom;
+  legacyRoomFlow?: true;
 };
 
 export type CreateAdventureOptions = {
@@ -44,6 +47,16 @@ const BOSS_HINTS: Record<BossIntent, string> = {
   thorns: '荊棘怕火焰。',
   falling_branch: '用護盾擋住落下的樹枝。',
   curse: '治療魔法可以解除詛咒。',
+};
+
+const LEGACY_WORD: VocabItem = {
+  id: 'legacy-word',
+  word: 'legacy',
+  imageName: 'legacy',
+  difficulty: 1,
+  enabled: true,
+  size: 0,
+  type: '',
 };
 
 function createSeededRandom(seed: number): () => number {
@@ -95,7 +108,7 @@ function getMissionWordSelection({
   return Array.from({ length: 6 }, (_, index) => uniqueIds[index % uniqueIds.length]);
 }
 
-export function createAdventure(options: CreateAdventureOptions): AdventureState {
+function createRelayAdventure(options: CreateAdventureOptions): AdventureState {
   const random = createSeededRandom(options.seed);
   const eventKinds = shuffle<MissionEventKind>(['scout', 'evade', 'escort', 'build'], random).slice(0, 3);
   const wordIds = getMissionWordSelection({ ...options, random });
@@ -122,6 +135,18 @@ export function createAdventure(options: CreateAdventureOptions): AdventureState
     rescued: false,
     rewards: [],
     modesUsed: [],
+    room: 'orchard',
+  };
+}
+
+export function createAdventure(): AdventureState;
+export function createAdventure(options: CreateAdventureOptions): AdventureState;
+export function createAdventure(options?: CreateAdventureOptions): AdventureState {
+  if (options) return createRelayAdventure(options);
+
+  return {
+    ...createRelayAdventure({ seed: 0, vocab: [LEGACY_WORD], progress: {}, now: 0 }),
+    legacyRoomFlow: true,
   };
 }
 
@@ -156,7 +181,40 @@ export function advanceEvent(state: AdventureState): AdventureState {
   return { ...state, eventIndex: state.eventIndex + 1 };
 }
 
+export function getBossTurn(state: AdventureState): { intent: BossIntent; spell: Spell; hint: string } {
+  const event = getCurrentEvent(state);
+  const turn = event?.kind === 'boss' ? event.bossTurns?.[state.bossTurn] : undefined;
+  const fallback = BOSS_TURNS[Math.min(state.bossTurn, BOSS_TURNS.length - 1)];
+  const activeTurn = turn ?? fallback;
+
+  return { ...activeTurn, hint: BOSS_HINTS[activeTurn.intent] };
+}
+
+function castLegacySpell(state: AdventureState, spell: Spell): { state: AdventureState; correct: boolean; hint: string } {
+  const turn = getBossTurn(state);
+  if (state.room !== 'rescue' || spell !== turn.spell) {
+    return { state, correct: false, hint: turn.hint };
+  }
+
+  const bossTurn = state.bossTurn + 1;
+  return bossTurn === BOSS_TURNS.length
+    ? {
+      state: {
+        ...state,
+        room: 'complete',
+        bossTurn,
+        rescued: true,
+        rewards: state.rewards.includes('forest-wizard') ? state.rewards : [...state.rewards, 'forest-wizard'],
+      },
+      correct: true,
+      hint: '',
+    }
+    : { state: { ...state, bossTurn }, correct: true, hint: '' };
+}
+
 export function castSpell(state: AdventureState, spell: Spell): { state: AdventureState; correct: boolean; hint: string } {
+  if (state.legacyRoomFlow) return castLegacySpell(state, spell);
+
   const event = getCurrentEvent(state);
   const turn = event?.kind === 'boss' ? event.bossTurns?.[state.bossTurn] : undefined;
 
@@ -180,6 +238,18 @@ export function castSpell(state: AdventureState, spell: Spell): { state: Adventu
   }
 
   return { state: { ...state, bossTurn, spellReady: false }, correct: true, hint: '' };
+}
+
+/** @deprecated Task 5 will replace this legacy room-flow adapter with relay UI. */
+export function completeRoomChallenge(state: AdventureState): AdventureState {
+  if (!state.legacyRoomFlow) return advanceEvent(completeChallenge(state));
+  if (state.room === 'orchard') {
+    return { ...state, room: 'bridge', rewards: [...state.rewards, 'healing-apple'] };
+  }
+  if (state.room === 'bridge') {
+    return { ...state, room: 'rescue', rewards: [...state.rewards, 'bridge-star'] };
+  }
+  return state;
 }
 
 export function recordMissionProfile(state: AdventureState, profile: LearnerProfile): AdventureState {

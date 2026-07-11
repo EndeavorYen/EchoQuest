@@ -125,6 +125,20 @@ describe('family relay adventure', () => {
     expect(getMissionWordIds(repaired)).not.toContain('missing');
   });
 
+  it('replaces a stored word id that is present but disabled', () => {
+    const state = createAdventure(options);
+    const disabledWordId = state.events[0].wordId!;
+    const vocabWithDisabledTarget = words.map((word) => (
+      word.id === disabledWordId ? { ...word, enabled: false } : word
+    ));
+
+    const repaired = repairAdventureWords(state, vocabWithDisabledTarget, {}, options.now);
+
+    expect(repaired.events.map((event) => event.kind)).toEqual(state.events.map((event) => event.kind));
+    expect(repaired.events[0].wordId).not.toBe(disabledWordId);
+    expect(getMissionWordIds(repaired)).not.toContain(disabledWordId);
+  });
+
   it('returns the current word and records the active learner profile', () => {
     const state = recordMissionProfile(createAdventure(options), 'kid');
 
