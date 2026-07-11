@@ -59,6 +59,7 @@ export function useSpeechRecognition({
   const langRef = useRef('en-US');
   const onResultRef = useRef(onResult);
   const activeRef = useRef(false);
+  const runTokenRef = useRef(0);
   const mountedRef = useRef(true);
 
   const [isSupported] = useState(() => {
@@ -86,6 +87,7 @@ export function useSpeechRecognition({
 
   const stop = useCallback(() => {
     activeRef.current = false;
+    runTokenRef.current += 1;
     listeningRef.current = false;
     setRequestingPermission(false);
     const recognition = recognitionRef.current;
@@ -124,6 +126,8 @@ export function useSpeechRecognition({
     }
 
     const newRecognition = recognitionRef.current ?? new SpeechRecognition();
+    const runToken = runTokenRef.current + 1;
+    runTokenRef.current = runToken;
     newRecognition.continuous = false;
     newRecognition.lang = langRef.current;
     newRecognition.interimResults = true; // Get results as the user speaks
@@ -131,8 +135,15 @@ export function useSpeechRecognition({
       newRecognition.maxAlternatives = 1;
     }
 
+    const isActiveRun = () => (
+      mountedRef.current
+      && recognitionRef.current === newRecognition
+      && activeRef.current
+      && runTokenRef.current === runToken
+    );
+
     newRecognition.onstart = () => {
-      if (!mountedRef.current || recognitionRef.current !== newRecognition || !activeRef.current) return;
+      if (!isActiveRun()) return;
       listeningRef.current = true;
       setRequestingPermission(false);
       setListening(true);
@@ -142,7 +153,7 @@ export function useSpeechRecognition({
     };
 
     newRecognition.onend = () => {
-      if (recognitionRef.current !== newRecognition) return;
+      if (!isActiveRun()) return;
       activeRef.current = false;
       listeningRef.current = false;
       if (mountedRef.current) {
@@ -152,7 +163,7 @@ export function useSpeechRecognition({
     };
 
     newRecognition.onerror = (event) => {
-      if (recognitionRef.current !== newRecognition || !mountedRef.current) return;
+      if (!isActiveRun()) return;
       activeRef.current = false;
       listeningRef.current = false;
       setRequestingPermission(false);
@@ -162,7 +173,7 @@ export function useSpeechRecognition({
     };
 
     newRecognition.onresult = (event) => {
-      if (!mountedRef.current || recognitionRef.current !== newRecognition || !activeRef.current) return;
+      if (!isActiveRun()) return;
       let finalTranscript = '';
       let interim = '';
 
@@ -212,6 +223,7 @@ export function useSpeechRecognition({
       const recognition = recognitionRef.current;
       mountedRef.current = false;
       activeRef.current = false;
+      runTokenRef.current += 1;
       listeningRef.current = false;
       setRequestingPermission(false);
       if (!recognition) {

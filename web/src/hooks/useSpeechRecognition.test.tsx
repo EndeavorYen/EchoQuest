@@ -66,6 +66,7 @@ function StrictModeHarness({ onResult }: { onResult: (result: string) => void })
   return (
     <div>
       <div data-testid="strict-listening">{String(speech.listening)}</div>
+      <div data-testid="strict-requesting">{String((speech as any).requestingPermission)}</div>
       <button onClick={() => speech.start('en-US')}>strict start</button>
     </div>
   );
@@ -189,6 +190,7 @@ describe('useSpeechRecognition', () => {
     );
     fireEvent.click(screen.getByText('strict start'));
     const recognition = MockSpeechRecognition.instances[0];
+    expect(screen.getByTestId('strict-requesting')).toHaveTextContent('true');
 
     act(() => {
       recognition.onstart?.();
@@ -199,7 +201,14 @@ describe('useSpeechRecognition', () => {
     });
 
     expect(screen.getByTestId('strict-listening')).toHaveTextContent('true');
+    expect(screen.getByTestId('strict-requesting')).toHaveTextContent('false');
     expect(onResult).toHaveBeenCalledWith('apple');
+
+    act(() => {
+      recognition.onend?.();
+    });
+    expect(screen.getByTestId('strict-listening')).toHaveTextContent('false');
+    expect(screen.getByTestId('strict-requesting')).toHaveTextContent('false');
   });
 
   it('does not restart after no-speech or after unmount', () => {
@@ -233,6 +242,44 @@ describe('useSpeechRecognition', () => {
       results: [{ isFinal: true, 0: { transcript: 'apple' } }],
     }));
     expect(onResult).not.toHaveBeenCalled();
+  });
+
+  it('ignores delayed callbacks from a stopped run after restarting the same recognizer', () => {
+    setMockSpeechRecognition();
+    render(<HookHarness />);
+
+    fireEvent.click(screen.getByText('start'));
+    const recognition = MockSpeechRecognition.instances[0];
+    const staleOnEnd = recognition.onend;
+    const staleOnError = recognition.onerror;
+
+    fireEvent.click(screen.getByText('stop'));
+    fireEvent.click(screen.getByText('start'));
+
+    expect(MockSpeechRecognition.instances).toHaveLength(1);
+    expect(screen.getByTestId('requesting')).toHaveTextContent('true');
+
+    act(() => {
+      staleOnEnd?.();
+      staleOnError?.({ error: 'aborted' });
+    });
+    expect(screen.getByTestId('requesting')).toHaveTextContent('true');
+    expect(screen.getByTestId('listening')).toHaveTextContent('false');
+    expect(screen.getByTestId('error')).toHaveTextContent('');
+
+    act(() => {
+      recognition.onstart?.();
+    });
+    expect(screen.getByTestId('requesting')).toHaveTextContent('false');
+    expect(screen.getByTestId('listening')).toHaveTextContent('true');
+
+    act(() => {
+      staleOnEnd?.();
+      staleOnError?.({ error: 'aborted' });
+    });
+    expect(screen.getByTestId('requesting')).toHaveTextContent('false');
+    expect(screen.getByTestId('listening')).toHaveTextContent('true');
+    expect(screen.getByTestId('error')).toHaveTextContent('');
   });
 
   it('ignores callbacks retained by a recognition instance after it is replaced', () => {
