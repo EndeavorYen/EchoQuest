@@ -1,28 +1,36 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Mic, Volume2 } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Mic, Settings, Volume2 } from 'lucide-react';
 import { LanguageSelector } from './components/LanguageSelector';
 import { VocabManager } from './components/VocabManager';
 import { defaultLevels, type Level } from './data/levels';
 import { initialVocab as defaultInitialVocab } from './data/vocab';
-import { getAvailableWords, isAnswerCorrect, selectWord } from './game/gameLogic';
+import { getAvailableWords, isAnswerCorrect } from './game/gameLogic';
 import { learnerProfileOptions, type LearnerProfile } from './game/challenges';
 import {
+  advanceEvent,
   castSpell,
-  completeRoomChallenge,
+  completeChallenge,
   createAdventure,
   getBossTurn,
-  type AdventureRoom,
+  getCurrentEvent,
+  getCurrentWordId,
+  getMissionWordIds,
+  recordMissionProfile,
+  repairAdventureWords,
+  type AdventureState,
+  type MissionEvent,
   type Spell,
 } from './game/adventure';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import {
-  createAnswerFeedback,
-  getTopReviewCandidates,
   recordPracticeAttempt,
-  type AnswerFeedback,
   type LearningProgressState,
   type PracticeMode,
 } from './learning/progress';
+import {
+  loadAdventureFromStorage,
+  saveAdventureToStorage,
+} from './persistence/adventureStorage';
 import { loadProgressFromStorage, saveProgressToStorage } from './persistence/progressStorage';
 import {
   hydrateDefaultVocabArtwork,
@@ -46,17 +54,24 @@ interface AppProps {
 }
 
 const profileHints: Record<LearnerProfile, { mode: string; goal: string }> = {
-  toddler: { mode: '認圖冒險', goal: '點同一張圖，答錯不扣血。' },
-  kid: { mode: '字母施法', goal: '用字母拼出圖片的英文單字。' },
-  adult: { mode: '成人/家長練習', goal: '快速打字練習；語音是可選加速輸入。' },
+  toddler: { mode: '2y 圖像接力', goal: '找到和目標一樣的圖。答錯可以再試一次。' },
+  kid: { mode: '5y 字母接力', goal: '依序點字母，讓魔法路徑一格一格亮起來。' },
+  adult: { mode: '成人/家長接力', goal: '輸入目標單字；也可以用語音加速。' },
 };
 
-const roomViews: Record<AdventureRoom, { number: number; kicker: string; title: string; instruction: string }> = {
-  orchard: { number: 1, kicker: 'ROOM 1 · 探索', title: '果園探索', instruction: '找到畫面中的目標，取得治療魔法。' },
-  bridge: { number: 2, kicker: 'ROOM 2 · 修復', title: '修復魔法橋', instruction: '完成單字，讓每個字母變成橋板。' },
-  rescue: { number: 3, kicker: 'ROOM 3 · 救援', title: '森林救援', instruction: '先完成學習挑戰充能，再觀察意圖選魔法。' },
-  complete: { number: 3, kicker: 'QUEST CLEAR', title: '救援成功', instruction: '森林巫師加入家庭收藏。' },
+const eventViews: Record<NonNullable<MissionEvent['kind']>, { title: string; cue: string; scene: string }> = {
+  scout: { title: '偵察找路', cue: '點亮藏在林間的路標', scene: '/assets/generated/scene-bramble-grove.png' },
+  build: { title: '魔法建造', cue: '把斷橋變成發光的通道', scene: '/assets/generated/scene-moon-bridge.png' },
+  escort: { title: '護送前進', cue: '陪小船安全穿過夜河', scene: '/assets/generated/scene-river-escort.png' },
+  evade: { title: '避險反制', cue: '撐起護罩穿越荊棘', scene: '/assets/generated/scene-bramble-grove.png' },
+  boss: { title: '荊棘救援', cue: '讀懂危機，再選出正確魔法', scene: '/assets/generated/scene-thorn-altar.png' },
 };
+
+const spellViews: Array<{ spell: Spell; name: string; detail: string }> = [
+  { spell: 'fire', name: '火焰術', detail: '燒開荊棘' },
+  { spell: 'shield', name: '守護盾', detail: '擋住樹枝' },
+  { spell: 'heal', name: '治癒光', detail: '解除詛咒' },
+];
 
 function getWordImage(word: VocabItem | null): string | undefined {
   return word?.imageDataUrl ?? word?.imageSrc;
@@ -76,32 +91,14 @@ function createLetterTiles(word: string): Tile[] {
     .sort((left, right) => scoreText(`${word}:${left.id}`) - scoreText(`${word}:${right.id}`));
 }
 
-function createPictureChoices(currentWord: VocabItem | null, words: VocabItem[], count = 2): VocabItem[] {
+function createPictureChoices(currentWord: VocabItem | null, words: VocabItem[], count: number): VocabItem[] {
   if (!currentWord) return [];
-
   const distractors = words
     .filter((word) => word.id !== currentWord.id)
     .sort((left, right) => scoreText(`${currentWord.word}:${left.id}`) - scoreText(`${currentWord.word}:${right.id}`))
     .slice(0, Math.max(0, count - 1));
-
   return [currentWord, ...distractors]
     .sort((left, right) => scoreText(`${currentWord.id}:${left.word}`) - scoreText(`${currentWord.id}:${right.word}`));
-}
-
-function chooseNextWord({
-  vocab,
-  level,
-  progress,
-  previousWordId,
-}: {
-  vocab: VocabItem[];
-  level: Level;
-  progress: LearningProgressState;
-  previousWordId?: string;
-}): VocabItem | null {
-  const levelWords = getAvailableWords(vocab, level, []);
-  const reviewCandidates = getTopReviewCandidates(levelWords, progress, Date.now());
-  return selectWord(reviewCandidates.length > 0 ? reviewCandidates : levelWords, Math.random, previousWordId);
 }
 
 function getInitialVocab(initialVocab?: VocabItem[]): VocabItem[] {
@@ -110,12 +107,27 @@ function getInitialVocab(initialVocab?: VocabItem[]): VocabItem[] {
   return stored.length > 0 ? stored : defaultInitialVocab;
 }
 
-function getWordClue(profile: LearnerProfile, word: VocabItem | null): string {
-  if (profile === 'toddler') return '找一樣的圖';
-  if (!word) return '';
-  return profile === 'kid'
-    ? [word.word[0], ...Array(Math.max(0, word.word.length - 1)).fill('_')].join(' ')
-    : Array(word.word.length).fill('_').join(' ');
+function skipPersistedCelebration(state: AdventureState): AdventureState {
+  let next = state;
+  let event = getCurrentEvent(next);
+  while (event && event.kind !== 'boss' && next.completedEventIds.includes(event.id)) {
+    const advanced = advanceEvent(next);
+    if (advanced === next) break;
+    next = advanced;
+    event = getCurrentEvent(next);
+  }
+  return next;
+}
+
+function createMission(vocab: VocabItem[], progress: LearningProgressState, recentWordIds: string[] = []): AdventureState | null {
+  if (vocab.length === 0) return null;
+  return createAdventure({
+    seed: Math.floor(Math.random() * 2 ** 31),
+    vocab,
+    progress,
+    now: Date.now(),
+    recentWordIds,
+  });
 }
 
 export default function App({ initialVocab, initialLevels = defaultLevels }: AppProps) {
@@ -127,59 +139,65 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
   ));
   const [recognitionLang, setRecognitionLang] = useState(() => loadLangFromStorage());
   const [progress, setProgress] = useState<LearningProgressState>(() => loadProgressFromStorage());
-  const [currentWord, setCurrentWord] = useState<VocabItem | null>(null);
-  const [adventure, setAdventure] = useState(createAdventure);
-  const [spellReady, setSpellReady] = useState(false);
+  const enabledVocab = useMemo(() => getEnabledVocab(vocab), [vocab]);
+  const [storedMission] = useState(() => loadAdventureFromStorage());
+  const [adventure, setAdventure] = useState<AdventureState | null>(() => {
+    if (!storedMission) return createMission(enabledVocab, progress);
+    if (enabledVocab.length === 0) return skipPersistedCelebration(storedMission);
+    try {
+      return skipPersistedCelebration(repairAdventureWords(storedMission, enabledVocab, progress, Date.now()));
+    } catch {
+      return createMission(enabledVocab, progress);
+    }
+  });
+  const [showResumePrompt, setShowResumePrompt] = useState(Boolean(storedMission && !storedMission.rescued));
+  const [celebratingEventId, setCelebratingEventId] = useState<string | null>(null);
   const [typedAnswer, setTypedAnswer] = useState('');
   const [letterTiles, setLetterTiles] = useState<Tile[]>([]);
   const [selectedLetters, setSelectedLetters] = useState('');
   const [voiceReview, setVoiceReview] = useState<VoiceReviewResult | null>(null);
-  const [lastAnswerFeedback, setLastAnswerFeedback] = useState<AnswerFeedback | null>(null);
   const [message, setMessage] = useState<{ kind: MessageKind; text: string }>({
     kind: 'neutral',
-    text: '選一個玩家，開始森林救援。',
+    text: '一家人可以隨時接手，同一場救援會繼續前進。',
   });
+  const celebrationTimer = useRef<number | null>(null);
 
-  const enabledVocab = useMemo(() => getEnabledVocab(vocab), [vocab]);
+  const currentEvent = adventure ? getCurrentEvent(adventure) : undefined;
+  const currentWordId = adventure ? getCurrentWordId(adventure) : undefined;
+  const currentWord = enabledVocab.find((word) => word.id === currentWordId) ?? null;
   const level = levels[0] ?? defaultLevels[0];
-  const currentImageSrc = getWordImage(currentWord);
+  const availableWords = useMemo(
+    () => getAvailableWords(enabledVocab, level, []),
+    [enabledVocab, level],
+  );
   const toddlerChoiceCount = currentWord && (progress[currentWord.id]?.mastery ?? 0) >= 2 ? 3 : 2;
   const pictureChoices = useMemo(
-    () => createPictureChoices(currentWord, getAvailableWords(enabledVocab, level, []), toddlerChoiceCount),
-    [currentWord, enabledVocab, level, toddlerChoiceCount],
+    () => createPictureChoices(currentWord, availableWords, toddlerChoiceCount),
+    [availableWords, currentWord, toddlerChoiceCount],
   );
-  const selectedProfileHint = profileHints[profile];
+  const eventView = currentEvent ? eventViews[currentEvent.kind] : null;
+  const bossTurn = adventure && currentEvent?.kind === 'boss' && !adventure.rescued ? getBossTurn(adventure) : null;
   const canUseVoice = profile !== 'toddler';
-  const roomView = roomViews[adventure.room];
-  const bossTurn = adventure.room === 'rescue' ? getBossTurn(adventure) : null;
-  const submitLabel = adventure.room === 'rescue' ? '魔法充能' : adventure.room === 'bridge' ? '修好橋梁' : '完成探索';
+  const submitLabel = currentEvent?.kind === 'boss' ? '魔法充能' : '施放路徑魔法';
 
-  const pickWord = useCallback((nextProgress: LearningProgressState, previousWordId?: string) => chooseNextWord({
-    vocab: enabledVocab,
-    level,
-    progress: nextProgress,
-    previousWordId,
-  }), [enabledVocab, level]);
-
-  const resetRoundInputs = useCallback((word: VocabItem | null) => {
+  const resetTransientInputs = useCallback((word: VocabItem | null = currentWord) => {
     setTypedAnswer('');
     setSelectedLetters('');
-    setLetterTiles(word ? createLetterTiles(word.word) : []);
+    setLetterTiles(word ? createLetterTiles(word.word.toLowerCase()) : []);
     setVoiceReview(null);
-  }, []);
+  }, [currentWord]);
 
   const speech = useSpeechRecognition({
     onResult: (result) => {
       if (!currentWord || !canUseVoice) return;
       const heardText = result.trim();
       if (!heardText) return;
-
       setVoiceReview({
         heardText,
         targetWord: currentWord.word,
         isMatch: isAnswerCorrect(heardText, currentWord),
       });
-      setMessage({ kind: 'voice', text: `聽到「${heardText}」，確認後才會送出。` });
+      setMessage({ kind: 'voice', text: `聽到「${heardText}」，確認後送出。` });
     },
   });
 
@@ -194,111 +212,124 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
   useEffect(() => { saveProgressToStorage(progress); }, [progress]);
   useEffect(() => { saveProfileToStorage(profile); }, [profile]);
   useEffect(() => { saveLangToStorage(recognitionLang); }, [recognitionLang]);
+  useEffect(() => {
+    if (adventure) saveAdventureToStorage(adventure);
+  }, [adventure]);
 
   useEffect(() => {
-    if (currentWord || enabledVocab.length === 0) return;
-    const nextWord = pickWord(progress);
-    setCurrentWord(nextWord);
-    resetRoundInputs(nextWord);
-  }, [currentWord, enabledVocab.length, pickWord, progress, resetRoundInputs]);
-
-  useEffect(() => {
-    setMessage({
-      kind: 'neutral',
-      text: profile === 'toddler'
-        ? '2y 模式只要點圖片，答錯也不扣血。'
-        : '語音可以用，但拼字/打字永遠可以繼續玩。',
+    if (enabledVocab.length === 0) return;
+    setAdventure((state) => {
+      if (!state) return createMission(enabledVocab, progress);
+      try {
+        return repairAdventureWords(state, enabledVocab, progress, Date.now());
+      } catch {
+        return createMission(enabledVocab, progress, getMissionWordIds(state));
+      }
     });
-  }, [profile]);
+  }, [enabledVocab, progress]);
 
   useEffect(() => {
-    if (profile === 'toddler' && speech.listening) speech.stop();
-  }, [profile, speech.listening, speech.stop]);
+    speech.stop();
+    speech.resetTranscript();
+    speech.clearError();
+    resetTransientInputs(currentWord);
+  }, [adventure?.eventIndex, adventure?.bossTurn, currentWordId]);
 
   useEffect(() => {
     if (!speech.error) return;
-    setMessage({ kind: 'voice', text: `語音暫時不可用：${getSpeechErrorMessage(speech.error)} 你仍可用拼字或打字。` });
+    setMessage({ kind: 'voice', text: `語音暫時不可用：${getSpeechErrorMessage(speech.error)} 仍可繼續拼字或打字。` });
   }, [speech.error]);
 
-  const moveToNextWord = (nextProgress: LearningProgressState, previousWordId?: string) => {
-    speech.stop();
-    const nextWord = pickWord(nextProgress, previousWordId);
-    setCurrentWord(nextWord);
-    resetRoundInputs(nextWord);
-    speech.resetTranscript();
-    speech.clearError();
-  };
+  useEffect(() => () => {
+    if (celebrationTimer.current !== null) window.clearTimeout(celebrationTimer.current);
+  }, []);
 
-  const finishLearningChallenge = () => {
-    setAdventure((state) => completeRoomChallenge(state));
-  };
-
-  const useSpell = (spell: Spell) => {
-    if (!spellReady) return;
-    setAdventure((state) => {
-      const result = castSpell(state, spell);
-      if (result.correct) setSpellReady(false);
-      setMessage({
-        kind: result.correct ? 'correct' : 'wrong',
-        text: result.correct ? '魔法成功！' : result.hint,
-      });
-      return result.state;
-    });
+  const updateProgress = (submittedText: string, mode: PracticeMode, isCorrect: boolean) => {
+    if (!currentWord) return;
+    const now = Date.now();
+    setProgress((state) => recordPracticeAttempt(state, currentWord, { isCorrect, mode, now }));
   };
 
   const submitAnswer = (submittedText: string, mode: PracticeMode) => {
-    if (!currentWord || !submittedText.trim()) return;
-
-    const now = Date.now();
+    if (!adventure || !currentEvent || !currentWord || !submittedText.trim() || adventure.rescued || celebratingEventId) return;
     const isCorrect = isAnswerCorrect(submittedText, currentWord);
-    const nextProgress = recordPracticeAttempt(progress, currentWord, { isCorrect, mode, now });
-    setProgress(nextProgress);
-    setLastAnswerFeedback(createAnswerFeedback({
-      word: currentWord,
-      submitted: submittedText,
-      isCorrect,
-      mode,
-      progress: nextProgress[currentWord.id],
-      now,
-    }));
+    updateProgress(submittedText, mode, isCorrect);
 
     if (!isCorrect) {
-      setVoiceReview(null);
+      speech.stop();
       speech.resetTranscript();
-      if (profile === 'kid') resetRoundInputs(currentWord);
+      setVoiceReview(null);
+      if (profile === 'kid') resetTransientInputs(currentWord);
       if (profile === 'adult') setTypedAnswer('');
       setMessage({
         kind: 'wrong',
-        text: profile === 'toddler' ? '再找一次，這個模式不扣血。' : `還差一點，目標是 ${currentWord.word}。`,
+        text: profile === 'toddler' ? '再找一次，救援不會倒退。' : `再試一次，目標是 ${currentWord.word}。`,
       });
       return;
     }
 
-    if (adventure.room === 'rescue') {
-      setSpellReady(true);
-      setMessage({ kind: 'correct', text: '魔法充能完成，選擇合適的魔法。' });
-    } else {
-      finishLearningChallenge();
-      setMessage({ kind: 'correct', text: `${currentWord.word} 答對了，前往下一個房間。` });
+    speech.stop();
+    speech.resetTranscript();
+    setVoiceReview(null);
+    setAdventure((state) => state ? completeChallenge(recordMissionProfile(state, profile)) : state);
+
+    if (currentEvent.kind === 'boss') {
+      setTypedAnswer('');
+      setSelectedLetters('');
+      setMessage({ kind: 'correct', text: '充能完成。根據危機提示選一個魔法。' });
+      return;
     }
-    moveToNextWord(nextProgress, currentWord.id);
+
+    const completedEventId = currentEvent.id;
+    setCelebratingEventId(completedEventId);
+    setMessage({ kind: 'correct', text: `${currentWord.word} 成功啟動了這段路徑！` });
+    if (celebrationTimer.current !== null) window.clearTimeout(celebrationTimer.current);
+    celebrationTimer.current = window.setTimeout(() => {
+      setAdventure((state) => {
+        const event = state ? getCurrentEvent(state) : undefined;
+        return state && event?.id === completedEventId ? advanceEvent(state) : state;
+      });
+      setCelebratingEventId((eventId) => eventId === completedEventId ? null : eventId);
+      celebrationTimer.current = null;
+    }, 600);
   };
 
   const selectLetter = (tileId: string) => {
+    if (!currentWord) return;
     const tile = letterTiles.find((item) => item.id === tileId);
     if (!tile || tile.used) return;
+    const expected = currentWord.word.toLowerCase()[selectedLetters.length];
+    if (tile.letter.toLowerCase() !== expected) {
+      resetTransientInputs(currentWord);
+      setMessage({ kind: 'wrong', text: '這顆符文順序不對，路徑已重新亮起。' });
+      return;
+    }
     setSelectedLetters((value) => `${value}${tile.letter}`);
     setLetterTiles((tiles) => tiles.map((item) => item.id === tileId ? { ...item, used: true } : item));
   };
 
-  const clearLetters = () => resetRoundInputs(currentWord);
+  const useSpell = (spell: Spell) => {
+    if (!adventure?.spellReady) return;
+    setAdventure((state) => {
+      if (!state) return state;
+      const result = castSpell(recordMissionProfile(state, profile), spell);
+      setMessage({
+        kind: result.correct ? 'correct' : 'wrong',
+        text: result.correct
+          ? result.state.rescued ? '荊棘消散了，森林夥伴安全獲救！' : '魔法奏效，下一波危機來了。'
+          : result.hint,
+      });
+      if (result.correct) resetTransientInputs(null);
+      return result.state;
+    });
+  };
 
   const startListening = () => {
     setVoiceReview(null);
     speech.resetTranscript();
     speech.clearError();
     speech.start(recognitionLang);
-    setMessage({ kind: 'voice', text: '請說出圖片的英文單字。' });
+    setMessage({ kind: 'voice', text: '請說出目標英文單字。' });
   };
 
   const confirmVoiceReview = () => {
@@ -308,36 +339,63 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
     submitAnswer(heardText, 'voice');
   };
 
-  const retryVoice = () => {
-    setVoiceReview(null);
-    startListening();
-  };
-
   const changeProfile = (nextProfile: LearnerProfile) => {
     speech.stop();
-    setProfile(nextProfile);
-    setVoiceReview(null);
     speech.resetTranscript();
     speech.clearError();
+    resetTransientInputs(currentWord);
+    setProfile(nextProfile);
+    setAdventure((state) => state ? recordMissionProfile(state, nextProfile) : state);
+    setMessage({ kind: 'neutral', text: `${profileHints[nextProfile].mode}接手，同一個目標繼續。` });
+  };
+
+  const startNewMission = () => {
+    if (celebrationTimer.current !== null) {
+      window.clearTimeout(celebrationTimer.current);
+      celebrationTimer.current = null;
+    }
+    speech.stop();
+    setCelebratingEventId(null);
+    const next = createMission(enabledVocab, progress, adventure ? getMissionWordIds(adventure) : []);
+    if (next && adventure && next.seed === adventure.seed) next.seed = (next.seed + 1) % (2 ** 31);
+    setAdventure(next);
+    setShowResumePrompt(false);
+    resetTransientInputs(null);
+    setMessage({
+      kind: next ? 'neutral' : 'wrong',
+      text: next ? '新的森林求救訊號出現了。' : '先在字庫啟用一個單字，再開始救援。',
+    });
   };
 
   if (screen === 'vocab_management') {
     return (
       <main className="eq-adventure eq-adventure--management">
         <div className="eq-adventure-vocab">
-          <button type="button" className="eq-arcade-small-button" onClick={() => setScreen('play')}>回到冒險</button>
+          <button type="button" className="eq-arcade-small-button" onClick={() => setScreen('play')}>回到救援</button>
           <VocabManager vocab={vocab} onVocabChange={setVocab} onGoBack={() => setScreen('play')} />
         </div>
       </main>
     );
   }
 
+  const relayClass = `eq-relay eq-relay--${currentEvent?.kind ?? 'empty'} eq-relay--${profile}`;
+  const activeVoice = speech.requestingPermission || speech.listening;
+  const voiceLabel = speech.requestingPermission ? '等待麥克風權限' : speech.listening ? '聆聽中' : '說出單字';
+  const nextLetter = currentWord?.word[selectedLetters.length]?.toUpperCase();
+  const runeProgress = currentWord ? selectedLetters.length / Math.max(1, currentWord.word.length) : 0;
+
   return (
-    <main className={`eq-adventure eq-adventure--${adventure.room} eq-adventure--${profile}`} aria-label="EchoQuest family magic adventure">
-      <header className="eq-adventure-hud">
-        <div><span>森林救援</span><strong>{roomView.number}/3</strong></div>
-        <div className="eq-adventure-hud-actions">
-          <button type="button" className="eq-arcade-small-button" onClick={() => setScreen('vocab_management')}>字庫</button>
+    <main className={relayClass} aria-label="EchoQuest family relay rescue">
+      <header className="eq-relay-hud">
+        <div className="eq-relay-mission">
+          <span>森林接力救援</span>
+          <strong>{adventure?.rescued ? '救援完成' : eventView?.title ?? '等待任務'}</strong>
+          <span>{adventure ? `${Math.min(adventure.eventIndex + 1, 4)} / 4` : '0 / 4'}</span>
+        </div>
+        <div className="eq-relay-hud-actions">
+          <button type="button" className="eq-icon-button" onClick={() => setScreen('vocab_management')} aria-label="開啟字庫" title="開啟字庫">
+            <Settings aria-hidden="true" />
+          </button>
           <nav aria-label="選擇玩家">
             {learnerProfileOptions.map((option) => (
               <button key={option.value} type="button" aria-pressed={profile === option.value} onClick={() => changeProfile(option.value)}>
@@ -347,41 +405,67 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
           </nav>
         </div>
       </header>
-      <section className="eq-adventure-scene" aria-live="polite">
-        <div className="eq-scene-copy">
-          <p>{roomView.kicker}</p>
-          <h1>{roomView.title}</h1>
-          <p>{roomView.instruction}</p>
-          {bossTurn && <p className="eq-boss-intent">森林危機：{bossTurn.hint}</p>}
+
+      <section
+        className="eq-relay-world"
+        data-testid="relay-world"
+        data-event={currentEvent?.kind ?? 'empty'}
+        data-complete={String(celebratingEventId === currentEvent?.id)}
+        aria-label={eventView?.title ?? '等待救援任務'}
+      >
+        <img className="eq-relay-backdrop" src={eventView?.scene ?? '/assets/generated/scene-bramble-grove.png'} alt="" />
+        <div
+          className="eq-relay-world-change"
+          aria-hidden="true"
+          style={{ '--relay-progress': runeProgress } as React.CSSProperties}
+        />
+        <img className="eq-relay-companion" src="/assets/generated/companion-scout.png" alt="" />
+        {currentEvent?.kind === 'boss' && <img className="eq-relay-boss" src="/assets/generated/boss-wizard.png" alt="" />}
+        <div className="eq-relay-scene-copy">
+          <h1>{adventure?.rescued ? '救援成功' : eventView?.title ?? '森林正在等待'}</h1>
+          <p>{adventure?.rescued ? '全家的魔法接力完成了。' : eventView?.cue ?? '先準備一個可以練習的單字。'}</p>
+          {bossTurn && <p className="eq-boss-intent">危機提示：{bossTurn.hint}</p>}
         </div>
-        <div className="eq-scene-character">
-          <img src={adventure.room === 'rescue' || adventure.room === 'complete' ? '/assets/generated/boss-wizard.png' : '/assets/generated/level-magic-gate.png'} alt="" />
+        <div className="eq-relay-cue" aria-label="目前目標">
+          {getWordImage(currentWord) && <img src={getWordImage(currentWord)} alt="" />}
+          <span data-testid="relay-target-word">{currentWord?.word ?? '—'}</span>
         </div>
-        {adventure.room !== 'complete' && (
-          <div className="eq-world-challenge">
-            <div className="eq-target-card">
-              {currentImageSrc ? <img src={currentImageSrc} alt={currentWord?.word ?? 'current word'} /> : <span aria-hidden="true">{currentWord?.imageName ?? '?'}</span>}
+      </section>
+
+      <section className="eq-relay-deck" aria-label="接力操作">
+        {enabledVocab.length === 0 ? (
+          <div className="eq-relay-empty" role="status">
+            <strong>需要至少一個啟用中的單字</strong>
+            <button type="button" className="eq-arcade-primary" onClick={() => setScreen('vocab_management')}>開啟字庫</button>
+          </div>
+        ) : adventure?.rescued ? (
+          <div className="eq-relay-clear" role="status">
+            <strong>森林夥伴已經安全回家</strong>
+            <button type="button" className="eq-arcade-primary" onClick={startNewMission}>新的救援</button>
+          </div>
+        ) : (
+          <>
+            <div className="eq-deck-heading">
+              <span>{profileHints[profile].mode}</span>
+              <p>{profileHints[profile].goal}</p>
             </div>
-            <div className="eq-word-clue">
-              <p>{selectedProfileHint.mode}</p>
-              <h2>{getWordClue(profile, currentWord)}</h2>
-              <span>{selectedProfileHint.goal}</span>
-            </div>
+
             {profile === 'toddler' && (
               <div className="eq-choice-grid" aria-label="圖片選項">
-                {pictureChoices.map((choice) => {
-                  const choiceImage = getWordImage(choice);
-                  return (
-                    <button key={choice.id} type="button" className="eq-picture-choice" onClick={() => submitAnswer(choice.word, 'image_choice')} aria-label={`選擇 ${choice.word}`}>
-                      {choiceImage ? <img src={choiceImage} alt="" /> : <span aria-hidden="true">{choice.imageName}</span>}
-                    </button>
-                  );
-                })}
+                {pictureChoices.map((choice) => (
+                  <button key={choice.id} type="button" className="eq-picture-choice" onClick={() => submitAnswer(choice.word, 'image_choice')} aria-label={`選擇 ${choice.word}`}>
+                    {getWordImage(choice) ? <img src={getWordImage(choice)} alt="" /> : <span aria-hidden="true">{choice.imageName}</span>}
+                  </button>
+                ))}
               </div>
             )}
+
             {profile === 'kid' && (
               <div className="eq-letter-game">
-                <div className="eq-letter-answer" aria-label="拼字答案">{selectedLetters || '點字母拼單字'}</div>
+                <div className="eq-letter-status">
+                  <div className="eq-letter-answer" aria-label="拼字答案">{selectedLetters || '點字母拼單字'}</div>
+                  <span>{nextLetter ? `下一個字母：${nextLetter}` : '符文已排列完成'}</span>
+                </div>
                 <div className="eq-letter-bank" aria-label="字母選項">
                   {letterTiles.map((tile) => (
                     <button key={tile.id} type="button" className="eq-letter-tile" onClick={() => selectLetter(tile.id)} disabled={tile.used} aria-label={`letter ${tile.letter}`}>
@@ -389,55 +473,74 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
                     </button>
                   ))}
                 </div>
-                <div className="eq-row-actions">
-                  <button type="button" className="eq-arcade-small-button" onClick={clearLetters}>清除</button>
-                  <button type="button" className="eq-arcade-primary" onClick={() => submitAnswer(selectedLetters, 'spelling')}>{submitLabel}</button>
-                </div>
+                <button type="button" className="eq-arcade-primary" disabled={!currentWord || selectedLetters.length !== currentWord.word.length} onClick={() => submitAnswer(selectedLetters, 'spelling')}>
+                  {submitLabel}
+                </button>
               </div>
             )}
+
             {profile === 'adult' && (
               <form className="eq-typing-game" onSubmit={(event) => { event.preventDefault(); submitAnswer(typedAnswer, 'spelling'); }}>
-                <input value={typedAnswer} onChange={(event) => setTypedAnswer(event.target.value)} placeholder="fast typing practice" aria-label="Type answer" />
+                <input value={typedAnswer} onChange={(event) => setTypedAnswer(event.target.value)} autoComplete="off" aria-label="Type answer" />
                 <button type="submit" className="eq-arcade-primary">{submitLabel}</button>
               </form>
             )}
+
+            {currentEvent?.kind === 'boss' && (
+              <div className="eq-spell-choices" aria-label="可用魔法">
+                {spellViews.map((spell) => (
+                  <button key={spell.spell} type="button" disabled={!adventure?.spellReady} onClick={() => useSpell(spell.spell)}>
+                    <strong>{spell.name}</strong><span>{spell.detail}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {canUseVoice && (
               <div className="eq-voice-panel" aria-label="語音輸入">
                 {speech.isSupported ? (
                   <>
                     <div className="eq-voice-controls">
-                      <button type="button" className={speech.listening ? 'eq-arcade-danger' : 'eq-arcade-secondary'} onClick={speech.listening ? speech.stop : startListening}>
-                        {speech.listening ? <Volume2 aria-hidden="true" /> : <Mic aria-hidden="true" />}
-                        {speech.listening ? '聆聽中' : '說出單字'}
+                      <button type="button" className={activeVoice ? 'eq-arcade-danger' : 'eq-arcade-secondary'} onClick={activeVoice ? speech.stop : startListening}>
+                        {activeVoice ? <Volume2 aria-hidden="true" /> : <Mic aria-hidden="true" />}
+                        {voiceLabel}
                       </button>
                       <LanguageSelector selectedLang={recognitionLang} onLangChange={setRecognitionLang} />
                     </div>
-                    <p className="eq-transcript-line">{speech.transcript || speech.interimTranscript || '語音是可選輸入，失敗也可以繼續拼字/打字。'}</p>
+                    {(speech.transcript || speech.interimTranscript) && <p className="eq-transcript-line">{speech.transcript || speech.interimTranscript}</p>}
                     {voiceReview && (
                       <div className="eq-voice-review" role="status" aria-live="polite">
                         <span>聽到：{voiceReview.heardText}</span>
-                        <strong>{voiceReview.isMatch ? '可確認送出' : `目標是 ${voiceReview.targetWord}`}</strong>
+                        <strong>{voiceReview.isMatch ? '可以送出' : `目標是 ${voiceReview.targetWord}`}</strong>
                         <div className="eq-row-actions">
-                          <button type="button" className="eq-arcade-small-button" onClick={retryVoice}>重試</button>
+                          <button type="button" className="eq-arcade-small-button" onClick={startListening}>重試</button>
                           <button type="button" className="eq-arcade-primary" onClick={confirmVoiceReview}>確認送出</button>
                         </div>
                       </div>
                     )}
                   </>
                 ) : (
-                  <p className="eq-voice-note" role="alert">語音暫時不可用；打字/拼字已可直接使用。</p>
+                  <p className="eq-voice-note" role="alert">語音暫時不可用；打字或拼字仍可直接使用。</p>
                 )}
               </div>
             )}
+
             <p className={`eq-adventure-message eq-adventure-message--${message.kind}`} role="status">{message.text}</p>
-          </div>
+          </>
         )}
       </section>
-      {adventure.room === 'rescue' && (
-        <div className="eq-spell-dock" aria-label="可用魔法">
-          <button type="button" disabled={!spellReady} onClick={() => useSpell('fire')}>火球</button>
-          <button type="button" disabled={!spellReady} onClick={() => useSpell('shield')}>護盾</button>
-          <button type="button" disabled={!spellReady} onClick={() => useSpell('heal')}>治療</button>
+
+      {showResumePrompt && (
+        <div className="eq-resume-scrim">
+          <section className="eq-resume-dialog" role="dialog" aria-modal="true" aria-labelledby="resume-title">
+            <span>接力訊號仍在</span>
+            <h2 id="resume-title">繼續森林救援</h2>
+            <p>上次的目標與世界狀態都已保留。</p>
+            <div className="eq-row-actions">
+              <button type="button" className="eq-arcade-primary" onClick={() => setShowResumePrompt(false)}>繼續救援</button>
+              <button type="button" className="eq-arcade-secondary" onClick={startNewMission}>新的救援</button>
+            </div>
+          </section>
         </div>
       )}
     </main>
