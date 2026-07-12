@@ -62,8 +62,8 @@ const profileHints: Record<LearnerProfile, { mode: string; goal: string }> = {
 const eventViews: Record<NonNullable<MissionEvent['kind']>, { title: string; cue: string; scene: string }> = {
   scout: { title: '偵察找路', cue: '點亮藏在林間的路標', scene: '/assets/generated/scene-bramble-grove.png' },
   build: { title: '魔法建造', cue: '把斷橋變成發光的通道', scene: '/assets/generated/scene-moon-bridge.png' },
-  escort: { title: '護送前進', cue: '陪小船安全穿過夜河', scene: '/assets/generated/scene-river-escort.png' },
-  evade: { title: '避險反制', cue: '撐起護罩穿越荊棘', scene: '/assets/generated/scene-bramble-grove.png' },
+  escort: { title: '護送前進', cue: '沿著發光石安全越過河流', scene: '/assets/generated/scene-river-escort.png' },
+  evade: { title: '避險反制', cue: '避開倒木，沿安全路線前進', scene: '/assets/generated/scene-river-escort.png' },
   boss: { title: '荊棘救援', cue: '讀懂危機，再選出正確魔法', scene: '/assets/generated/scene-thorn-altar.png' },
 };
 
@@ -310,18 +310,15 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
 
   const useSpell = (spell: Spell) => {
     if (!adventure?.spellReady) return;
-    setAdventure((state) => {
-      if (!state) return state;
-      const result = castSpell(recordMissionProfile(state, profile), spell);
-      setMessage({
-        kind: result.correct ? 'correct' : 'wrong',
-        text: result.correct
-          ? result.state.rescued ? '荊棘消散了，森林夥伴安全獲救！' : '魔法奏效，下一波危機來了。'
-          : result.hint,
-      });
-      if (result.correct) resetTransientInputs(null);
-      return result.state;
+    const result = castSpell(recordMissionProfile(adventure, profile), spell);
+    setAdventure(result.state);
+    setMessage({
+      kind: result.correct ? 'correct' : 'wrong',
+      text: result.correct
+        ? result.state.rescued ? '荊棘消散了，森林夥伴安全獲救！' : '魔法奏效，下一波危機來了。'
+        : result.hint,
     });
+    if (result.correct) resetTransientInputs(null);
   };
 
   const startListening = () => {
