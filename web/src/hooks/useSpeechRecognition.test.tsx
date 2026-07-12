@@ -42,7 +42,9 @@ function HookHarness() {
       <div data-testid="supported">{String((speech as any).isSupported)}</div>
       <div data-testid="error">{(speech as any).error ?? ''}</div>
       <div data-testid="listening">{String(speech.listening)}</div>
+      <div data-testid="requesting">{String((speech as any).requestingPermission)}</div>
       <button onClick={() => speech.start('en-US')}>start</button>
+      <button onClick={speech.stop}>stop</button>
     </div>
   );
 }
@@ -64,6 +66,7 @@ function StrictModeHarness({ onResult }: { onResult: (result: string) => void })
   return (
     <div>
       <div data-testid="strict-listening">{String(speech.listening)}</div>
+      <div data-testid="strict-requesting">{String((speech as any).requestingPermission)}</div>
       <button onClick={() => speech.start('en-US')}>strict start</button>
     </div>
   );
@@ -85,6 +88,53 @@ describe('useSpeechRecognition', () => {
     expect(screen.getByTestId('error')).toHaveTextContent(
       'Speech recognition is not supported in this browser.'
     );
+    expect(screen.getByTestId('requesting')).toHaveTextContent('false');
+  });
+
+  it('shows a permission request until recognition starts or errors', () => {
+    setMockSpeechRecognition();
+    render(<HookHarness />);
+
+    fireEvent.click(screen.getByText('start'));
+    const recognition = MockSpeechRecognition.instances[0];
+    expect(screen.getByTestId('requesting')).toHaveTextContent('true');
+
+    act(() => {
+      recognition.onstart?.();
+    });
+    expect(screen.getByTestId('requesting')).toHaveTextContent('false');
+
+    act(() => {
+      recognition.onend?.();
+    });
+    fireEvent.click(screen.getByText('start'));
+    expect(screen.getByTestId('requesting')).toHaveTextContent('true');
+    act(() => {
+      recognition.onerror?.({ error: 'not-allowed' });
+    });
+    expect(screen.getByTestId('requesting')).toHaveTextContent('false');
+  });
+
+  it('clears a pending permission request when stopped, ended, or start fails', () => {
+    setMockSpeechRecognition();
+    render(<HookHarness />);
+
+    fireEvent.click(screen.getByText('start'));
+    const recognition = MockSpeechRecognition.instances[0];
+    fireEvent.click(screen.getByText('stop'));
+    expect(screen.getByTestId('requesting')).toHaveTextContent('false');
+
+    fireEvent.click(screen.getByText('start'));
+    act(() => {
+      recognition.onend?.();
+    });
+    expect(screen.getByTestId('requesting')).toHaveTextContent('false');
+
+    recognition.start.mockImplementationOnce(() => {
+      throw new DOMException('device unavailable', 'NotReadableError');
+    });
+    fireEvent.click(screen.getByText('start'));
+    expect(screen.getByTestId('requesting')).toHaveTextContent('false');
   });
 
   it('stops recognition and detaches handlers when the hook unmounts', () => {
@@ -140,6 +190,7 @@ describe('useSpeechRecognition', () => {
     );
     fireEvent.click(screen.getByText('strict start'));
     const recognition = MockSpeechRecognition.instances[0];
+    expect(screen.getByTestId('strict-requesting')).toHaveTextContent('true');
 
     act(() => {
       recognition.onstart?.();
@@ -150,7 +201,14 @@ describe('useSpeechRecognition', () => {
     });
 
     expect(screen.getByTestId('strict-listening')).toHaveTextContent('true');
+    expect(screen.getByTestId('strict-requesting')).toHaveTextContent('false');
     expect(onResult).toHaveBeenCalledWith('apple');
+
+    act(() => {
+      recognition.onend?.();
+    });
+    expect(screen.getByTestId('strict-listening')).toHaveTextContent('false');
+    expect(screen.getByTestId('strict-requesting')).toHaveTextContent('false');
   });
 
   it('does not restart after no-speech or after unmount', () => {
@@ -184,5 +242,65 @@ describe('useSpeechRecognition', () => {
       results: [{ isFinal: true, 0: { transcript: 'apple' } }],
     }));
     expect(onResult).not.toHaveBeenCalled();
+  });
+
+  it('ignores delayed callbacks from a stopped run after restarting the same recognizer', () => {
+    setMockSpeechRecognition();
+    render(<HookHarness />);
+
+    fireEvent.click(screen.getByText('start'));
+    const recognition = MockSpeechRecognition.instances[0];
+    const staleOnEnd = recognition.onend;
+    const staleOnError = recognition.onerror;
+
+    fireEvent.click(screen.getByText('stop'));
+    fireEvent.click(screen.getByText('start'));
+
+    expect(MockSpeechRecognition.instances).toHaveLength(1);
+    expect(screen.getByTestId('requesting')).toHaveTextContent('true');
+
+    act(() => {
+      staleOnEnd?.();
+      staleOnError?.({ error: 'aborted' });
+    });
+    expect(screen.getByTestId('requesting')).toHaveTextContent('true');
+    expect(screen.getByTestId('listening')).toHaveTextContent('false');
+    expect(screen.getByTestId('error')).toHaveTextContent('');
+
+    act(() => {
+      recognition.onstart?.();
+    });
+    expect(screen.getByTestId('requesting')).toHaveTextContent('false');
+    expect(screen.getByTestId('listening')).toHaveTextContent('true');
+
+    act(() => {
+      staleOnEnd?.();
+      staleOnError?.({ error: 'aborted' });
+    });
+    expect(screen.getByTestId('requesting')).toHaveTextContent('false');
+    expect(screen.getByTestId('listening')).toHaveTextContent('true');
+    expect(screen.getByTestId('error')).toHaveTextContent('');
+  });
+
+  it('ignores callbacks retained by a recognition instance after it is replaced', () => {
+    setMockSpeechRecognition();
+    const firstResult = jest.fn();
+    const secondResult = jest.fn();
+
+    const first = render(<ResultHarness onResult={firstResult} />);
+    fireEvent.click(first.getByText('start'));
+    const staleRecognition = MockSpeechRecognition.instances[0];
+    const staleOnResult = staleRecognition.onresult;
+    first.unmount();
+
+    render(<ResultHarness onResult={secondResult} />);
+    fireEvent.click(screen.getByText('start'));
+    act(() => staleOnResult?.({
+      resultIndex: 0,
+      results: [{ isFinal: true, 0: { transcript: 'apple' } }],
+    }));
+
+    expect(firstResult).not.toHaveBeenCalled();
+    expect(secondResult).not.toHaveBeenCalled();
   });
 });

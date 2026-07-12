@@ -29,6 +29,7 @@ declare global {
 
 interface UseSpeechRecognitionResult {
   listening: boolean;
+  requestingPermission: boolean;
   transcript: string;
   interimTranscript: string;
   isSupported: boolean;
@@ -49,6 +50,7 @@ export function useSpeechRecognition({
   onResult,
 }: UseSpeechRecognitionOptions = {}): UseSpeechRecognitionResult {
   const [listening, setListening] = useState(false);
+  const [requestingPermission, setRequestingPermission] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +59,7 @@ export function useSpeechRecognition({
   const langRef = useRef('en-US');
   const onResultRef = useRef(onResult);
   const activeRef = useRef(false);
+  const runTokenRef = useRef(0);
   const mountedRef = useRef(true);
 
   const [isSupported] = useState(() => {
@@ -84,12 +87,14 @@ export function useSpeechRecognition({
 
   const stop = useCallback(() => {
     activeRef.current = false;
+    runTokenRef.current += 1;
+    listeningRef.current = false;
+    setRequestingPermission(false);
     const recognition = recognitionRef.current;
     if (!recognition) {
       return;
     }
 
-    listeningRef.current = false;
     try {
       recognition.stop();
     } catch {
@@ -101,17 +106,19 @@ export function useSpeechRecognition({
     langRef.current = lang;
 
     if (!isSupported) {
+      setRequestingPermission(false);
       setError(UNSUPPORTED_ERROR_MESSAGE);
       return;
     }
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
+      setRequestingPermission(false);
       setError(UNSUPPORTED_ERROR_MESSAGE);
       return;
     }
 
-    if (listeningRef.current) {
+    if (activeRef.current) {
       if (recognitionRef.current && recognitionRef.current.lang !== lang) {
         recognitionRef.current.stop();
       }
@@ -119,6 +126,8 @@ export function useSpeechRecognition({
     }
 
     const newRecognition = recognitionRef.current ?? new SpeechRecognition();
+    const runToken = runTokenRef.current + 1;
+    runTokenRef.current = runToken;
     newRecognition.continuous = false;
     newRecognition.lang = langRef.current;
     newRecognition.interimResults = true; // Get results as the user speaks
@@ -126,9 +135,17 @@ export function useSpeechRecognition({
       newRecognition.maxAlternatives = 1;
     }
 
+    const isActiveRun = () => (
+      mountedRef.current
+      && recognitionRef.current === newRecognition
+      && activeRef.current
+      && runTokenRef.current === runToken
+    );
+
     newRecognition.onstart = () => {
-      if (!mountedRef.current || !activeRef.current) return;
+      if (!isActiveRun()) return;
       listeningRef.current = true;
+      setRequestingPermission(false);
       setListening(true);
       setError(null);
       setTranscript('');
@@ -136,21 +153,27 @@ export function useSpeechRecognition({
     };
 
     newRecognition.onend = () => {
+      if (!isActiveRun()) return;
       activeRef.current = false;
       listeningRef.current = false;
-      if (mountedRef.current) setListening(false);
+      if (mountedRef.current) {
+        setRequestingPermission(false);
+        setListening(false);
+      }
     };
 
     newRecognition.onerror = (event) => {
+      if (!isActiveRun()) return;
       activeRef.current = false;
       listeningRef.current = false;
+      setRequestingPermission(false);
       setListening(false);
       setInterimTranscript('');
       setError(event.error || 'unknown-error');
     };
 
     newRecognition.onresult = (event) => {
-      if (!mountedRef.current || !activeRef.current) return;
+      if (!isActiveRun()) return;
       let finalTranscript = '';
       let interim = '';
 
@@ -177,8 +200,12 @@ export function useSpeechRecognition({
 
     try {
       activeRef.current = true;
+      setRequestingPermission(true);
       newRecognition.start();
     } catch (err) {
+      activeRef.current = false;
+      listeningRef.current = false;
+      setRequestingPermission(false);
       const domError = err as DOMException;
       if (domError?.name !== 'InvalidStateError') {
         setError(domError?.message || 'Failed to start speech recognition.');
@@ -196,6 +223,9 @@ export function useSpeechRecognition({
       const recognition = recognitionRef.current;
       mountedRef.current = false;
       activeRef.current = false;
+      runTokenRef.current += 1;
+      listeningRef.current = false;
+      setRequestingPermission(false);
       if (!recognition) {
         return;
       }
@@ -207,9 +237,19 @@ export function useSpeechRecognition({
         recognition.abort?.();
       }
       recognitionRef.current = null;
-      listeningRef.current = false;
     };
   }, [detachHandlers]);
 
-  return { listening, transcript, interimTranscript, isSupported, error, start, stop, resetTranscript, clearError };
+  return {
+    listening,
+    requestingPermission,
+    transcript,
+    interimTranscript,
+    isSupported,
+    error,
+    start,
+    stop,
+    resetTranscript,
+    clearError,
+  };
 }

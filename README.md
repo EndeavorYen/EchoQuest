@@ -1,15 +1,17 @@
 # EchoQuest
 
+> **TL;DR** — EchoQuest is a local-first family English game. A toddler, early reader, and adult can take turns inside one shared rescue mission without losing the current word or progress.
+
 EchoQuest is a local-first English learning adventure game for a family audience: toddlers, young kids, and adults share the same vocabulary and quest content while playing through different challenge modes.
 
-## Current Game Loop
+## Family Relay Rescue
 
-- Open the app and pick a learner profile from the top of the play screen.
-- Complete one shared family mission: explore the orchard, repair the magic bridge, then rescue the forest wizard.
-- Correct learning answers advance the first two rooms and charge a spell during the rescue.
-- Read the wizard's intent and counter it with fire, shield, or healing magic. A wrong spell gives a hint without resetting the room.
+- A mission seed chooses three rescue events, Boss hazards, and vocabulary.
+- Switch `2y 圖像`, `5y 單字`, and `成人/家長` at any point; the target word and world progress stay shared.
+- Correct answers visibly change the scene, then the mission advances automatically.
+- During the Boss event, answer the word to charge magic, read the danger hint, then choose fire, shield, or healing.
+- Reloading an unfinished mission offers `繼續救援`; `新的救援` creates a different event and vocabulary plan.
 - Missed or weak words are stored in browser `localStorage` and prioritized for review.
-- Voice input is optional for kid/adult players and never blocks picture, spelling, or typing play.
 
 ## Learner Profiles
 
@@ -19,15 +21,16 @@ EchoQuest is a local-first English learning adventure game for a family audience
 | `5y 單字` | early reader | tap letter tiles to assemble the English word; optional voice input is available |
 | `成人/家長` | adult practice | fast typing practice; optional voice input is available |
 
-Progress is stored in browser `localStorage`, including vocabulary, learner profile, recognition language, and per-word mastery.
+Progress is stored in browser `localStorage`, including the exact active mission, vocabulary, learner profile, recognition language, and per-word mastery.
 
 ## Voice Input
 
 Voice is implemented as a safe optional input path:
 
-- Click `說出單字`.
+- Click `說出單字`; while the browser asks for access, the button shows `等待麥克風權限`.
+- After permission is granted, the button shows `聆聽中`.
 - Speak the English word shown by the picture.
-- EchoQuest displays `聽到：...`.
+- EchoQuest displays `聽到：...` for review.
 - Click `確認送出` to use the answer, or `重試` to listen again.
 
 If speech recognition is unsupported, blocked by microphone permission, or temporarily unavailable, the app keeps the spelling/typing controls usable. For the best chance of voice support, run in Chrome or Edge from `localhost` or HTTPS and allow microphone access when prompted.
@@ -64,14 +67,9 @@ From the repository root:
 git diff --check
 ```
 
-## Roadmap
+## Design Notes
 
-The current multi-age gameplay plan lives at:
+The current relay design and implementation plan live at:
 
-- `docs/superpowers/plans/2026-06-29-multi-age-gameplay-upgrade.md`
-
-Next high-impact slices:
-
-- add a second mission after real family playtesting
-- add stronger cast, shield, rescue, and treasure-opening animation
-- generate distinct scene art after the Forest Rescue loop proves fun in repeated play
+- `docs/superpowers/specs/2026-07-11-family-relay-rescue-design.md`
+- `docs/superpowers/plans/2026-07-11-family-relay-rescue.md`

@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import App from './App';
 import type { Level } from './data/levels';
+import type { AdventureState, MissionEventKind } from './game/adventure';
+import { STORAGE_KEY_ADVENTURE } from './persistence/adventureStorage';
 import type { VocabItem } from './types/vocab';
 
 class MockSpeechRecognition {
@@ -44,14 +46,6 @@ const ball: VocabItem = {
   imageSrc: 'assets/generated/word-ball.png',
 };
 
-const cat: VocabItem = {
-  ...apple,
-  id: 'cat',
-  word: 'cat',
-  imageName: 'cat',
-  imageSrc: 'assets/generated/word-cat.png',
-};
-
 const testLevels: Level[] = [{
   id: 1,
   name: 'Training Gate',
@@ -64,7 +58,33 @@ const testLevels: Level[] = [{
   maxDifficulty: 1,
 }];
 
-const testVocab = [apple];
+function missionAt(kind: MissionEventKind = 'build'): AdventureState {
+  const kinds: MissionEventKind[] = [kind, 'scout', 'escort'];
+  return {
+    version: 2,
+    seed: 42,
+    events: [
+      ...kinds.map((eventKind, index) => ({ id: `${eventKind}-${index}`, kind: eventKind, wordId: index === 1 ? 'ball' : 'apple' })),
+      {
+        id: 'boss',
+        kind: 'boss',
+        bossTurns: [
+          { intent: 'thorns', spell: 'fire', wordId: 'apple' },
+          { intent: 'falling_branch', spell: 'shield', wordId: 'ball' },
+          { intent: 'curse', spell: 'heal', wordId: 'apple' },
+        ],
+      },
+    ],
+    eventIndex: 0,
+    bossTurn: 0,
+    spellReady: false,
+    completedEventIds: [],
+    rescued: false,
+    rewards: [],
+    modesUsed: [],
+    room: 'orchard',
+  };
+}
 
 function setProfile(profile: 'toddler' | 'kid' | 'adult') {
   localStorage.setItem('echoquest_profile_v1', profile);
@@ -81,216 +101,207 @@ function uninstallSpeechRecognitionMock() {
   delete (window as any).webkitSpeechRecognition;
 }
 
-function renderGame() {
-  return render(<App initialVocab={testVocab} initialLevels={testLevels} />);
+function renderGame(vocab = [apple, ball]) {
+  return render(<App initialVocab={vocab} initialLevels={testLevels} />);
 }
 
-async function expectRoom(name: string) {
-  expect(await screen.findByRole('heading', { name })).toBeInTheDocument();
-}
-
-describe('EchoQuest arcade game', () => {
+describe('EchoQuest family relay rescue', () => {
   beforeEach(() => {
     localStorage.clear();
     uninstallSpeechRecognitionMock();
     jest.clearAllMocks();
+    jest.useRealTimers();
   });
 
-  it('lets the family finish orchard, bridge, and rescue rooms together', async () => {
-    render(<App initialVocab={testVocab} initialLevels={testLevels} />);
-
-    expect(screen.getByRole('heading', { name: '果園探索' })).toBeInTheDocument();
-    expect(screen.getByText('找到畫面中的目標，取得治療魔法。')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /選擇 apple/i }));
-
-    expect(screen.getByRole('heading', { name: '修復魔法橋' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '5y 單字' }));
-    for (const letter of ['a', 'p', 'p', 'l', 'e']) {
-      const tile = screen.getAllByRole('button', { name: `letter ${letter}` })
-        .find((button) => !(button as HTMLButtonElement).disabled);
-      fireEvent.click(tile!);
-    }
-    fireEvent.click(screen.getByRole('button', { name: '修好橋梁' }));
-
-    expect(screen.getByRole('heading', { name: '森林救援' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '成人/家長' }));
-    for (const spell of ['火球', '護盾', '治療']) {
-      fireEvent.change(screen.getByLabelText('Type answer'), { target: { value: 'apple' } });
-      fireEvent.click(screen.getByRole('button', { name: '魔法充能' }));
-      fireEvent.click(screen.getByRole('button', { name: spell }));
-    }
-    expect(screen.getByRole('heading', { name: '救援成功' })).toBeInTheDocument();
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
-  it('keeps a rescue charge after a wrong spell and consumes it after the correct spell', () => {
+  it('offers and restores a saved active build event', async () => {
+    localStorage.setItem(STORAGE_KEY_ADVENTURE, JSON.stringify(missionAt('build')));
     renderGame();
 
-    fireEvent.click(screen.getByRole('button', { name: /選擇 apple/i }));
-    fireEvent.click(screen.getByRole('button', { name: '5y 單字' }));
-    for (const letter of ['a', 'p', 'p', 'l', 'e']) {
-      const tile = screen.getAllByRole('button', { name: `letter ${letter}` })
-        .find((button) => !(button as HTMLButtonElement).disabled);
-      fireEvent.click(tile!);
-    }
-    fireEvent.click(screen.getByRole('button', { name: '修好橋梁' }));
-    fireEvent.click(screen.getByRole('button', { name: '成人/家長' }));
+    expect(screen.getByRole('dialog', { name: '繼續森林救援' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
 
-    const spells = ['火球', '護盾', '治療'];
-    for (const spell of spells) {
-      expect(screen.getByRole('button', { name: spell })).toBeDisabled();
-    }
+    expect(await screen.findByRole('heading', { name: '魔法建造' })).toBeInTheDocument();
+    expect(screen.getByTestId('relay-world')).toHaveAttribute('data-event', 'build');
+    expect(screen.getByTestId('relay-target-word')).toHaveTextContent('apple');
+  });
+
+  it('starts a new rescue from the resume prompt', () => {
+    const saved = missionAt('build');
+    localStorage.setItem(STORAGE_KEY_ADVENTURE, JSON.stringify(saved));
+    renderGame();
+
+    fireEvent.click(screen.getByRole('button', { name: '新的救援' }));
+
+    expect(screen.queryByRole('dialog', { name: '繼續森林救援' })).not.toBeInTheDocument();
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY_ADVENTURE)!) as AdventureState;
+    expect(persisted.seed).not.toBe(saved.seed);
+    expect(persisted.eventIndex).toBe(0);
+  });
+
+  it('keeps the active target during a toddler to kid handoff', () => {
+    localStorage.setItem(STORAGE_KEY_ADVENTURE, JSON.stringify(missionAt('build')));
+    renderGame();
+    fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
+
+    const target = screen.getByTestId('relay-target-word').textContent;
+    fireEvent.click(screen.getByRole('button', { name: '5y 單字' }));
+
+    expect(screen.getByTestId('relay-target-word')).toHaveTextContent(target!);
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY_ADVENTURE)!).seed).toBe(42);
+  });
+
+  it('marks a non-Boss scene complete for 600ms and advances exactly once', () => {
+    jest.useFakeTimers();
+    setProfile('adult');
+    localStorage.setItem(STORAGE_KEY_ADVENTURE, JSON.stringify(missionAt('build')));
+    renderGame();
+    fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
+
+    fireEvent.change(screen.getByLabelText('Type answer'), { target: { value: 'apple' } });
+    fireEvent.click(screen.getByRole('button', { name: '施放路徑魔法' }));
+
+    expect(screen.getByTestId('relay-world')).toHaveAttribute('data-event', 'build');
+    expect(screen.getByTestId('relay-world')).toHaveAttribute('data-complete', 'true');
+    act(() => { jest.advanceTimersByTime(599); });
+    expect(screen.getByTestId('relay-world')).toHaveAttribute('data-event', 'build');
+    act(() => { jest.advanceTimersByTime(1); });
+    expect(screen.getByTestId('relay-world')).toHaveAttribute('data-event', 'scout');
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY_ADVENTURE)!).eventIndex).toBe(1);
+  });
+
+  it('does not restart the scene timer when an answer is submitted twice', () => {
+    jest.useFakeTimers();
+    setProfile('adult');
+    localStorage.setItem(STORAGE_KEY_ADVENTURE, JSON.stringify(missionAt('build')));
+    renderGame();
+    fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
+
+    const answer = screen.getByLabelText('Type answer');
+    const submit = screen.getByRole('button', { name: '施放路徑魔法' });
+    fireEvent.change(answer, { target: { value: 'apple' } });
+    fireEvent.click(submit);
+    act(() => { jest.advanceTimersByTime(300); });
+    fireEvent.change(answer, { target: { value: 'apple' } });
+    fireEvent.click(submit);
+    act(() => { jest.advanceTimersByTime(300); });
+
+    expect(screen.getByTestId('relay-world')).toHaveAttribute('data-event', 'scout');
+    act(() => { jest.advanceTimersByTime(600); });
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY_ADVENTURE)!).eventIndex).toBe(1);
+  });
+
+  it('immediately advances a saved completed current event without replaying celebration', () => {
+    const saved = missionAt('build');
+    saved.completedEventIds = [saved.events[0].id];
+    localStorage.setItem(STORAGE_KEY_ADVENTURE, JSON.stringify(saved));
+    renderGame();
+    fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
+
+    expect(screen.getByTestId('relay-world')).toHaveAttribute('data-event', 'scout');
+    expect(screen.getByTestId('relay-world')).toHaveAttribute('data-complete', 'false');
+  });
+
+  it('repairs unavailable mission words before offering resume', () => {
+    localStorage.setItem(STORAGE_KEY_ADVENTURE, JSON.stringify(missionAt('build')));
+    renderGame([ball]);
+    fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
+
+    expect(screen.getByTestId('relay-target-word')).toHaveTextContent('ball');
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY_ADVENTURE)!) as AdventureState;
+    expect(persisted.events[0].wordId).toBe('ball');
+  });
+
+  it('accepts only the next kid letter and clears the draft on a wrong letter', () => {
+    setProfile('kid');
+    localStorage.setItem(STORAGE_KEY_ADVENTURE, JSON.stringify(missionAt('build')));
+    renderGame();
+    fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'letter p' })[0]);
+    expect(screen.getByLabelText('拼字答案')).toHaveTextContent('點字母拼單字');
+    expect(screen.getByText('下一個字母：A')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'letter a' }));
+    expect(screen.getByLabelText('拼字答案')).toHaveTextContent('a');
+    expect(screen.getByText('下一個字母：P')).toBeInTheDocument();
+  });
+
+  it('charges the Boss with an answer and keeps all spell paths playable', () => {
+    setProfile('adult');
+    const bossMission = missionAt('build');
+    bossMission.eventIndex = 3;
+    bossMission.completedEventIds = bossMission.events.slice(0, 3).map((event) => event.id);
+    localStorage.setItem(STORAGE_KEY_ADVENTURE, JSON.stringify(bossMission));
+    renderGame();
+    fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
 
     fireEvent.change(screen.getByLabelText('Type answer'), { target: { value: 'apple' } });
     fireEvent.click(screen.getByRole('button', { name: '魔法充能' }));
-    for (const spell of spells) {
-      expect(screen.getByRole('button', { name: spell })).toBeEnabled();
+    for (const spell of ['火焰術', '守護盾', '治癒光']) {
+      expect(screen.getByRole('button', { name: new RegExp(spell) })).toBeEnabled();
     }
 
-    fireEvent.click(screen.getByRole('button', { name: '護盾' }));
-    expect(screen.getByRole('heading', { name: '森林救援' })).toBeInTheDocument();
-    for (const spell of spells) {
-      expect(screen.getByRole('button', { name: spell })).toBeEnabled();
-    }
-
-    fireEvent.click(screen.getByRole('button', { name: '火球' }));
-    for (const spell of spells) {
-      expect(screen.getByRole('button', { name: spell })).toBeDisabled();
-    }
+    fireEvent.click(screen.getByRole('button', { name: /守護盾/ }));
+    expect(screen.getByRole('button', { name: /火焰術/ })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: /火焰術/ }));
+    expect(screen.getByTestId('relay-target-word')).toHaveTextContent('ball');
   });
 
-  it('starts toddler rounds with two choices and allows a wrong tap before the match', async () => {
-    setProfile('toddler');
-    const { container } = render(<App initialVocab={[apple, ball, cat]} initialLevels={testLevels} />);
-
-    const targetWord = container.querySelector('.eq-target-card img')?.getAttribute('alt');
-    expect(targetWord).toBeTruthy();
-
-    const choiceButtons = await screen.findAllByRole('button', { name: /選擇/i });
-    expect(choiceButtons).toHaveLength(2);
-
-    const wrongChoice = choiceButtons.find((button) => !button.getAttribute('aria-label')?.includes(targetWord!));
-    expect(wrongChoice).toBeTruthy();
-    fireEvent.click(wrongChoice!);
-    expect(await screen.findByText(/再找一次/i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(`選擇 ${targetWord}`, 'i') }));
-
-    await expectRoom('修復魔法橋');
-  });
-
-  it('lets a kid assemble letters before attacking', async () => {
-    setProfile('kid');
-    renderGame();
-
-    for (const letter of ['a', 'p', 'p', 'l', 'e']) {
-      await screen.findAllByRole('button', { name: `letter ${letter}` });
-      const nextTile = screen
-        .getAllByRole('button', { name: `letter ${letter}` })
-        .find((button) => !button.hasAttribute('disabled'));
-      expect(nextTile).toBeTruthy();
-      fireEvent.click(nextTile!);
-    }
-
-    expect(screen.getByLabelText('拼字答案')).toHaveTextContent('apple');
-    fireEvent.click(screen.getByRole('button', { name: '完成探索' }));
-
-    await expectRoom('修復魔法橋');
-  });
-
-  it('clears kid letter tiles after a wrong spelling attempt', async () => {
-    setProfile('kid');
-    renderGame();
-
-    fireEvent.click(await screen.findByRole('button', { name: 'letter a' }));
-    expect(screen.getByLabelText('拼字答案')).toHaveTextContent('a');
-
-    fireEvent.click(screen.getByRole('button', { name: '完成探索' }));
-
-    expect(await screen.findByText(/還差一點/i)).toBeInTheDocument();
-    expect(screen.getByLabelText('拼字答案')).toHaveTextContent('點字母拼單字');
-    expect(screen.getByRole('button', { name: 'letter a' })).not.toBeDisabled();
-  });
-
-  it('lets an adult type the answer without voice', async () => {
+  it('wins all three Boss turns through the relay controls', () => {
     setProfile('adult');
+    const bossMission = missionAt('build');
+    bossMission.eventIndex = 3;
+    bossMission.completedEventIds = bossMission.events.slice(0, 3).map((event) => event.id);
+    localStorage.setItem(STORAGE_KEY_ADVENTURE, JSON.stringify(bossMission));
     renderGame();
+    fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
 
-    fireEvent.change(await screen.findByLabelText(/type answer/i), { target: { value: 'apple' } });
-    fireEvent.click(screen.getByRole('button', { name: '完成探索' }));
+    for (const [word, spell] of [['apple', '火焰術'], ['ball', '守護盾'], ['apple', '治癒光']] as const) {
+      fireEvent.change(screen.getByLabelText('Type answer'), { target: { value: word } });
+      fireEvent.click(screen.getByRole('button', { name: '魔法充能' }));
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(spell) }));
+    }
 
-    await expectRoom('修復魔法橋');
+    expect(screen.getByText('森林夥伴已經安全回家')).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY_ADVENTURE)!).rescued).toBe(true);
   });
 
-  it('uses voice as an optional confirmed answer for adult mode', async () => {
+  it('shows mic request priority, cancels a pending request, and stops on handoff', () => {
     setProfile('adult');
     installSpeechRecognitionMock();
     renderGame();
 
-    fireEvent.click(await screen.findByRole('button', { name: /說出單字/i }));
+    fireEvent.click(screen.getByRole('button', { name: '說出單字' }));
+    expect(screen.getByRole('button', { name: '等待麥克風權限' })).toBeInTheDocument();
     const recognition = MockSpeechRecognition.instances[0];
 
-    act(() => {
-      recognition.onresult?.({
-        resultIndex: 0,
-        results: [{ isFinal: true, 0: { transcript: ' apple ' } }],
-      });
-    });
+    fireEvent.click(screen.getByRole('button', { name: '等待麥克風權限' }));
+    expect(screen.getByRole('button', { name: '說出單字' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '說出單字' }));
 
-    expect(await screen.findByText('聽到：apple')).toBeInTheDocument();
-    expect(recognition.continuous).toBe(false);
-    fireEvent.click(screen.getByRole('button', { name: /確認送出/i }));
-
-    await expectRoom('修復魔法橋');
-  });
-
-  it('ignores an active voice result after switching players', async () => {
-    setProfile('adult');
-    installSpeechRecognitionMock();
-    renderGame();
-
-    fireEvent.click(await screen.findByRole('button', { name: /說出單字/i }));
-    const recognition = MockSpeechRecognition.instances[0];
-    const staleOnResult = recognition.onresult;
-
+    act(() => { recognition.onstart?.(); });
+    expect(screen.getByRole('button', { name: '聆聽中' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '5y 單字' }));
-    expect(screen.queryByText('聽到：apple')).not.toBeInTheDocument();
-
-    act(() => staleOnResult?.({
-      resultIndex: 0,
-      results: [{ isFinal: true, 0: { transcript: ' apple ' } }],
-    }));
-    expect(screen.queryByText('聽到：apple')).not.toBeInTheDocument();
+    expect(recognition.stop).toHaveBeenCalled();
   });
 
-  it('ignores an active voice result after advancing rooms', async () => {
-    setProfile('adult');
-    installSpeechRecognitionMock();
-    renderGame();
-
-    fireEvent.click(await screen.findByRole('button', { name: /說出單字/i }));
-    const recognition = MockSpeechRecognition.instances[0];
-    const staleOnResult = recognition.onresult;
-
-    fireEvent.change(screen.getByLabelText('Type answer'), { target: { value: 'apple' } });
-    fireEvent.click(screen.getByRole('button', { name: '完成探索' }));
-    await expectRoom('修復魔法橋');
-    expect(screen.queryByText('聽到：apple')).not.toBeInTheDocument();
-
-    act(() => staleOnResult?.({
-      resultIndex: 0,
-      results: [{ isFinal: true, 0: { transcript: ' apple ' } }],
-    }));
-    expect(screen.queryByText('聽到：apple')).not.toBeInTheDocument();
-  });
-
-  it('keeps typing playable when speech recognition is unsupported', async () => {
+  it('keeps the mission playable when speech is unsupported', () => {
     setProfile('adult');
     renderGame();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('語音暫時不可用');
-    fireEvent.change(screen.getByLabelText(/type answer/i), { target: { value: 'apple' } });
-    fireEvent.click(screen.getByRole('button', { name: '完成探索' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('語音暫時不可用');
+    expect(screen.getByLabelText('Type answer')).toBeEnabled();
+  });
 
-    await expectRoom('修復魔法橋');
+  it('fails gracefully when no vocabulary is enabled', () => {
+    renderGame([{ ...apple, enabled: false }]);
+
+    expect(screen.getByTestId('relay-world')).toBeInTheDocument();
+    expect(screen.getByText('需要至少一個啟用中的單字')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '開啟字庫' })[1]).toBeEnabled();
   });
 });
