@@ -44,7 +44,7 @@ export function MenuScreen({
               <select
                 value={learnerProfile}
                 onChange={(event) => onLearnerProfileChange(event.target.value as LearnerProfile)}
-                aria-label="Select learner profile"
+                aria-label="選擇學習者模式"
                 className="eq-select flex-1"
               >
                 {learnerProfileOptions.map((option) => (

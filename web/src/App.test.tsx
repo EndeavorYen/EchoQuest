@@ -161,7 +161,7 @@ describe('EchoQuest family relay rescue', () => {
     renderGame();
     fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
 
-    fireEvent.change(screen.getByLabelText('Type answer'), { target: { value: 'apple' } });
+    fireEvent.change(screen.getByLabelText('輸入答案'), { target: { value: 'apple' } });
     fireEvent.click(screen.getByRole('button', { name: '施放路徑魔法' }));
 
     expect(screen.getByTestId('relay-world')).toHaveAttribute('data-event', 'build');
@@ -180,7 +180,7 @@ describe('EchoQuest family relay rescue', () => {
     renderGame();
     fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
 
-    const answer = screen.getByLabelText('Type answer');
+    const answer = screen.getByLabelText('輸入答案');
     const submit = screen.getByRole('button', { name: '施放路徑魔法' });
     fireEvent.change(answer, { target: { value: 'apple' } });
     fireEvent.click(submit);
@@ -221,11 +221,11 @@ describe('EchoQuest family relay rescue', () => {
     renderGame();
     fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'letter p' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: '字母 p' })[0]);
     expect(screen.getByLabelText('拼字答案')).toHaveTextContent('點字母拼單字');
     expect(screen.getByText('下一個字母：A')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'letter a' }));
+    fireEvent.click(screen.getByRole('button', { name: '字母 a' }));
     expect(screen.getByLabelText('拼字答案')).toHaveTextContent('a');
     expect(screen.getByText('下一個字母：P')).toBeInTheDocument();
   });
@@ -239,7 +239,7 @@ describe('EchoQuest family relay rescue', () => {
     renderGame();
     fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
 
-    fireEvent.change(screen.getByLabelText('Type answer'), { target: { value: 'apple' } });
+    fireEvent.change(screen.getByLabelText('輸入答案'), { target: { value: 'apple' } });
     fireEvent.click(screen.getByRole('button', { name: '魔法充能' }));
     for (const spell of ['火焰術', '守護盾', '治癒光']) {
       expect(screen.getByRole('button', { name: new RegExp(spell) })).toBeEnabled();
@@ -261,7 +261,7 @@ describe('EchoQuest family relay rescue', () => {
     fireEvent.click(screen.getByRole('button', { name: '繼續救援' }));
 
     for (const [word, spell] of [['apple', '火焰術'], ['ball', '守護盾'], ['apple', '治癒光']] as const) {
-      fireEvent.change(screen.getByLabelText('Type answer'), { target: { value: word } });
+      fireEvent.change(screen.getByLabelText('輸入答案'), { target: { value: word } });
       fireEvent.click(screen.getByRole('button', { name: '魔法充能' }));
       fireEvent.click(screen.getByRole('button', { name: new RegExp(spell) }));
     }
@@ -294,7 +294,16 @@ describe('EchoQuest family relay rescue', () => {
     renderGame();
 
     expect(screen.getByRole('alert')).toHaveTextContent('語音暫時不可用');
-    expect(screen.getByLabelText('Type answer')).toBeEnabled();
+    expect(screen.getByLabelText('輸入答案')).toBeEnabled();
+  });
+
+  it('opens the vocabulary library with one main landmark and one return command', () => {
+    renderGame();
+
+    fireEvent.click(screen.getByRole('button', { name: '開啟字庫' }));
+
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: '返回遊戲' })).toHaveLength(1);
   });
 
   it('fails gracefully when no vocabulary is enabled', () => {

@@ -23,6 +23,10 @@ EchoQuest is a local-first English learning adventure game for a family audience
 
 Progress is stored in browser `localStorage`, including the exact active mission, vocabulary, learner profile, recognition language, and per-word mastery.
 
+## Family Vocabulary Library
+
+Open the library with the settings button to search, filter, edit, enable, or remove words. Image and folder imports skip duplicate words case-insensitively and report added, skipped, and failed files inline without interrupting play.
+
 ## Voice Input
 
 Voice is implemented as a safe optional input path:

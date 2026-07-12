@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, FolderOpen, ImagePlus, Trash2 } from 'lucide-react';
 import { Panel, QuestButton, ScreenShell } from './QuestFrame';
 import type { VocabItem } from '../types/vocab';
@@ -27,9 +27,31 @@ export function parseDifficultyFromPath(path?: string): number | null {
   return null;
 }
 
+export function mergeImportedVocab(existing: VocabItem[], incoming: VocabItem[]) {
+  const seen = new Set(existing.map((item) => item.word.trim().toLowerCase()));
+  const addedItems: VocabItem[] = [];
+  let skipped = 0;
+
+  for (const item of incoming) {
+    const word = item.word.trim().toLowerCase();
+    if (!word || seen.has(word)) {
+      skipped += 1;
+      continue;
+    }
+    seen.add(word);
+    addedItems.push({ ...item, word });
+  }
+
+  return {
+    vocab: [...existing, ...addedItems],
+    added: addedItems.length,
+    skipped,
+  };
+}
+
 function DifficultyPips({ level }: { level: number }) {
   return (
-    <div className="flex items-center gap-1" title={`Difficulty ${level}`}>
+    <div className="flex items-center gap-1" title={`難度 ${level}`}>
       {Array.from({ length: 5 }).map((_, i) => (
         <div
           key={i}
@@ -50,7 +72,7 @@ function ImagePreview({ src, label }: { src?: string; label: string }) {
   return (
     <img
       src={src}
-      alt={`${label} artwork`}
+      alt={`${label} 圖片`}
       className="eq-preview"
     />
   );
@@ -64,11 +86,23 @@ interface VocabManagerProps {
 
 export const VocabManager: React.FC<VocabManagerProps> = ({ vocab, onVocabChange, onGoBack }) => {
   const dirInputRef = useRef<HTMLInputElement | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [visibility, setVisibility] = useState<'all' | 'enabled' | 'disabled'>('all');
+  const [importSummary, setImportSummary] = useState<{ added: number; skipped: number; errors: string[] } | null>(null);
+
+  const visibleVocab = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return vocab.filter((item) => {
+      const matchesQuery = !query || item.word.toLowerCase().includes(query);
+      const matchesVisibility = visibility === 'all'
+        || (visibility === 'enabled' ? item.enabled : !item.enabled);
+      return matchesQuery && matchesVisibility;
+    });
+  }, [searchQuery, visibility, vocab]);
 
   useEffect(() => {
     if (dirInputRef.current) {
-      // @ts-ignore
-      dirInputRef.current.webkitdirectory = true;
+      dirInputRef.current.setAttribute('webkitdirectory', '');
     }
   }, []);
 
@@ -91,25 +125,24 @@ export const VocabManager: React.FC<VocabManagerProps> = ({ vocab, onVocabChange
     const errors: string[] = [];
     for (const f of arr) {
       if (!f.type.startsWith("image/")) {
-        errors.push(`${f.name}: Not an image file`);
+        errors.push(`${f.name}：不是圖片檔案`);
         continue;
       }
       if (f.size > MAX_IMAGE_BYTES) {
-        errors.push(`${f.name}: File too large`);
+        errors.push(`${f.name}：檔案超過 1MB`);
         continue;
       }
       let dataUrl: string | undefined;
       try {
         dataUrl = await fileToDataUrl(f);
       } catch {
-        errors.push(`${f.name}: Failed to load`);
+        errors.push(`${f.name}：讀取失敗`);
         continue;
       }
-      const anyFile = f as any;
-      const relPath: string | undefined = directoryMode ? anyFile.webkitRelativePath : undefined;
+      const relPath = directoryMode ? f.webkitRelativePath : undefined;
       const word = fileNameToWord(f.name);
       if (!word) {
-        errors.push(`${f.name}: Could not derive word from filename`);
+        errors.push(`${f.name}：檔名中找不到英文單字`);
         continue;
       }
       const parsedLevel = parseDifficultyFromPath(relPath);
@@ -126,11 +159,10 @@ export const VocabManager: React.FC<VocabManagerProps> = ({ vocab, onVocabChange
       };
       newItems.push(item);
     }
-    if (errors.length) {
-      alert(errors.join("\n"));
-    }
-    if (newItems.length) {
-      onVocabChange([...vocab, ...newItems]);
+    const merged = mergeImportedVocab(vocab, newItems);
+    setImportSummary({ added: merged.added, skipped: merged.skipped, errors });
+    if (merged.added > 0) {
+      onVocabChange(merged.vocab);
     }
   }
 
@@ -140,7 +172,7 @@ export const VocabManager: React.FC<VocabManagerProps> = ({ vocab, onVocabChange
         <Panel className="p-5 sm:p-7">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
             <div>
-              <p className="text-sm font-extrabold uppercase text-[color:var(--eq-muted)]">Inventory</p>
+              <p className="text-sm font-extrabold text-[color:var(--eq-muted)]">家庭字庫</p>
               <h1 className="eq-display text-3xl font-extrabold text-[color:var(--eq-ink)]">字彙管理</h1>
             </div>
             <QuestButton onClick={onGoBack} variant="quiet" icon={<ArrowLeft className="w-5 h-5" />}>
@@ -173,37 +205,87 @@ export const VocabManager: React.FC<VocabManagerProps> = ({ vocab, onVocabChange
             </label>
           </div>
 
+          {importSummary && (
+            <div className="mb-5 rounded-md border border-[color:var(--eq-line)] bg-white p-3 text-sm text-[color:var(--eq-ink)]" role="status">
+              <strong>匯入完成：</strong>新增 {importSummary.added} 個、略過重複 {importSummary.skipped} 個、失敗 {importSummary.errors.length} 個。
+              {importSummary.errors.length > 0 && (
+                <ul className="mt-2 list-disc pl-5">
+                  {importSummary.errors.map((error, index) => <li key={`${error}-${index}`}>{error}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <div className="mb-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
+            <label className="grid gap-1 text-sm font-bold text-[color:var(--eq-ink)]">
+              搜尋單字
+              <input
+                type="search"
+                className="eq-input"
+                aria-label="搜尋單字"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-bold text-[color:var(--eq-ink)]">
+              顯示範圍
+              <select className="eq-select" aria-label="顯示範圍" value={visibility} onChange={(event) => setVisibility(event.target.value as typeof visibility)}>
+                <option value="all">全部</option>
+                <option value="enabled">已啟用</option>
+                <option value="disabled">已停用</option>
+              </select>
+            </label>
+          </div>
+
           <div className="eq-vocab-list">
             <ul>
-              {vocab.map((v) => (
+              {visibleVocab.map((v) => (
                 <li key={v.id} className="eq-vocab-row">
                   <ImagePreview src={v.imageDataUrl ?? v.imageSrc} label={v.word} />
-                  <div className="min-w-0">
-                    <span className="font-extrabold text-[color:var(--eq-ink)]">{v.word}</span>
-                    <DifficultyPips level={v.difficulty} />
-                  </div>
-                  <div className="eq-vocab-actions flex flex-wrap items-center gap-3">
-                    <select
-                      className="eq-select"
-                      value={v.difficulty}
-                      onChange={(e) =>
-                        onVocabChange(vocab.map((i) => i.id === v.id ? { ...i, difficulty: Number(e.target.value) } : i))
-                      }
-                    >
-                      {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
-                    </select>
+                  <label className="min-w-0 text-sm font-bold text-[color:var(--eq-ink)]">
+                    單字
                     <input
-                      type="checkbox"
-                      className="h-5 w-5 accent-[color:var(--eq-forest)]"
-                      checked={v.enabled}
-                      onChange={(e) =>
-                        onVocabChange(vocab.map((i) => i.id === v.id ? { ...i, enabled: e.target.checked } : i))
-                      }
+                      className="eq-input mt-1 w-full font-extrabold"
+                      aria-label={`${v.word} 單字`}
+                      value={v.word}
+                      onChange={(event) => {
+                        const word = event.target.value.toLowerCase().replace(/[^a-z]/g, '');
+                        onVocabChange(vocab.map((item) => item.id === v.id ? { ...item, word } : item));
+                      }}
                     />
+                    <DifficultyPips level={v.difficulty} />
+                  </label>
+                  <div className="eq-vocab-actions flex flex-wrap items-center gap-3">
+                    <label className="grid gap-1 text-sm font-bold text-[color:var(--eq-ink)]">
+                      難度
+                      <select
+                        className="eq-select"
+                        aria-label={`${v.word} 難度`}
+                        value={v.difficulty}
+                        onChange={(e) =>
+                          onVocabChange(vocab.map((i) => i.id === v.id ? { ...i, difficulty: Number(e.target.value) } : i))
+                        }
+                      >
+                        {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm font-bold text-[color:var(--eq-ink)]">
+                      <input
+                        type="checkbox"
+                        aria-label={`${v.word} 啟用`}
+                        className="h-5 w-5 accent-[color:var(--eq-forest)]"
+                        checked={v.enabled}
+                        onChange={(e) =>
+                          onVocabChange(vocab.map((i) => i.id === v.id ? { ...i, enabled: e.target.checked } : i))
+                        }
+                      />
+                      啟用
+                    </label>
                     <QuestButton
                       onClick={() => onVocabChange(vocab.filter(i => i.id !== v.id))}
                       variant="danger"
                       icon={<Trash2 className="w-4 h-4" />}
+                      aria-label={`刪除 ${v.word}`}
                     >
                       刪除
                     </QuestButton>
@@ -211,6 +293,7 @@ export const VocabManager: React.FC<VocabManagerProps> = ({ vocab, onVocabChange
                 </li>
               ))}
             </ul>
+            {visibleVocab.length === 0 && <p className="p-6 text-center text-[color:var(--eq-muted)]" role="status">找不到符合條件的單字。</p>}
           </div>
         </Panel>
       </div>

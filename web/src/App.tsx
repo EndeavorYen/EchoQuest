@@ -365,14 +365,7 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
   };
 
   if (screen === 'vocab_management') {
-    return (
-      <main className="eq-adventure eq-adventure--management">
-        <div className="eq-adventure-vocab">
-          <button type="button" className="eq-arcade-small-button" onClick={() => setScreen('play')}>回到救援</button>
-          <VocabManager vocab={vocab} onVocabChange={setVocab} onGoBack={() => setScreen('play')} />
-        </div>
-      </main>
-    );
+    return <VocabManager vocab={vocab} onVocabChange={setVocab} onGoBack={() => setScreen('play')} />;
   }
 
   const relayClass = `eq-relay eq-relay--${currentEvent?.kind ?? 'empty'} eq-relay--${profile}`;
@@ -382,7 +375,7 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
   const runeProgress = currentWord ? selectedLetters.length / Math.max(1, currentWord.word.length) : 0;
 
   return (
-    <main className={relayClass} aria-label="EchoQuest family relay rescue">
+    <main className={relayClass} aria-label="EchoQuest 家庭接力救援">
       <header className="eq-relay-hud">
         <div className="eq-relay-mission">
           <span>森林接力救援</span>
@@ -465,7 +458,7 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
                 </div>
                 <div className="eq-letter-bank" aria-label="字母選項">
                   {letterTiles.map((tile) => (
-                    <button key={tile.id} type="button" className="eq-letter-tile" onClick={() => selectLetter(tile.id)} disabled={tile.used} aria-label={`letter ${tile.letter}`}>
+                    <button key={tile.id} type="button" className="eq-letter-tile" onClick={() => selectLetter(tile.id)} disabled={tile.used} aria-label={`字母 ${tile.letter}`}>
                       {tile.letter}
                     </button>
                   ))}
@@ -478,7 +471,7 @@ export default function App({ initialVocab, initialLevels = defaultLevels }: App
 
             {profile === 'adult' && (
               <form className="eq-typing-game" onSubmit={(event) => { event.preventDefault(); submitAnswer(typedAnswer, 'spelling'); }}>
-                <input value={typedAnswer} onChange={(event) => setTypedAnswer(event.target.value)} autoComplete="off" aria-label="Type answer" />
+                <input value={typedAnswer} onChange={(event) => setTypedAnswer(event.target.value)} autoComplete="off" aria-label="輸入答案" />
                 <button type="submit" className="eq-arcade-primary">{submitLabel}</button>
               </form>
             )}
