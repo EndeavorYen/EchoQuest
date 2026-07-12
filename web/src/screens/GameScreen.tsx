@@ -125,14 +125,14 @@ export function GameScreen({
 
             <div className={`eq-enemy-figure ${feedbackPresentation.enemyClassName}`}>
               {level.imageSrc ? (
-                <img src={level.imageSrc} alt={`${level.name} artwork`} className="eq-enemy-artwork" />
+                <img src={level.imageSrc} alt={`${level.name} 圖片`} className="eq-enemy-artwork" />
               ) : (
                 <span aria-hidden="true">{level.imageEmoji}</span>
               )}
             </div>
 
             {level.type === 'boss' && (
-              <div className="flex justify-center items-center gap-2" aria-label="Boss health">
+              <div className="flex justify-center items-center gap-2" aria-label="首領生命值">
                 <Skull className="w-7 h-7 text-[color:var(--eq-rust)]" />
                 <div className="flex gap-1">
                   {[...Array(level.enemyLives ?? 0)].map((_, i) => (
@@ -147,7 +147,7 @@ export function GameScreen({
             )}
 
             {level.type === 'puzzle' && (
-              <div className="flex justify-center items-center gap-2 text-4xl" aria-label="Puzzle progress">
+              <div className="flex justify-center items-center gap-2 text-4xl" aria-label="謎題進度">
                 {[...Array(level.tools ? level.tools.length - collectedTools.length : 0)].map((_, i) => (
                   <span key={i}>🚪</span>
                 ))}
@@ -246,7 +246,7 @@ export function GameScreen({
                 )}
 
                 {usesImageChoice && challenge && (
-                  <div className="eq-choice-grid" aria-label="Picture choices">
+                  <div className="eq-choice-grid" aria-label="圖片選項">
                     {challenge.choices.map((choice) => {
                       const choiceImageSrc = choice.imageDataUrl ?? choice.imageSrc;
                       return (
@@ -337,7 +337,7 @@ export function GameScreen({
 
                 <div className="flex gap-3 items-center">
                   <IconButton
-                    aria-label="Show hint"
+                    aria-label="顯示提示"
                     onMouseDown={() => onShowHintChange(true)}
                     onMouseUp={() => onShowHintChange(false)}
                     onTouchStart={() => onShowHintChange(true)}
@@ -345,7 +345,7 @@ export function GameScreen({
                   >
                     <HelpCircle className="w-6 h-6" />
                   </IconButton>
-                  <IconButton aria-label="Skip word" onClick={onSkip} variant="danger">
+                  <IconButton aria-label="跳過單字" onClick={onSkip} variant="danger">
                     <SkipForward className="w-6 h-6" />
                   </IconButton>
                 </div>

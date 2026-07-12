@@ -23,7 +23,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     <select
       value={selectedLang}
       onChange={(e) => onLangChange(e.target.value)}
-      aria-label="Select recognition language"
+      aria-label="選擇語音辨識語言"
       className="eq-select"
     >
       {languages.map((lang) => (

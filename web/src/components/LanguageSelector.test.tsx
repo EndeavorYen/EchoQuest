@@ -15,7 +15,7 @@ describe('<LanguageSelector />', () => {
       />
     );
 
-    const selector = screen.getByRole('combobox', { name: /select recognition language/i });
+    const selector = screen.getByRole('combobox', { name: '選擇語音辨識語言' });
 
     expect(selector).toHaveValue('en-US');
     expect(screen.getByText('English (US)')).toBeInTheDocument();
@@ -29,7 +29,7 @@ describe('<LanguageSelector />', () => {
   it('renders the compact selector with the current language', () => {
     render(<LanguageSelector selectedLang="zh-TW" onLangChange={jest.fn()} />);
 
-    expect(screen.getByRole('combobox', { name: /select recognition language/i })).toHaveValue('zh-TW');
+    expect(screen.getByRole('combobox', { name: '選擇語音辨識語言' })).toHaveValue('zh-TW');
     expect(screen.getByText('English (UK)')).toBeInTheDocument();
   });
 });

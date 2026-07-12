@@ -1,7 +1,7 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { VocabManager, fileNameToWord, parseDifficultyFromPath } from './VocabManager';
+import { VocabManager, fileNameToWord, mergeImportedVocab, parseDifficultyFromPath } from './VocabManager';
 import type { VocabItem } from '../types/vocab';
 
 // Mock data for testing the component
@@ -62,6 +62,21 @@ describe('VocabManager utility functions', () => {
       expect(parseDifficultyFromPath('004-a/002-b/image.png')).toBe(4);
     });
   });
+
+  describe('mergeImportedVocab', () => {
+    it('skips duplicate words case-insensitively', () => {
+      const incoming: VocabItem[] = [
+        { ...mockVocab[0], id: '3', word: 'Apple' },
+        { ...mockVocab[0], id: '4', word: 'cherry', imageName: 'cherry.png' },
+      ];
+
+      expect(mergeImportedVocab(mockVocab, incoming)).toEqual({
+        vocab: [...mockVocab, incoming[1]],
+        added: 1,
+        skipped: 1,
+      });
+    });
+  });
 });
 
 describe('<VocabManager /> Component', () => {
@@ -83,13 +98,13 @@ describe('<VocabManager /> Component', () => {
 
   it('should render the list of vocabulary items', () => {
     expect(screen.getByRole('main', { name: 'EchoQuest 字彙庫' })).toHaveAttribute('data-screen', 'vocab-management');
-    expect(screen.getByText('apple')).toBeInTheDocument();
-    expect(screen.getByText('banana')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('apple')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('banana')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem').length).toBe(2);
   });
 
   it('should render bundled artwork previews when imageSrc is available', () => {
-    expect(screen.getByRole('img', { name: 'apple artwork' })).toHaveAttribute('src', 'assets/generated/word-apple.png');
+    expect(screen.getByRole('img', { name: 'apple 圖片' })).toHaveAttribute('src', 'assets/generated/word-apple.png');
   });
 
   it('should call onGoBack when the "返回遊戲" button is clicked', () => {
@@ -98,9 +113,7 @@ describe('<VocabManager /> Component', () => {
   });
 
   it('should call onVocabChange with the item removed when delete is clicked', () => {
-    // Get all delete buttons, and click the first one (for 'apple')
-    const deleteButtons = screen.getAllByRole('button', { name: '刪除' });
-    fireEvent.click(deleteButtons[0]);
+    fireEvent.click(screen.getByRole('button', { name: '刪除 apple' }));
 
     expect(mockOnVocabChange).toHaveBeenCalledTimes(1);
     // Expect the call to be with an array containing only the 'banana' item
@@ -108,9 +121,7 @@ describe('<VocabManager /> Component', () => {
   });
 
   it('should call onVocabChange with updated difficulty when changed', () => {
-    const difficultySelects = screen.getAllByRole('combobox');
-    // Change the difficulty of the first item ('apple') to 5
-    fireEvent.change(difficultySelects[0], { target: { value: '5' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'apple 難度' }), { target: { value: '5' } });
 
     expect(mockOnVocabChange).toHaveBeenCalledTimes(1);
     const expectedNewVocab = [...mockVocab];
@@ -119,13 +130,46 @@ describe('<VocabManager /> Component', () => {
   });
 
   it('should call onVocabChange with updated enabled status when checkbox is clicked', () => {
-    const checkboxes = screen.getAllByRole('checkbox');
-    // The first item 'apple' is enabled, so its checkbox is checked. Click it to disable.
-    fireEvent.click(checkboxes[0]);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'apple 啟用' }));
 
     expect(mockOnVocabChange).toHaveBeenCalledTimes(1);
     const expectedNewVocab = [...mockVocab];
     expectedNewVocab[0] = { ...expectedNewVocab[0], enabled: false };
     expect(mockOnVocabChange).toHaveBeenCalledWith(expectedNewVocab);
+  });
+
+  it('filters the vocabulary list by search text and enabled state', () => {
+    fireEvent.change(screen.getByRole('searchbox', { name: '搜尋單字' }), { target: { value: 'ban' } });
+    expect(screen.queryByText('apple')).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue('banana')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('searchbox', { name: '搜尋單字' }), { target: { value: '' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '顯示範圍' }), { target: { value: 'enabled' } });
+    expect(screen.getByDisplayValue('apple')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('banana')).not.toBeInTheDocument();
+  });
+
+  it('edits a word through a labelled text field', () => {
+    fireEvent.change(screen.getByRole('textbox', { name: 'apple 單字' }), { target: { value: 'apricot' } });
+
+    expect(mockOnVocabChange).toHaveBeenCalledWith([
+      { ...mockVocab[0], word: 'apricot' },
+      mockVocab[1],
+    ]);
+  });
+
+  it('shows import errors inline without a blocking alert', async () => {
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => undefined);
+    const invalidFile = new File(['hello'], 'notes.txt', { type: 'text/plain' });
+    const fileInput = screen.getByLabelText('新增圖片');
+
+    fireEvent.change(fileInput, { target: { files: [invalidFile] } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('新增 0 個');
+      expect(screen.getByRole('status')).toHaveTextContent('失敗 1 個');
+    });
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
   });
 });
