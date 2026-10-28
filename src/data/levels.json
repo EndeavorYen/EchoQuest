@@ -1,0 +1,24 @@
+{
+ "levels": [
+  {
+   "lv": 1,
+   "name": "幼兒園",
+   "en": "Kinder"
+  },
+  {
+   "lv": 2,
+   "name": "國小",
+   "en": "Primary"
+  },
+  {
+   "lv": 3,
+   "name": "國中",
+   "en": "Junior"
+  },
+  {
+   "lv": 4,
+   "name": "高中",
+   "en": "Senior"
+  }
+ ]
+}

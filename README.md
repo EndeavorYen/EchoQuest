@@ -36,3 +36,12 @@ HTTPS). Where it's unavailable or the mic is blocked, a typing box takes over.
 - Pixel font: [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font) (OFL).
 - Add `?debug` to the URL to expose the app as `window.__eq` for automated tests.
 - Deploy: import the repo in Vercel (it's a plain Vite static site; `vercel.json` sets the build and allows camera/microphone). CI (`.github/workflows/ci.yml`) runs tests and a build on every PR.
+
+## Word bank & saves
+
+- Words live in `src/data/packs/*.json` (one file per pack). Drop in another file and it is picked up — no code changes.
+  Every pack records its `license`; only add data that is clearly free to ship.
+- A word's id is `<word>:<part of speech>` (e.g. `rabbit:n`) and never changes with level or list.
+- **Difficulty** (`lv`, the bands in `src/data/levels.json`) and **word lists** (`lists`, e.g. `starter`) are separate:
+  one word can sit in several lists.
+- Saves are versioned (`echoquest.v3`). Older saves are migrated on load and the old entry is left in place as a backup.

@@ -56,3 +56,29 @@ export function summary(progress: Progress, now: number): { seen: number; master
     due: items.filter((p) => p.dueAt <= now).length,
   };
 }
+
+export interface LevelStat {
+  total: number;
+  /** tried at least once */
+  seen: number;
+  /** got right at least once since the last miss */
+  learned: number;
+  /** got right three times in a row (rests for a week) */
+  mastered: number;
+}
+
+/** How a player is doing within one difficulty band. Derived, never stored, so it can't drift from the word bank. */
+export function levelStat(progress: Progress, words: readonly { id: string; lv: number }[], lv: number): LevelStat {
+  const inLevel = words.filter((w) => w.lv === lv);
+  let seen = 0;
+  let learned = 0;
+  let mastered = 0;
+  for (const w of inLevel) {
+    const p = progress[w.id];
+    if (!p || p.attempts === 0) continue;
+    seen += 1;
+    if (p.mastery >= 1) learned += 1;
+    if (p.mastery >= 3) mastered += 1;
+  }
+  return { total: inLevel.length, seen, learned, mastered };
+}

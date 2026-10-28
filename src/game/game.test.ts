@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { Battle, monsterHp } from './battle';
 import { dealCard, pickDefenseWord } from './deck';
 import { newPlayer } from './model';
-import { record, priority } from './progress';
+import { record, priority, levelStat } from './progress';
 import { advance, isFinished, newRun, nextRelic } from './run';
-import { defaultSave, load, persist } from './save';
-import { WORDS } from '../data/words';
+import { defaultSave, load, persist, migrateV2 } from './save';
+import { WORDS, WORD_BY_ID, buildBank, wordId, wordsInList, LEVELS, type Pack } from '../data/words';
 import { Revenge } from './revenge';
 import { Rng } from '../util/rng';
 
@@ -188,7 +188,86 @@ describe('run & save', () => {
     const back = load(s);
     expect(back.players[0].level).toBe(3);
     expect(back.collection).toEqual(['1-cat']);
-    mem.set('echoquest.v2', '{not json');
+    mem.set('echoquest.v3', '{not json');
     expect(load(s).players).toHaveLength(1);
+  });
+});
+
+describe('word bank', () => {
+  it('ids are stable and unique: word + part of speech, no level in them', () => {
+    expect(new Set(WORDS.map((w) => w.id)).size).toBe(WORDS.length);
+    expect(WORD_BY_ID.get('rabbit:n')?.lv).toBe(2);
+    expect(wordId(' Bank ', 'v')).toBe('bank:v');
+    expect(wordId('bank', 'n')).not.toBe(wordId('bank', 'v'));
+  });
+
+  it('every difficulty band has words, and every word belongs to a list', () => {
+    for (const l of LEVELS) expect(WORDS.filter((w) => w.lv === l.lv).length, `level ${l.lv}`).toBeGreaterThan(10);
+    expect(WORDS.every((w) => w.lists.length > 0)).toBe(true);
+    expect(wordsInList('starter').length).toBe(WORDS.length);
+  });
+
+  const pack = (id: string, words: Pack['words']): Pack => ({ id, name: id, license: 'test', lists: [id], words });
+
+  it('one word can sit in several lists while keeping one id and one level', () => {
+    const bank = buildBank([
+      pack('a', [{ w: 'cat', pos: 'n', zh: '貓', lv: 1 }]),
+      pack('b', [{ w: 'cat', pos: 'n', zh: '貓咪', lv: 3, lists: ['extra'] }, { w: 'cat', pos: 'v', zh: '(俚)', lv: 4 }]),
+    ]);
+    expect(bank).toHaveLength(2);
+    const cat = bank.find((w) => w.id === 'cat:n')!;
+    expect(cat.lv).toBe(1);
+    expect(cat.lists).toEqual(['a', 'b', 'extra']);
+  });
+
+  it('skips broken entries instead of crashing', () => {
+    const bad = [
+      { w: '', pos: 'n', zh: 'x', lv: 1 },
+      { w: 'ok', pos: 'n', zh: 'x', lv: 9 },
+      { w: 'fine', pos: 'n', zh: 'x', lv: 2 },
+      null,
+    ] as unknown as Pack['words'];
+    expect(buildBank([pack('p', bad)]).map((w) => w.id)).toEqual(['fine:n']);
+  });
+});
+
+describe('save migration & level stats', () => {
+  it('v2 saves keep their progress under the new word ids', () => {
+    const mem = new Map<string, string>();
+    const s = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v) };
+    const p = newPlayer(0, 2);
+    p.progress = record({}, '2-rabbit', true, 5);
+    mem.set('echoquest.v2', JSON.stringify({ v: 2, players: [p], active: 0, run: null, collection: ['1-cat', 'zzz-unknown'], relics: ['key'], treks: 3, sound: true, music: false }));
+    const save = load(s);
+    expect(save.v).toBe(3);
+    expect(save.players[0].progress['rabbit:n'].correct).toBe(1);
+    expect(save.players[0].progress['2-rabbit']).toBeUndefined();
+    expect(save.collection).toEqual(['cat:n', 'zzz-unknown']);
+    expect(save.treks).toBe(3);
+    expect(save.music).toBe(false);
+    // written under the v3 key, with the v2 entry left alone as a backup
+    expect(JSON.parse(mem.get('echoquest.v3')!).v).toBe(3);
+    expect(JSON.parse(mem.get('echoquest.v2')!).v).toBe(2);
+    // and a second load reads v3 directly
+    expect(load(s).collection).toEqual(['cat:n', 'zzz-unknown']);
+  });
+
+  it('migrating twice changes nothing', () => {
+    const once = migrateV2({ v: 2, players: [newPlayer(0)], collection: ['1-cat'] });
+    expect(migrateV2(once).collection).toEqual(['cat:n']);
+  });
+
+  it('counts seen / learned / mastered per difficulty band', () => {
+    let pr = record({}, 'cat:n', true, 0);
+    pr = record(pr, 'dog:n', false, 0);
+    pr = record(pr, 'fish:n', true, 0);
+    pr = record(pr, 'fish:n', true, 0);
+    pr = record(pr, 'fish:n', true, 0);
+    pr = record(pr, 'rabbit:n', true, 0);
+    const st = levelStat(pr, WORDS, 1);
+    expect(st.total).toBe(WORDS.filter((w) => w.lv === 1).length);
+    expect(st).toMatchObject({ seen: 3, learned: 2, mastered: 1 });
+    expect(levelStat(pr, WORDS, 2)).toMatchObject({ seen: 1, learned: 1, mastered: 0 });
+    expect(levelStat(pr, WORDS, 4)).toMatchObject({ seen: 0, learned: 0, mastered: 0 });
   });
 });

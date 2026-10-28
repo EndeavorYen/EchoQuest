@@ -4,7 +4,8 @@ import { ICON } from '../gfx/icons';
 import { BTN, avatarSprite, panel, AVATAR_COUNT } from '../gfx/ui';
 import { drawText } from '../gfx/text';
 import { MAX_PLAYERS, PLAYER_NAMES, newPlayer, type Level } from '../game/model';
-import { LEVELS } from '../data/words';
+import { LEVELS, WORDS } from '../data/words';
+import { levelStat } from '../game/progress';
 import { sfx } from '../audio/sfx';
 import { backdrop, levelPips } from './common';
 
@@ -53,7 +54,7 @@ export class PlayersScene implements Scene {
     fb.veil(0, 0, W, H, C.ink, 11);
 
     drawText(fb, 'PARTY', W / 2, 8, C.sun, { align: 'center', scale: 2, outline: C.ink, pixel: true });
-    drawText(fb, '每個人選自己的等級，隨時可以換', W / 2, 36, C.mist, { align: 'center' });
+    drawText(fb, '點頭像或名字可換，等級隨時調', W / 2, 36, C.mist, { align: 'center' });
 
     const players = app.save.players;
     const rowH = 54;
@@ -69,7 +70,8 @@ export class PlayersScene implements Scene {
       drawText(fb, p.name, 46, y + 5, C.snow);
       const idx = PLAYER_NAMES.indexOf(p.name);
       app.ui.zone(44, y + 4, 70, 16, () => this.patch(i, { name: PLAYER_NAMES[(idx + 1) % PLAYER_NAMES.length] }));
-      drawText(fb, '點名字可換', 46, y + 19, C.mist);
+      const st = levelStat(p.progress, WORDS, p.level);
+      drawText(fb, `已學 ${st.learned}/${st.total}`, 46, y + 19, C.mist);
       // level
       const ly = y + 35;
       app.ui.button(fb, 14, ly, 18, 15, '', BTN.gray, () => this.change(i, -1), { icon: ICON.arrowL, disabled: p.level <= 1, name: `level-${i}` });

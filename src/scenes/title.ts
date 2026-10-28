@@ -128,7 +128,7 @@ export class TitleScene implements Scene {
       sfx.refreshMusic();
     });
 
-    drawText(fb, 'v2', 4, H - 16, C.slate);
+    drawText(fb, 'v3', 4, H - 16, C.slate);
     void ICON;
   }
 }

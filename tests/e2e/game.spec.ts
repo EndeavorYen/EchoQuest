@@ -479,6 +479,47 @@ test.describe('practice mode', () => {
   });
 });
 
+test.describe('saves', () => {
+  test('an old v2 save is upgraded in place: progress follows the new word ids, the old entry stays as a backup', async ({ game, page }) => {
+    await game.open();
+    await page.evaluate(() => {
+      localStorage.removeItem('echoquest.v3');
+      const wp = { attempts: 2, correct: 2, misses: 0, streak: 2, mastery: 2, lastAt: 1, dueAt: 9e15 };
+      localStorage.setItem('echoquest.v2', JSON.stringify({
+        v: 2, active: 0, run: null, collection: ['2-rabbit'], relics: [], treks: 4, sound: true, music: true,
+        players: [{ id: 'old1', name: 'Mochi', level: 2, face: 3, progress: { '2-rabbit': wp }, stats: { dealt: 5, perfect: 1, blocks: 0, words: 2 } }],
+      }));
+    });
+    await game.reload();
+    const s = await game.save();
+    expect(s.v).toBe(3);
+    expect(s.players[0].name).toBe('Mochi');
+    expect(s.players[0].progress['rabbit:n'].correct).toBe(2);
+    expect(s.collection).toEqual(['rabbit:n']);
+    expect(s.treks).toBe(4);
+    const keys = await page.evaluate(() => ({ v2: !!localStorage.getItem('echoquest.v2'), v3: !!localStorage.getItem('echoquest.v3') }));
+    expect(keys).toEqual({ v2: true, v3: true });
+  });
+
+  test('the party screen shows how many words each player has learned at their level', async ({ game }) => {
+    await game.open();
+    await game.tap('PRACTICE');
+    await game.waitScene('practice');
+    const word = await game.eval((a) => a.scene.word);
+    await game.say(word.w);
+    await game.tap('mic');
+    await expect.poll(() => game.eval((a) => a.scene.result)).toMatch(/perfect|good/);
+    await game.tap('BACK');
+    await game.tap('PARTY');
+    await game.waitScene('players');
+    const learned = await game.eval((a) => {
+      const p = a.save.players[0];
+      return Object.values(p.progress).filter((w: any) => w.mastery >= 1).length;
+    });
+    expect(learned).toBe(1);
+  });
+});
+
 test.describe('camera', () => {
   test('scan with the camera: open → viewfinder → shutter → monster → fight', async ({ game }) => {
     await game.newGameToMap();

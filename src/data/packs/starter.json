@@ -1,0 +1,704 @@
+{
+ "id": "starter",
+ "name": "Starter words",
+ "license": "original",
+ "lists": [
+  "starter"
+ ],
+ "words": [
+  {
+   "w": "apple",
+   "pos": "n",
+   "zh": "蘋果",
+   "lv": 1,
+   "icon": "🍎"
+  },
+  {
+   "w": "banana",
+   "pos": "n",
+   "zh": "香蕉",
+   "lv": 1,
+   "icon": "🍌"
+  },
+  {
+   "w": "cat",
+   "pos": "n",
+   "zh": "貓",
+   "lv": 1,
+   "icon": "🐱"
+  },
+  {
+   "w": "dog",
+   "pos": "n",
+   "zh": "狗",
+   "lv": 1,
+   "icon": "🐶"
+  },
+  {
+   "w": "fish",
+   "pos": "n",
+   "zh": "魚",
+   "lv": 1,
+   "icon": "🐟"
+  },
+  {
+   "w": "bird",
+   "pos": "n",
+   "zh": "鳥",
+   "lv": 1,
+   "icon": "🐦"
+  },
+  {
+   "w": "cow",
+   "pos": "n",
+   "zh": "牛",
+   "lv": 1,
+   "icon": "🐮"
+  },
+  {
+   "w": "pig",
+   "pos": "n",
+   "zh": "豬",
+   "lv": 1,
+   "icon": "🐷"
+  },
+  {
+   "w": "duck",
+   "pos": "n",
+   "zh": "鴨子",
+   "lv": 1,
+   "icon": "🦆"
+  },
+  {
+   "w": "frog",
+   "pos": "n",
+   "zh": "青蛙",
+   "lv": 1,
+   "icon": "🐸"
+  },
+  {
+   "w": "sun",
+   "pos": "n",
+   "zh": "太陽",
+   "lv": 1,
+   "icon": "☀️"
+  },
+  {
+   "w": "moon",
+   "pos": "n",
+   "zh": "月亮",
+   "lv": 1,
+   "icon": "🌙"
+  },
+  {
+   "w": "star",
+   "pos": "n",
+   "zh": "星星",
+   "lv": 1,
+   "icon": "⭐"
+  },
+  {
+   "w": "tree",
+   "pos": "n",
+   "zh": "樹",
+   "lv": 1,
+   "icon": "🌳"
+  },
+  {
+   "w": "flower",
+   "pos": "n",
+   "zh": "花",
+   "lv": 1,
+   "icon": "🌸"
+  },
+  {
+   "w": "car",
+   "pos": "n",
+   "zh": "汽車",
+   "lv": 1,
+   "icon": "🚗"
+  },
+  {
+   "w": "bus",
+   "pos": "n",
+   "zh": "公車",
+   "lv": 1,
+   "icon": "🚌"
+  },
+  {
+   "w": "ball",
+   "pos": "n",
+   "zh": "球",
+   "lv": 1,
+   "icon": "⚽"
+  },
+  {
+   "w": "book",
+   "pos": "n",
+   "zh": "書",
+   "lv": 1,
+   "icon": "📖"
+  },
+  {
+   "w": "egg",
+   "pos": "n",
+   "zh": "蛋",
+   "lv": 1,
+   "icon": "🥚"
+  },
+  {
+   "w": "milk",
+   "pos": "n",
+   "zh": "牛奶",
+   "lv": 1,
+   "icon": "🥛"
+  },
+  {
+   "w": "cake",
+   "pos": "n",
+   "zh": "蛋糕",
+   "lv": 1,
+   "icon": "🍰"
+  },
+  {
+   "w": "hand",
+   "pos": "n",
+   "zh": "手",
+   "lv": 1,
+   "icon": "✋"
+  },
+  {
+   "w": "red",
+   "pos": "adj",
+   "zh": "紅色",
+   "lv": 1,
+   "icon": "🟥"
+  },
+  {
+   "w": "blue",
+   "pos": "adj",
+   "zh": "藍色",
+   "lv": 1,
+   "icon": "🟦"
+  },
+  {
+   "w": "green",
+   "pos": "adj",
+   "zh": "綠色",
+   "lv": 1,
+   "icon": "🟩"
+  },
+  {
+   "w": "rabbit",
+   "pos": "n",
+   "zh": "兔子",
+   "lv": 2,
+   "icon": "🐰"
+  },
+  {
+   "w": "monkey",
+   "pos": "n",
+   "zh": "猴子",
+   "lv": 2,
+   "icon": "🐵"
+  },
+  {
+   "w": "tiger",
+   "pos": "n",
+   "zh": "老虎",
+   "lv": 2,
+   "icon": "🐯"
+  },
+  {
+   "w": "lion",
+   "pos": "n",
+   "zh": "獅子",
+   "lv": 2,
+   "icon": "🦁"
+  },
+  {
+   "w": "panda",
+   "pos": "n",
+   "zh": "熊貓",
+   "lv": 2,
+   "icon": "🐼"
+  },
+  {
+   "w": "horse",
+   "pos": "n",
+   "zh": "馬",
+   "lv": 2,
+   "icon": "🐴"
+  },
+  {
+   "w": "chicken",
+   "pos": "n",
+   "zh": "雞",
+   "lv": 2,
+   "icon": "🐔"
+  },
+  {
+   "w": "pizza",
+   "pos": "n",
+   "zh": "披薩",
+   "lv": 2,
+   "icon": "🍕"
+  },
+  {
+   "w": "cookie",
+   "pos": "n",
+   "zh": "餅乾",
+   "lv": 2,
+   "icon": "🍪"
+  },
+  {
+   "w": "school",
+   "pos": "n",
+   "zh": "學校",
+   "lv": 2,
+   "icon": "🏫"
+  },
+  {
+   "w": "pencil",
+   "pos": "n",
+   "zh": "鉛筆",
+   "lv": 2,
+   "icon": "✏️"
+  },
+  {
+   "w": "bag",
+   "pos": "n",
+   "zh": "書包",
+   "lv": 2,
+   "icon": "🎒"
+  },
+  {
+   "w": "clock",
+   "pos": "n",
+   "zh": "時鐘",
+   "lv": 2,
+   "icon": "⏰"
+  },
+  {
+   "w": "chair",
+   "pos": "n",
+   "zh": "椅子",
+   "lv": 2,
+   "icon": "🪑"
+  },
+  {
+   "w": "door",
+   "pos": "n",
+   "zh": "門",
+   "lv": 2,
+   "icon": "🚪"
+  },
+  {
+   "w": "bed",
+   "pos": "n",
+   "zh": "床",
+   "lv": 2,
+   "icon": "🛏️"
+  },
+  {
+   "w": "shoes",
+   "pos": "n",
+   "zh": "鞋子",
+   "lv": 2,
+   "icon": "👟"
+  },
+  {
+   "w": "hat",
+   "pos": "n",
+   "zh": "帽子",
+   "lv": 2,
+   "icon": "🎩"
+  },
+  {
+   "w": "umbrella",
+   "pos": "n",
+   "zh": "雨傘",
+   "lv": 2,
+   "icon": "☂️"
+  },
+  {
+   "w": "rainbow",
+   "pos": "n",
+   "zh": "彩虹",
+   "lv": 2,
+   "icon": "🌈"
+  },
+  {
+   "w": "snow",
+   "pos": "n",
+   "zh": "雪",
+   "lv": 2,
+   "icon": "❄️"
+  },
+  {
+   "w": "bicycle",
+   "pos": "n",
+   "zh": "腳踏車",
+   "lv": 2,
+   "icon": "🚲"
+  },
+  {
+   "w": "train",
+   "pos": "n",
+   "zh": "火車",
+   "lv": 2,
+   "icon": "🚆"
+  },
+  {
+   "w": "airplane",
+   "pos": "n",
+   "zh": "飛機",
+   "lv": 2,
+   "icon": "✈️"
+  },
+  {
+   "w": "grape",
+   "pos": "n",
+   "zh": "葡萄",
+   "lv": 2,
+   "icon": "🍇"
+  },
+  {
+   "w": "orange",
+   "pos": "n",
+   "zh": "柳橙",
+   "lv": 2,
+   "icon": "🍊"
+  },
+  {
+   "w": "elephant",
+   "pos": "n",
+   "zh": "大象",
+   "lv": 3,
+   "icon": "🐘"
+  },
+  {
+   "w": "giraffe",
+   "pos": "n",
+   "zh": "長頸鹿",
+   "lv": 3,
+   "icon": "🦒"
+  },
+  {
+   "w": "dolphin",
+   "pos": "n",
+   "zh": "海豚",
+   "lv": 3,
+   "icon": "🐬"
+  },
+  {
+   "w": "butterfly",
+   "pos": "n",
+   "zh": "蝴蝶",
+   "lv": 3,
+   "icon": "🦋"
+  },
+  {
+   "w": "volcano",
+   "pos": "n",
+   "zh": "火山",
+   "lv": 3,
+   "icon": "🌋"
+  },
+  {
+   "w": "mountain",
+   "pos": "n",
+   "zh": "山",
+   "lv": 3,
+   "icon": "⛰️"
+  },
+  {
+   "w": "island",
+   "pos": "n",
+   "zh": "島嶼",
+   "lv": 3,
+   "icon": "🏝️"
+  },
+  {
+   "w": "castle",
+   "pos": "n",
+   "zh": "城堡",
+   "lv": 3,
+   "icon": "🏰"
+  },
+  {
+   "w": "bridge",
+   "pos": "n",
+   "zh": "橋",
+   "lv": 3,
+   "icon": "🌉"
+  },
+  {
+   "w": "library",
+   "pos": "n",
+   "zh": "圖書館",
+   "lv": 3,
+   "icon": "📚"
+  },
+  {
+   "w": "hospital",
+   "pos": "n",
+   "zh": "醫院",
+   "lv": 3,
+   "icon": "🏥"
+  },
+  {
+   "w": "telescope",
+   "pos": "n",
+   "zh": "望遠鏡",
+   "lv": 3,
+   "icon": "🔭"
+  },
+  {
+   "w": "calendar",
+   "pos": "n",
+   "zh": "日曆",
+   "lv": 3,
+   "icon": "📅"
+  },
+  {
+   "w": "medicine",
+   "pos": "n",
+   "zh": "藥",
+   "lv": 3,
+   "icon": "💊"
+  },
+  {
+   "w": "vegetable",
+   "pos": "n",
+   "zh": "蔬菜",
+   "lv": 3,
+   "icon": "🥦"
+  },
+  {
+   "w": "strawberry",
+   "pos": "n",
+   "zh": "草莓",
+   "lv": 3,
+   "icon": "🍓"
+  },
+  {
+   "w": "sandwich",
+   "pos": "n",
+   "zh": "三明治",
+   "lv": 3,
+   "icon": "🥪"
+  },
+  {
+   "w": "battery",
+   "pos": "n",
+   "zh": "電池",
+   "lv": 3,
+   "icon": "🔋"
+  },
+  {
+   "w": "adventure",
+   "pos": "n",
+   "zh": "冒險",
+   "lv": 3
+  },
+  {
+   "w": "courage",
+   "pos": "n",
+   "zh": "勇氣",
+   "lv": 3
+  },
+  {
+   "w": "friendship",
+   "pos": "n",
+   "zh": "友誼",
+   "lv": 3
+  },
+  {
+   "w": "holiday",
+   "pos": "n",
+   "zh": "假日",
+   "lv": 3
+  },
+  {
+   "w": "popular",
+   "pos": "adj",
+   "zh": "受歡迎的",
+   "lv": 3
+  },
+  {
+   "w": "dangerous",
+   "pos": "adj",
+   "zh": "危險的",
+   "lv": 3
+  },
+  {
+   "w": "beautiful",
+   "pos": "adj",
+   "zh": "美麗的",
+   "lv": 3
+  },
+  {
+   "w": "yesterday",
+   "pos": "adv",
+   "zh": "昨天",
+   "lv": 3
+  },
+  {
+   "w": "environment",
+   "pos": "n",
+   "zh": "環境",
+   "lv": 4
+  },
+  {
+   "w": "technology",
+   "pos": "n",
+   "zh": "科技",
+   "lv": 4
+  },
+  {
+   "w": "opportunity",
+   "pos": "n",
+   "zh": "機會",
+   "lv": 4
+  },
+  {
+   "w": "responsibility",
+   "pos": "n",
+   "zh": "責任",
+   "lv": 4
+  },
+  {
+   "w": "communicate",
+   "pos": "v",
+   "zh": "溝通",
+   "lv": 4
+  },
+  {
+   "w": "society",
+   "pos": "n",
+   "zh": "社會",
+   "lv": 4
+  },
+  {
+   "w": "experience",
+   "pos": "n",
+   "zh": "經驗",
+   "lv": 4
+  },
+  {
+   "w": "knowledge",
+   "pos": "n",
+   "zh": "知識",
+   "lv": 4
+  },
+  {
+   "w": "development",
+   "pos": "n",
+   "zh": "發展",
+   "lv": 4
+  },
+  {
+   "w": "influence",
+   "pos": "n",
+   "zh": "影響",
+   "lv": 4
+  },
+  {
+   "w": "creative",
+   "pos": "adj",
+   "zh": "有創意的",
+   "lv": 4
+  },
+  {
+   "w": "essential",
+   "pos": "adj",
+   "zh": "必要的",
+   "lv": 4
+  },
+  {
+   "w": "anxiety",
+   "pos": "n",
+   "zh": "焦慮",
+   "lv": 4
+  },
+  {
+   "w": "ambitious",
+   "pos": "adj",
+   "zh": "有野心的",
+   "lv": 4
+  },
+  {
+   "w": "sustainable",
+   "pos": "adj",
+   "zh": "永續的",
+   "lv": 4
+  },
+  {
+   "w": "philosophy",
+   "pos": "n",
+   "zh": "哲學",
+   "lv": 4
+  },
+  {
+   "w": "architecture",
+   "pos": "n",
+   "zh": "建築",
+   "lv": 4
+  },
+  {
+   "w": "democracy",
+   "pos": "n",
+   "zh": "民主",
+   "lv": 4
+  },
+  {
+   "w": "hypothesis",
+   "pos": "n",
+   "zh": "假設",
+   "lv": 4
+  },
+  {
+   "w": "atmosphere",
+   "pos": "n",
+   "zh": "大氣",
+   "lv": 4
+  },
+  {
+   "w": "abandon",
+   "pos": "v",
+   "zh": "放棄",
+   "lv": 4
+  },
+  {
+   "w": "significant",
+   "pos": "adj",
+   "zh": "重要的",
+   "lv": 4
+  },
+  {
+   "w": "efficient",
+   "pos": "adj",
+   "zh": "有效率的",
+   "lv": 4
+  },
+  {
+   "w": "reluctant",
+   "pos": "adj",
+   "zh": "不情願的",
+   "lv": 4
+  },
+  {
+   "w": "vocabulary",
+   "pos": "n",
+   "zh": "字彙",
+   "lv": 4
+  },
+  {
+   "w": "temperature",
+   "pos": "n",
+   "zh": "溫度",
+   "lv": 4
+  }
+ ]
+}
