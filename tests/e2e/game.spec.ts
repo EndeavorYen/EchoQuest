@@ -24,6 +24,8 @@ test.describe('core loop', () => {
     const saved = await game.save();
     expect(saved.run.idx).toBe(1);
     expect(saved.collection.length).toBeGreaterThan(0);
+    // the beaten monster turns into a sticker for the book
+    expect(saved.stickers).toHaveLength(1);
     expect(saved.players[0].stats.words).toBeGreaterThan(0);
 
     // the progress survives a reload
@@ -316,7 +318,8 @@ test.describe('party', () => {
     const players = (await game.save()).players;
     expect((await game.battle()).defender).toBe(players[0].name);
     expect(await game.eval((a) => a.scene.defLimit)).toBeGreaterThan(0);
-    await game.page.waitForTimeout(2500);
+    // pretend three seconds have already ticked away (keeps the test independent of machine speed)
+    await game.eval((a) => { a.scene.defLeft = Math.max(0.5, a.scene.defLimit - 3); });
     const left = await game.eval((a) => a.scene.defLeft);
     await game.switchTo(1);
     const b = await game.battle();
@@ -391,7 +394,7 @@ test.describe('map stops', () => {
     await game.tap('DONE');
     await game.tap('START');
     await game.waitScene('map');
-    await game.jumpToNode(9);
+    await game.jumpToNode(5);
     await game.tap('CONTINUE');
     await game.waitScene('map');
     await game.tap('BOSS BATTLE!');
@@ -462,7 +465,7 @@ test.describe('map stops', () => {
   test('co-op boss with a single player: they play every role', async ({ game }) => {
     test.slow();
     await game.newGameToMap();
-    await game.jumpToNode(9);
+    await game.jumpToNode(5);
     await game.tap('CONTINUE');
     await game.waitScene('map');
     await game.tap('BOSS BATTLE!');

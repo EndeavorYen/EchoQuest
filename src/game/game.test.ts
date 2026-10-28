@@ -214,11 +214,13 @@ describe('battle', () => {
 });
 
 describe('run & save', () => {
-  it('a run has ten nodes ending in a boss', () => {
+  it('a run is a short walk of six stops with a chest in the middle, ending in a boss', () => {
     let run = newRun(1);
-    expect(run.nodes).toHaveLength(10);
-    expect(run.nodes[9].type).toBe('boss');
-    for (let i = 0; i < 10; i++) run = advance(run);
+    expect(run.nodes).toHaveLength(6);
+    expect(run.nodes[5].type).toBe('boss');
+    expect(run.nodes.some((n) => n.type === 'chest')).toBe(true);
+    expect(run.nodes.filter((n) => n.type === 'monster').length).toBeGreaterThanOrEqual(4);
+    for (let i = 0; i < 6; i++) run = advance(run);
     expect(isFinished(run)).toBe(true);
   });
 

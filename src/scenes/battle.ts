@@ -5,7 +5,7 @@ import { ICON } from '../gfx/icons';
 import { BTN, avatarSprite, bar, faceTint, panel } from '../gfx/ui';
 import { drawText, measure, wrap } from '../gfx/text';
 import { emojiSprite } from '../gfx/emoji';
-import type { Monster, FrameName } from '../gfx/monster';
+import { generateMonster, type Monster, type FrameName } from '../gfx/monster';
 import { sfx, say, stopSay } from '../audio/sfx';
 import { judge, type Tier } from '../speech/match';
 import { Speaker, type SpeakResult } from '../speech/speaker';
@@ -14,6 +14,7 @@ import { dealCard, pickDefenseWord, type Card } from '../game/deck';
 import { record } from '../game/progress';
 import { Revenge, REVENGE_MULT } from '../game/revenge';
 import { BossFight } from '../game/boss';
+import { TODDLER_TAPS, addSticker, growthSpecs } from '../game/toddler';
 import { advance } from '../game/run';
 import type { Word } from '../data/words';
 import { bob, groundShadow, levelPips } from './common';
@@ -62,6 +63,9 @@ export class BattleScene implements Scene {
   private boss: BossFight | null = null;
   /** Seconds since the bounced player was launched; -1 when nobody is down. */
   private bounceT = -1;
+  /** What the beaten monster turns into (a sticker friend). */
+  private friend: Monster | null = null;
+  private friendShown = false;
   private manage = false;
   private manageLevel = 1;
   /** The current spell is a word the player missed earlier in this battle. */
@@ -338,6 +342,11 @@ export class BattleScene implements Scene {
         if (tier === 'perfect') att.stats.perfect += 1;
         this.impact(res.damage, lv, tier);
         if (revenge) app.fx.float(this.monsterX, this.groundY - this.init.monster.size - 60, 'REVENGE!', C.berry, 2);
+        const MILESTONE: Record<number, string> = { 3: 'NICE!', 5: 'GREAT!', 8: 'AMAZING!' };
+        if (MILESTONE[res.combo]) {
+          app.fx.float(this.monsterX, this.groundY - this.init.monster.size - 60, MILESTONE[res.combo], C.lime, 2, C.ink);
+          app.fx.burst(hero.x, hero.y - 10, 18, [C.sun, C.lime, C.ice, C.snow], 70, 60, 0.8);
+        }
         if (res.combo >= 2) {
           app.fx.float(this.monsterX, this.groundY - this.init.monster.size - 32, `COMBO x${res.combo}`, C.sun, 1);
           sfx.play('combo', res.combo);
@@ -573,6 +582,10 @@ export class BattleScene implements Scene {
     app.fx.burst(this.monsterX, this.groundY - m.size / 2, 40, [C.sun, C.snow, C.ice, C.lime, C.orange], 100, 80, 1.2);
     if (!this.lootGiven) {
       this.lootGiven = true;
+      // the beaten monster turns into a friend and a sticker: a reward after every single fight
+      const look = growthSpecs(this.init.monster.spec)[TODDLER_TAPS - 1];
+      this.friend = generateMonster(look);
+      app.save = { ...app.save, stickers: addSticker(app.save.stickers, look) };
       const have = new Set(app.save.collection);
       for (const id of this.used.keys()) have.add(id);
       app.save = { ...app.save, collection: [...have], active: this.b.turn };
@@ -659,6 +672,12 @@ export class BattleScene implements Scene {
       }
     }
     if (this.phase === 'victory') this.dissolve = Math.min(1, this.pt / 1.0);
+    if (this.phase === 'victory' && this.friend && !this.friendShown && this.pt > 1.0) {
+      this.friendShown = true;
+      sfx.play('appear');
+      this.app.fx.float(this.monsterX, this.groundY - this.friend.size - 6, 'NEW STICKER!', C.sun, 1);
+      this.app.fx.burst(this.monsterX, this.groundY - this.friend.size / 2, 20, [C.sun, C.snow, C.lime, C.ice], 80, 60, 0.8);
+    }
   }
 
   key(e: KeyboardEvent): void {
@@ -719,6 +738,20 @@ export class BattleScene implements Scene {
       if (this.phase === 'defend') {
         // danger aura
         fb.veil(0, 0, W, this.panelY, C.berry, 2 + (Math.floor(app.t * 6) % 2) * 2);
+      }
+    }
+
+    // the beaten monster, grown into a friend (and a sticker)
+    if (this.phase === 'victory' && this.dissolve >= 1 && this.friend) {
+      const f = this.friend;
+      const k = Math.min(1, (this.pt - 1.0) / 0.5);
+      const pop = k <= 0 ? 0 : 1 + Math.sin(k * Math.PI) * 0.25;
+      const size = Math.round(f.size * 0.75 * pop);
+      if (size > 4) {
+        const fx = Math.round(mx - size / 2) + off.x;
+        const fy = gy - size + bob(app.t, 2, 4) + off.y;
+        groundShadow(fb, mx + off.x, gy + 1 + off.y, Math.round(size * 0.35));
+        fb.blitStretch(f.frames.idle, fx, fy, size, size, {});
       }
     }
 

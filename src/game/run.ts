@@ -7,7 +7,7 @@ export interface MapNode {
   theme: Theme;
 }
 
-/** One trek through the map: ten stops ending with a boss. */
+/** One trek through the map: a short walk of six stops ending with a boss. */
 export interface Run {
   seed: number;
   nodes: MapNode[];
@@ -20,10 +20,6 @@ const LAYOUT: Array<[NodeType, Theme]> = [
   ['monster', 'meadow'],
   ['chest', 'meadow'],
   ['monster', 'night'],
-  ['monster', 'night'],
-  ['chest', 'night'],
-  ['monster', 'cave'],
-  ['monster', 'cave'],
   ['monster', 'cave'],
   ['boss', 'sunset'],
 ];
