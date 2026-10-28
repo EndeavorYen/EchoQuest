@@ -18,6 +18,8 @@ import type { Word } from '../data/words';
 import { bob, groundShadow, levelPips } from './common';
 import { micButton, statusLine, typingBox, failMessage } from './speakpanel';
 import { MapScene } from './map';
+import { MAX_PLAYERS, newPlayer, type Level } from '../game/model';
+import { LEVELS } from '../data/words';
 
 export interface BattleInit {
   bg: FB;
@@ -54,6 +56,9 @@ export class BattleScene implements Scene {
   private note = '';
   private recent: string[] = [];
   private revenge = new Revenge();
+  /** The party panel (add players, change levels) is open; the battle clock is paused. */
+  private manage = false;
+  private manageLevel = 1;
   /** The current spell is a word the player missed earlier in this battle. */
   private isRevenge = false;
   private used = new Map<string, Word>();
@@ -157,6 +162,74 @@ export class BattleScene implements Scene {
     this.heroCast = 0.3;
     if (this.phase === 'speak') this.dealSpell();
     else this.dealShield(false);
+  }
+
+  // ---- party management (any time, even mid-battle) -----------------------
+
+  private openManage(): void {
+    if (this.phase !== 'speak' && this.phase !== 'defend') return;
+    sfx.unlock();
+    sfx.play('tap');
+    this.speaker.cancel();
+    stopSay();
+    this.manage = true;
+    this.manageLevel = this.b.attacker.level;
+  }
+
+  private closeManage(): void {
+    sfx.play('select');
+    this.manage = false;
+    // a changed level means a different word; the shield clock always starts fresh
+    if (this.phase === 'speak') {
+      if (this.b.attacker.level !== this.manageLevel) this.dealSpell();
+      else if (this.sel) say(this.sel.word.w);
+    } else if (this.phase === 'defend') this.dealShield(false);
+  }
+
+  private setLevel(i: number, delta: number): void {
+    const p = this.app.save.players[i];
+    const lv = Math.max(1, Math.min(4, p.level + delta)) as Level;
+    if (lv === p.level) return;
+    p.level = lv; // in place: the battle holds these same player objects
+    this.app.persist();
+    sfx.play('tap');
+  }
+
+  private addPlayer(): void {
+    const app = this.app;
+    if (app.save.players.length >= MAX_PLAYERS) return;
+    const np = newPlayer(app.save.players.length, 1); // a fresh start: blank progress
+    app.save = { ...app.save, players: [...app.save.players, np] };
+    this.b.players = app.save.players;
+    app.persist();
+    sfx.play('select');
+  }
+
+  private drawManage(): void {
+    const app = this.app;
+    const fb = app.fb;
+    const { W } = app;
+    fb.veil(0, 0, W, app.H, C.ink, 13);
+    const n = app.save.players.length;
+    panel(fb, 4, 36, W - 8, 62 - 36 + n * 30 + (n < MAX_PLAYERS ? 24 : 0) + 22 + 8, C.dusk, C.slate);
+    drawText(fb, 'PARTY', W / 2, 41, C.sun, { align: 'center', scale: 2, outline: C.ink, pixel: true });
+    const players = app.save.players;
+    players.forEach((p, i) => {
+      const y = 62 + i * 30;
+      fb.rect(10, y, W - 20, 27, C.navy);
+      fb.frame(10, y, W - 20, 27, C.ink);
+      fb.blit(avatarSprite(p.face), 14, y + 5, { scale: 1 });
+      drawText(fb, p.name, 32, y + 3, C.snow);
+      drawText(fb, `Lv.${p.level} ${LEVELS[p.level - 1].name}`, 32, y + 15, C.sun);
+      app.ui.button(fb, W - 54, y + 5, 18, 17, '', BTN.gray, () => this.setLevel(i, -1), { icon: ICON.arrowL, disabled: p.level <= 1, name: `level-${i}` });
+      app.ui.button(fb, W - 32, y + 5, 18, 17, '', BTN.gray, () => this.setLevel(i, 1), { icon: ICON.arrowR, disabled: p.level >= 4, name: `level+${i}` });
+    });
+    let by = 62 + players.length * 30 + 2;
+    if (players.length < MAX_PLAYERS) {
+      app.ui.button(fb, 10, by, W - 20, 20, '+ ADD PLAYER', BTN.green, () => this.addPlayer());
+      by += 24;
+    }
+    app.ui.button(fb, 10, by, W - 20, 22, 'DONE', BTN.primary, () => this.closeManage());
   }
 
   private mic(): void {
@@ -471,7 +544,7 @@ export class BattleScene implements Scene {
     }
 
     // defence clock: pauses while the mic is spinning up
-    if (this.phase === 'defend' && this.defLimit > 0 && !this.speaker.starting) {
+    if (this.phase === 'defend' && this.defLimit > 0 && !this.speaker.starting && !this.manage) {
       this.defLeft -= dt;
       if (this.defLeft <= 0) {
         this.defLeft = 0;
@@ -546,13 +619,13 @@ export class BattleScene implements Scene {
       const hurt = isDef && this.heroHurt > 0 && Math.floor(app.t * 20) % 2 === 0;
       const x = pos.x - Math.floor((sp.w * HS) / 2) + off.x + (isDef && this.heroHurt > 0 ? app.rng.int(-2, 2) : 0);
       groundShadow(fb, pos.x + off.x, pos.y + 9 + off.y, 10, 2);
-      if (this.phase === 'speak' || this.phase === 'defend') app.ui.zone(pos.x - 16, pos.y - 20, 32, 36, () => this.selectPlayer(i), 'hero');
+      if (!this.manage && (this.phase === 'speak' || this.phase === 'defend')) app.ui.zone(pos.x - 16, pos.y - 20, 32, 36, () => this.selectPlayer(i), 'hero');
       fb.blit(sp, x, pos.y - 16 + hop + off.y, { scale: HS, tint: hurt ? C.snow : undefined, alpha: 16 });
-      if (isAtt) {
+      if (isAtt && !this.manage) {
         fb.blit(ICON.arrowR, pos.x - 2 + off.x, pos.y - 30 + bob(app.t, 1, 6) + off.y, { alpha: 16 });
         drawText(fb, p.name, pos.x + off.x, pos.y + 12, C.snow, { align: 'center', outline: C.ink });
       }
-      if (isDef) {
+      if (isDef && !this.manage) {
         drawText(fb, p.name, pos.x + off.x, pos.y + 12, C.ice, { align: 'center', outline: C.ink });
       }
       if (isDef && this.heroShield > 0) {
@@ -576,7 +649,8 @@ export class BattleScene implements Scene {
 
     app.fx.draw(fb);
     this.drawHud();
-    this.drawPanel();
+    if (this.manage) this.drawManage();
+    else this.drawPanel();
   }
 
   private drawHud(): void {
@@ -586,7 +660,10 @@ export class BattleScene implements Scene {
     const ms = this.b.monster;
     fb.veil(0, 0, W, 34, C.ink, 12);
     drawText(fb, ms.name, 6, 3, ms.boss ? C.sun : C.snow, { outline: C.ink });
-    drawText(fb, `${Math.max(0, Math.ceil(this.shownHp))}/${ms.maxHp}`, W - 6, 3, C.mist, { align: 'right', outline: C.ink });
+    drawText(fb, `${Math.max(0, Math.ceil(this.shownHp))}/${ms.maxHp}`, W - 26, 3, C.mist, { align: 'right', outline: C.ink });
+    if (!this.manage && (this.phase === 'speak' || this.phase === 'defend')) {
+      this.app.ui.button(fb, W - 22, 1, 17, 17, '', BTN.gray, () => this.openManage(), { icon: ICON.gear, name: 'party' });
+    }
     const bw = W - 12;
     bar(fb, 6, 21, bw, 7, 1, C.dusk, C.dusk);
     bar(fb, 6, 21, bw, 7, this.chipHp / ms.maxHp, C.sun, C.dusk);
@@ -610,7 +687,7 @@ export class BattleScene implements Scene {
     const cw = Math.min(40, Math.floor((W - 8 - (n - 1) * 3) / n));
     const ch = 32;
     const x0 = Math.round((W - (n * cw + (n - 1) * 3)) / 2);
-    const canTap = this.phase === 'speak' || this.phase === 'defend';
+    const canTap = !this.manage && (this.phase === 'speak' || this.phase === 'defend');
     players.forEach((p, i) => {
       const x = x0 + i * (cw + 3);
       const y = 37;

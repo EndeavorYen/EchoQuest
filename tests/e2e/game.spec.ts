@@ -329,6 +329,59 @@ test.describe('party', () => {
   });
 });
 
+test.describe('party management during a battle', () => {
+  test('add a player and raise a level mid-battle; the new player starts fresh and gets their own words', async ({ game }) => {
+    await game.newGameToMap();
+    await game.startBattle();
+    await game.setMonsterHp(9999);
+    await game.tap('party');
+    await game.tap('+ ADD PLAYER');
+    let save = await game.save();
+    expect(save.players).toHaveLength(2);
+    expect(save.players[1].progress).toEqual({});
+    expect(save.players[1].level).toBe(1);
+    await game.tap('level+0');
+    await game.tap('level+0');
+    expect((await game.save()).players[0].level).toBe(3);
+    await game.tap('DONE');
+    // the current player's level changed, so a harder word is dealt right away
+    expect((await game.battle()).phase).toBe('speak');
+    expect(await game.eval((a) => a.scene.sel.word.lv)).toBe(3);
+    // two avatars are now on screen, and the newcomer can take over
+    expect(await game.eval((a) => a.ui.list().filter((z: any) => z.label === 'player').length)).toBe(2);
+    await game.switchTo(1);
+    expect(await game.eval((a) => a.scene.sel.word.lv)).toBe(1);
+    await game.cast();
+    await game.waitPhase('defend');
+    save = await game.save();
+    expect(save.players[1].stats.words).toBe(1);
+    // it all survives a reload
+    await game.reload();
+    expect((await game.save()).players).toHaveLength(2);
+  });
+
+  test('the shield clock waits while the party panel is open, then starts over', async ({ game }) => {
+    test.slow();
+    await game.open();
+    await game.tap('PARTY');
+    await game.tap('level+0');
+    await game.tap('DONE');
+    await game.tap('START');
+    await game.startBattle();
+    await game.setMonsterHp(9999);
+    await game.cast();
+    await game.waitPhase('defend');
+    await game.tap('party');
+    const a = await game.eval((x) => x.scene.defLeft);
+    await game.page.waitForTimeout(1500);
+    expect(await game.eval((x) => x.scene.defLeft)).toBe(a);
+    await game.tap('DONE');
+    const limit = await game.eval((x) => x.scene.defLimit);
+    expect(await game.eval((x) => x.scene.defLeft)).toBeGreaterThan(limit - 1);
+    expect((await game.battle()).phase).toBe('defend');
+  });
+});
+
 test.describe('map stops', () => {
   test('the boss cannot fall until everyone has acted, then the trek is cleared', async ({ game }) => {
     await game.open();

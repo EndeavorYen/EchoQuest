@@ -186,6 +186,17 @@ export const ICON = {
     '...kwk..',
     '....k...',
   ]),
+  gear: fromRows([
+    '...kkk...',
+    '.k.kmk.k.',
+    '..kmmmk..',
+    'kkmmkmmkk',
+    'kmmkdkmmk',
+    'kkmmkmmkk',
+    '..kmmmk..',
+    '.k.kmk.k.',
+    '...kkk...',
+  ]),
   flag: fromRows([
     'kkkk....',
     'krrrkk..',
