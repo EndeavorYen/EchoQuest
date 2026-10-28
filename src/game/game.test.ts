@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Battle, monsterHp } from './battle';
-import { pickCards, pickDefenseWord } from './deck';
+import { dealCard, pickDefenseWord } from './deck';
 import { newPlayer } from './model';
 import { record, priority } from './progress';
 import { advance, isFinished, newRun, nextRelic } from './run';
@@ -11,17 +11,19 @@ import { Rng } from '../util/rng';
 const word = (lv: 1 | 2 | 3 | 4) => WORDS.find((w) => w.lv === lv)!;
 
 describe('deck', () => {
-  it('deals three distinct cards spanning easy → hard', () => {
-    const p = newPlayer(0, 2);
-    const cards = pickCards(p, Date.now(), new Rng(1));
-    expect(cards).toHaveLength(3);
-    expect(new Set(cards.map((c) => c.word.id)).size).toBe(3);
-    expect(cards.map((c) => c.word.lv)).toEqual([1, 2, 3]);
+  it('deals one word at the player level, straight away', () => {
+    for (const lv of [1, 2, 3, 4] as const) {
+      const c = dealCard(newPlayer(0, lv), Date.now(), new Rng(lv));
+      expect(c.word.lv).toBe(lv);
+    }
   });
 
-  it('clamps at both ends of the level range', () => {
-    expect(pickCards(newPlayer(0, 1), 0, new Rng(2)).map((c) => c.word.lv)).toEqual([1, 1, 2]);
-    expect(pickCards(newPlayer(0, 4), 0, new Rng(3)).map((c) => c.word.lv)).toEqual([3, 4, 4]);
+  it('avoids repeating the words just dealt', () => {
+    const p = newPlayer(0, 2);
+    const recent = WORDS.filter((w) => w.lv === 2).slice(0, 5).map((w) => w.id);
+    for (let s = 0; s < 20; s++) {
+      expect(recent).not.toContain(dealCard(p, 0, new Rng(s), recent).word.id);
+    }
   });
 
   it('brings back words the player missed', () => {
@@ -30,9 +32,9 @@ describe('deck', () => {
     p.progress = record(p.progress, target.id, false, 1000);
     let seen = 0;
     for (let s = 0; s < 40; s++) {
-      if (pickCards(p, 2000, new Rng(s)).some((c) => c.word.id === target.id)) seen += 1;
+      if (dealCard(p, 2000, new Rng(s)).word.id === target.id) seen += 1;
     }
-    expect(seen).toBeGreaterThan(20);
+    expect(seen).toBeGreaterThan(10);
   });
 
   it('defense words are short and easy', () => {
@@ -95,13 +97,15 @@ describe('battle', () => {
     expect(b.monster.hp).toBeLessThan(100);
   });
 
-  it('defender is the next player in line', () => {
+  it('the defender is whoever is up, and switching changes both', () => {
     const b = new Battle({ name: 'x', hp: 100, maxHp: 100, boss: false }, party);
     expect(b.attacker.id).toBe(party[0].id);
-    expect(b.defender.id).toBe(party[1].id);
-    b.nextTurn();
-    expect(b.attacker.id).toBe(party[1].id);
     expect(b.defender.id).toBe(party[0].id);
+    b.select(1);
+    expect(b.attacker.id).toBe(party[1].id);
+    expect(b.defender.id).toBe(party[1].id);
+    b.select(5);
+    expect(b.attacker.id).toBe(party[1].id);
   });
 
   it('single players defend for themselves', () => {
@@ -117,7 +121,7 @@ describe('battle', () => {
     expect(r.held).toBe(true);
     expect(r.waitingFor).toEqual([party[1].name]);
     expect(b.monster.hp).toBe(1);
-    b.nextTurn();
+    b.select(1);
     expect(b.attacker.id).toBe(party[1].id);
     expect(b.attack(word(1), 'perfect').killed).toBe(true);
   });

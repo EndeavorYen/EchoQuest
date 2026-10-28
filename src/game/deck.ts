@@ -1,13 +1,11 @@
 import { WORDS, type Word } from '../data/words';
 import { priority } from './progress';
-import type { Level, Player } from './model';
+import type { Player } from './model';
 import { Rng } from '../util/rng';
 
-export type CardTag = 'easy' | 'mid' | 'hard';
-
+/** The spell word a player is dealt. */
 export interface Card {
   word: Word;
-  tag: CardTag;
 }
 
 function pickFrom(
@@ -30,24 +28,15 @@ function pickFrom(
 }
 
 /**
- * Three spell cards: easier / on-level / harder than the player.
- * Harder words hit harder — the player decides how brave to be.
+ * Deal one spell at the player's own difficulty. Words the player is still
+ * learning (or has missed) come first; `recent` keeps repeats away.
  */
-export function pickCards(player: Player, now: number, rng: Rng, recent: string[] = []): Card[] {
-  const L = player.level;
-  const tiers: Array<[Level, CardTag]> =
-    L === 1 ? [[1, 'easy'], [1, 'mid'], [2, 'hard']]
-      : L === 4 ? [[3, 'easy'], [4, 'mid'], [4, 'hard']]
-        : [[(L - 1) as Level, 'easy'], [L, 'mid'], [(L + 1) as Level, 'hard']];
-  const avoid = new Set(recent);
-  const cards: Card[] = [];
-  for (const [lv, tag] of tiers) {
-    const w = pickFrom(player, lv, now, rng, avoid);
-    if (!w) continue;
-    avoid.add(w.id);
-    cards.push({ word: w, tag });
-  }
-  return cards;
+export function dealCard(player: Player, now: number, rng: Rng, recent: string[] = []): Card {
+  const word =
+    pickFrom(player, player.level, now, rng, new Set(recent)) ??
+    pickFrom(player, 1, now, rng, new Set()) ??
+    WORDS[0];
+  return { word };
 }
 
 /** A short, easy word for the shield spell (one level below, never long). */

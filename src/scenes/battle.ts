@@ -2,7 +2,7 @@ import type { App, Scene } from '../core/app';
 import type { FB } from '../gfx/fb';
 import { C, RAMPS, type PalIndex } from '../gfx/palette';
 import { ICON } from '../gfx/icons';
-import { BTN, avatarSprite, bar, panel } from '../gfx/ui';
+import { BTN, avatarSprite, bar, faceTint, panel } from '../gfx/ui';
 import { drawText, measure, wrap } from '../gfx/text';
 import { emojiSprite } from '../gfx/emoji';
 import type { Monster, FrameName } from '../gfx/monster';
@@ -10,12 +10,11 @@ import { sfx, say, stopSay } from '../audio/sfx';
 import { judge, type Tier } from '../speech/match';
 import { Speaker, type SpeakResult } from '../speech/speaker';
 import { Battle, attackName, type MonsterState } from '../game/battle';
-import { pickCards, pickDefenseWord, type Card } from '../game/deck';
-import { BASE_DAMAGE } from '../game/model';
+import { dealCard, pickDefenseWord, type Card } from '../game/deck';
 import { record } from '../game/progress';
 import { advance } from '../game/run';
 import type { Word } from '../data/words';
-import { bob, groundShadow } from './common';
+import { bob, groundShadow, levelPips } from './common';
 import { micButton, statusLine, typingBox, failMessage } from './speakpanel';
 import { MapScene } from './map';
 
@@ -28,7 +27,7 @@ export interface BattleInit {
   nodeIdx: number;
 }
 
-type Phase = 'intro' | 'pick' | 'speak' | 'strike' | 'defend' | 'resolve' | 'victory';
+type Phase = 'intro' | 'speak' | 'strike' | 'defend' | 'resolve' | 'victory';
 
 interface Proj {
   x0: number; y0: number; x1: number; y1: number;
@@ -49,7 +48,6 @@ export class BattleScene implements Scene {
   private speaker: Speaker;
   private phase: Phase = 'intro';
   private pt = 0;
-  private cards: Card[] = [];
   private sel: Card | null = null;
   private tries = 0;
   private note = '';
@@ -119,26 +117,38 @@ export class BattleScene implements Scene {
 
   // ---- flow --------------------------------------------------------------
 
-  private startPick(): void {
+  /** Deal the selected player a word at their own difficulty. */
+  private dealSpell(): void {
     const att = this.b.attacker;
-    this.cards = pickCards(att, Date.now(), this.app.rng, this.recent);
-    this.sel = null;
+    this.sel = dealCard(att, Date.now(), this.app.rng, this.recent);
     this.tries = 0;
     this.note = '';
     this.speaker.cancel();
-    this.phase = 'pick';
-    this.pt = 0;
-  }
-
-  private selectCard(card: Card): void {
-    sfx.unlock();
-    sfx.play('select');
-    this.sel = card;
-    this.tries = 0;
-    this.note = '';
     this.phase = 'speak';
     this.pt = 0;
-    say(card.word.w);
+    say(this.sel.word.w);
+  }
+
+  /** One tap on an avatar: that player is up. Mid-spell or mid-shield, the word and the shield clock start over. */
+  private selectPlayer(i: number): void {
+    if (this.phase !== 'speak' && this.phase !== 'defend') return;
+    sfx.unlock();
+    this.speaker.cancel();
+    stopSay();
+    if (i === this.b.turn) {
+      sfx.play('tap');
+      const w = this.phase === 'speak' ? this.sel?.word : this.defWord;
+      if (w) say(w.w);
+      return;
+    }
+    sfx.play('select');
+    this.b.select(i);
+    const app = this.app;
+    app.save = { ...app.save, active: i };
+    app.persist();
+    this.heroCast = 0.3;
+    if (this.phase === 'speak') this.dealSpell();
+    else this.dealShield(false);
   }
 
   private mic(): void {
@@ -263,6 +273,16 @@ export class BattleScene implements Scene {
   }
 
   private startDefense(): void {
+    this.phase = 'defend';
+    this.pt = 0;
+    this.openT = 99;
+    sfx.play('warn');
+    this.app.fx.flash(C.berry, 0.2);
+    this.dealShield(true);
+  }
+
+  /** Give whoever is selected a shield word; their clock (if their level has one) starts fresh. */
+  private dealShield(first: boolean): void {
     const def = this.b.defender;
     this.defWord = pickDefenseWord(def, Date.now(), this.app.rng, this.recent);
     this.recent = [this.defWord.id, ...this.recent].slice(0, 8);
@@ -271,12 +291,8 @@ export class BattleScene implements Scene {
     this.tries = 0;
     this.note = '';
     this.speaker.cancel();
-    this.phase = 'defend';
-    this.pt = 0;
-    this.openT = 99;
-    sfx.play('warn');
-    this.app.fx.flash(C.berry, 0.2);
     say(this.defWord.w, 0.9);
+    void first;
   }
 
   private onDefended(r: SpeakResult): void {
@@ -306,8 +322,7 @@ export class BattleScene implements Scene {
     this.pt = 0;
     this.speaker.cancel();
     const m = this.init.monster;
-    const di = (this.b.turn + 1) % this.b.players.length;
-    const hero = this.heroPos(di);
+    const hero = this.heroPos(this.b.turn);
     sfx.play('monsterAttack');
     this.openT = 0.5;
     this.proj = {
@@ -351,9 +366,9 @@ export class BattleScene implements Scene {
   }
 
   private nextRound(): void {
-    this.b.nextTurn();
+    this.b.nextRound();
     this.openT = 0;
-    this.startPick();
+    this.dealSpell();
   }
 
   private victory(): void {
@@ -371,7 +386,7 @@ export class BattleScene implements Scene {
       this.lootGiven = true;
       const have = new Set(app.save.collection);
       for (const id of this.used.keys()) have.add(id);
-      app.save = { ...app.save, collection: [...have], active: (app.save.active + 1) % app.save.players.length };
+      app.save = { ...app.save, collection: [...have], active: this.b.turn };
       app.persist();
     }
   }
@@ -419,7 +434,7 @@ export class BattleScene implements Scene {
     if (this.chipHp > this.shownHp) this.chipHp = Math.max(this.shownHp, this.chipHp - 25 * dt);
     else this.chipHp = this.shownHp;
 
-    if (this.phase === 'intro' && this.pt > 1.1) this.startPick();
+    if (this.phase === 'intro' && this.pt > 1.1) this.dealSpell();
 
     if (this.proj) {
       this.proj.t += dt;
@@ -511,8 +526,8 @@ export class BattleScene implements Scene {
     const players = app.save.players;
     players.forEach((p, i) => {
       const pos = this.heroPos(i);
-      const isAtt = i === this.b.turn && (this.phase === 'pick' || this.phase === 'speak' || this.phase === 'strike');
-      const isDef = i === (this.b.turn + 1) % players.length && (this.phase === 'defend' || this.phase === 'resolve');
+      const isAtt = i === this.b.turn && (this.phase === 'speak' || this.phase === 'strike');
+      const isDef = i === this.b.turn && (this.phase === 'defend' || this.phase === 'resolve');
       const sp = avatarSprite(p.face);
       const HS = 2;
       let hop = 0;
@@ -521,6 +536,7 @@ export class BattleScene implements Scene {
       const hurt = isDef && this.heroHurt > 0 && Math.floor(app.t * 20) % 2 === 0;
       const x = pos.x - Math.floor((sp.w * HS) / 2) + off.x + (isDef && this.heroHurt > 0 ? app.rng.int(-2, 2) : 0);
       groundShadow(fb, pos.x + off.x, pos.y + 9 + off.y, 10, 2);
+      if (this.phase === 'speak' || this.phase === 'defend') app.ui.zone(pos.x - 16, pos.y - 20, 32, 36, () => this.selectPlayer(i), 'hero');
       fb.blit(sp, x, pos.y - 16 + hop + off.y, { scale: HS, tint: hurt ? C.snow : undefined, alpha: 16 });
       if (isAtt) {
         fb.blit(ICON.arrowR, pos.x - 2 + off.x, pos.y - 30 + bob(app.t, 1, 6) + off.y, { alpha: 16 });
@@ -566,11 +582,42 @@ export class BattleScene implements Scene {
     bar(fb, 6, 21, bw, 7, this.chipHp / ms.maxHp, C.sun, C.dusk);
     const frac = this.shownHp / ms.maxHp;
     bar(fb, 6, 21, bw, 7, frac, frac > 0.5 ? C.leaf : frac > 0.25 ? C.orange : C.berry, 0, frac > 0.5 ? C.lime : frac > 0.25 ? C.sun : C.orange);
+    this.drawChips();
     // combo badge
     if (this.b.combo >= 2) {
       const t = `x${this.b.combo}`;
-      drawText(fb, t, W - 6, 36, C.sun, { align: 'right', outline: C.ink, scale: 2, pixel: true });
+      drawText(fb, t, W - 6, 72, C.sun, { align: 'right', outline: C.ink, scale: 2, pixel: true });
     }
+  }
+
+  /** The fixed row of colour-coded avatars: one tap picks who plays (or who raises the shield). */
+  private drawChips(): void {
+    const app = this.app;
+    const fb = app.fb;
+    const { W } = app;
+    const players = app.save.players;
+    const n = players.length;
+    const cw = Math.min(40, Math.floor((W - 8 - (n - 1) * 3) / n));
+    const ch = 32;
+    const x0 = Math.round((W - (n * cw + (n - 1) * 3)) / 2);
+    const canTap = this.phase === 'speak' || this.phase === 'defend';
+    players.forEach((p, i) => {
+      const x = x0 + i * (cw + 3);
+      const y = 37;
+      const on = i === this.b.turn;
+      const tint = faceTint(p.face);
+      const pressed = canTap && app.ui.isPressed(x, y, cw, ch);
+      const lift = on ? -2 : 0;
+      fb.rect(x, y + lift + 1, cw, ch, C.ink);
+      fb.rect(x + 1, y + lift + 2, cw - 2, ch - 2, on ? tint : C.dusk);
+      if (!on) fb.rect(x + 1, y + lift + ch - 4, cw - 2, 3, tint);
+      if (on) fb.frame(x, y + lift + 1, cw, ch, C.snow);
+      const sp = avatarSprite(p.face);
+      const ax = x + Math.round((cw - sp.w * 2) / 2);
+      fb.blit(sp, ax, y + lift + 4 + (pressed ? 1 : 0), { scale: 2, alpha: on ? 16 : 11 });
+      levelPips(fb, x + Math.round((cw - 15) / 2), y + lift + ch - 6, p.level);
+      if (canTap) app.ui.zone(x - 1, y - 3, cw + 2, ch + 4, () => this.selectPlayer(i), 'player');
+    });
   }
 
   private drawPanel(): void {
@@ -580,8 +627,7 @@ export class BattleScene implements Scene {
     const py = this.panelY;
     panel(fb, 2, py, W - 4, PANEL_H - 2, C.dusk, C.slate);
 
-    if (this.phase === 'pick') this.drawPick(py);
-    else if (this.phase === 'speak') this.drawSpeak(py);
+    if (this.phase === 'speak') this.drawSpeak(py);
     else if (this.phase === 'defend') this.drawDefend(py);
     else if (this.phase === 'victory') this.drawVictory(py);
     else if (this.phase === 'strike' || this.phase === 'resolve') {
@@ -608,44 +654,12 @@ export class BattleScene implements Scene {
     }
   }
 
-  private drawPick(py: number): void {
-    const app = this.app;
-    const fb = app.fb;
-    const { W } = app;
-    const att = this.b.attacker;
-    drawText(fb, `${att.name}: pick a spell!`, W / 2, py + 5, C.sun, { align: 'center' });
-    const lv1 = att.level === 1;
-    this.cards.forEach((c, i) => {
-      const cy = py + 21 + i * 40;
-      const cx = 7;
-      const cw = W - 14;
-      const pressed = app.ui.isPressed(cx, cy, cw, 37);
-      const oy = pressed ? 1 : 0;
-      fb.rect(cx, cy + 1, cw, 36, C.ink);
-      fb.rect(cx + 1, cy + 2, cw - 2, 34, C.navy);
-      fb.rect(cx + 1, cy + 1 + oy, cw - 2, 34, C.royal);
-      if (!pressed) fb.rect(cx + 1, cy + 1, cw - 2, 1, C.sky);
-      this.wordArt(c.word, cx + 4, cy + 4 + oy, 29);
-      const big = lv1 && measure(c.word.w, 2) <= 100;
-      if (big) {
-        drawText(fb, c.word.w, cx + 38, cy + 6 + oy, C.snow, { scale: 2, outline: C.navy });
-      } else {
-        drawText(fb, c.word.w, cx + 38, cy + 5 + oy, C.snow, { outline: C.navy });
-        if (!lv1) drawText(fb, c.word.zh, cx + 38, cy + 20 + oy, C.ice);
-      }
-      const tag = c.tag === 'easy' ? 'EASY' : c.tag === 'mid' ? 'GOOD' : 'HARD';
-      const tagC = c.tag === 'easy' ? C.lime : c.tag === 'mid' ? C.sun : C.orange;
-      drawText(fb, tag, cx + cw - 5, cy + 4 + oy, tagC, { align: 'right', outline: C.navy });
-      drawText(fb, `${BASE_DAMAGE[c.word.lv]}`, cx + cw - 5, cy + 20 + oy, C.snow, { align: 'right', outline: C.navy });
-      app.ui.zone(cx, cy, cw, 37, () => this.selectCard(c), 'card');
-    });
-  }
-
   private answerBlock(py: number, word: Word, level: number, shield: boolean): void {
     const app = this.app;
     const fb = app.fb;
     const { W } = app;
     this.wordArt(word, Math.round(W / 2 - 17), py + 6, 34);
+    app.ui.zone(Math.round(W / 2 - 60), py + 4, 120, 70, () => { sfx.unlock(); sfx.play('tap'); say(word.w); }, 'word');
     const lv1 = level === 1;
     const big = measure(word.w, 2) <= W - 24;
     const wy = py + 44;
@@ -676,15 +690,6 @@ export class BattleScene implements Scene {
   private drawSpeak(py: number): void {
     const card = this.sel;
     if (!card) return;
-    const app = this.app;
-    app.ui.button(app.fb, 6, py + 5, 30, 13, 'BACK', BTN.dark, () => {
-      sfx.play('back');
-      this.speaker.cancel();
-      stopSay();
-      this.phase = 'pick';
-      this.sel = null;
-      this.note = '';
-    });
     this.answerBlock(py, card.word, this.b.attacker.level, false);
   }
 

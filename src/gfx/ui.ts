@@ -187,6 +187,12 @@ const avatarCache = new Map<number, Sprite>();
 
 export const AVATAR_COUNT = 6;
 
+/** A bright colour per avatar so little kids can tell players apart without reading. */
+const FACE_TINT: PalIndex[] = [C.orange, C.lime, C.sky, C.berry, C.sun, C.ice];
+export function faceTint(face: number): PalIndex {
+  return FACE_TINT[((face % AVATAR_COUNT) + AVATAR_COUNT) % AVATAR_COUNT];
+}
+
 export function avatarSprite(face: number): Sprite {
   const f = ((face % AVATAR_COUNT) + AVATAR_COUNT) % AVATAR_COUNT;
   let s = avatarCache.get(f);

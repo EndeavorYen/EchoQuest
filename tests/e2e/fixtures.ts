@@ -140,7 +140,7 @@ export class Game {
     return expect.poll(async () => (await this.battle()).phase, { timeout, message: `waiting for battle phase ${phase}` }).toBe(phase);
   }
 
-  /** Title → map → "find a monster" → summon (no camera) → fight. Leaves you in the battle's pick phase. */
+  /** Title → map → "find a monster" → summon (no camera) → fight. Leaves you in the battle's speak phase, with a word already dealt. */
   async startBattle(opts: { boss?: boolean } = {}): Promise<void> {
     if ((await this.scene()) === 'title') await this.tap(await this.has('CONTINUE') ? 'CONTINUE' : 'START');
     await this.waitScene('map');
@@ -150,7 +150,7 @@ export class Game {
     await this.waitFor('FIGHT!');
     await this.tap('FIGHT!');
     await this.waitScene('battle');
-    await this.waitPhase('pick');
+    await this.waitPhase('speak');
     void opts;
   }
 
@@ -175,10 +175,13 @@ export class Game {
     await this.waitScene('map');
   }
 
-  /** One attacker turn: pick the first card and say `words` (default: the right word). */
-  async cast(says?: (word: string) => string | string[], cardIndex = 0): Promise<void> {
-    await this.waitPhase('pick');
-    await this.tap('card', cardIndex);
+  /** Tap a player's avatar chip to hand them the turn. */
+  async switchTo(index: number): Promise<void> {
+    await this.tap('player', index);
+  }
+
+  /** One attacker turn: the word is already dealt; say it (or whatever `says` returns). */
+  async cast(says?: (word: string) => string | string[]): Promise<void> {
     await this.waitPhase('speak');
     const b = await this.battle();
     await this.say(says ? says(b.word!) : b.word!);
@@ -208,10 +211,7 @@ export class Game {
     for (let i = 0; i < 80; i++) {
       const b = await this.battle();
       if (b.phase === 'victory') return;
-      if (b.phase === 'pick') {
-        await this.tap('card');
-        await this.waitPhase('speak');
-      } else if (b.phase === 'speak') {
+      if (b.phase === 'speak') {
         await this.say(b.word!);
         await this.tap('mic');
         await this.settle(b);

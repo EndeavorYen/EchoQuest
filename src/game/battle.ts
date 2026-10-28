@@ -73,13 +73,19 @@ export class Battle {
     this.turn = startIndex % players.length;
   }
 
+  /** Whoever is selected casts the spell… */
   get attacker(): Player {
     return this.players[this.turn];
   }
 
-  /** The player who has to hold up the shield: the next one in line. */
+  /** …and the same selected player holds up the shield (the party calls out "quick, switch to big brother!"). */
   get defender(): Player {
-    return this.players[(this.turn + 1) % this.players.length];
+    return this.players[this.turn];
+  }
+
+  /** Switch to another player (one tap on their avatar). */
+  select(index: number): void {
+    this.turn = ((index % this.players.length) + this.players.length) % this.players.length;
   }
 
   private unacted(): Player[] {
@@ -132,20 +138,8 @@ export class Battle {
     return { blocked: false, reflect: 0, combo: 0, healed, killed: false };
   }
 
-  /** Move on to the next attacker. Players who have not acted yet go first. */
-  nextTurn(): void {
-    const n = this.players.length;
-    if (this.monster.boss && this.monster.hp <= 1) {
-      for (let i = 1; i <= n; i++) {
-        const idx = (this.turn + i) % n;
-        if (!this.acted.has(this.players[idx].id)) {
-          this.turn = idx;
-          this.round += 1;
-          return;
-        }
-      }
-    }
-    this.turn = (this.turn + 1) % n;
+  /** A new exchange starts; the same player stays selected until someone taps another avatar. */
+  nextRound(): void {
     this.round += 1;
   }
 }

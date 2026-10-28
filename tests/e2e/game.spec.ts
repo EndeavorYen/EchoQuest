@@ -14,7 +14,7 @@ test.describe('core loop', () => {
     await game.waitFor('FIGHT!');
     await game.tap('FIGHT!');
     await game.waitScene('battle');
-    await game.waitPhase('pick');
+    await game.waitPhase('speak');
 
     await game.setMonsterHp(20);
     await game.winBattle();
@@ -63,7 +63,6 @@ test.describe('failing is safe', () => {
     await game.newGameToMap();
     await game.startBattle();
     const full = await game.battle();
-    await game.tap('card');
     await game.waitPhase('speak');
     await game.say('zzzz');
     await game.tap('mic');
@@ -89,7 +88,7 @@ test.describe('failing is safe', () => {
     await expect.poll(async () => (await game.battle()).tries).toBe(1);
     await game.tap('mic');
     await game.waitPhase('resolve');
-    await game.waitPhase('pick');
+    await game.waitPhase('speak');
     const b = await game.battle();
     expect(b.combo).toBe(0);
     expect(b.hp).toBeGreaterThan(hit.hp);
@@ -106,7 +105,7 @@ test.describe('failing is safe', () => {
     await game.waitPhase('defend');
     const hit = await game.battle();
     await game.shield();
-    await game.waitPhase('pick');
+    await game.waitPhase('speak');
     const b = await game.battle();
     expect(b.hp).toBeLessThan(hit.hp);
     expect(b.combo).toBeGreaterThanOrEqual(2);
@@ -129,7 +128,7 @@ test.describe('shield timer', () => {
     const hit = await game.battle();
     expect(await game.eval((a) => a.scene.defLimit)).toBeGreaterThan(0);
     // say nothing: the clock runs out by itself
-    await game.waitPhase('pick', 25_000);
+    await game.waitPhase('speak', 25_000);
     const after = await game.battle();
     expect(after.combo).toBe(0);
     expect(after.hp).toBeGreaterThan(hit.hp);
@@ -147,10 +146,9 @@ test.describe('shield timer', () => {
 });
 
 test.describe('voice and fallbacks', () => {
-  test('a silent mic asks to try again and keeps the card', async ({ game }) => {
+  test('a silent mic asks to try again and keeps the word', async ({ game }) => {
     await game.newGameToMap();
     await game.startBattle();
-    await game.tap('card');
     await game.waitPhase('speak');
     await game.tap('mic'); // nothing queued → "no speech"
     await expect.poll(() => game.eval((a) => a.scene.note)).toMatch(/hear/i);
@@ -162,7 +160,6 @@ test.describe('voice and fallbacks', () => {
   test('a blocked mic falls back to typing, and typing works', async ({ game }) => {
     await game.newGameToMap();
     await game.startBattle();
-    await game.tap('card');
     await game.waitPhase('speak');
     await game.say('!denied');
     await game.tap('mic');
@@ -179,7 +176,6 @@ test.describe('voice and fallbacks', () => {
   test('the keyboard button switches to typing on demand', async ({ game }) => {
     await game.newGameToMap();
     await game.startBattle();
-    await game.tap('card');
     await game.waitPhase('speak');
     await game.tap('keyboard');
     expect((await game.battle()).mode).toBe('typing');
@@ -190,7 +186,6 @@ test.describe('voice and fallbacks', () => {
   test('near-miss pronunciations still count (engine alternatives are used)', async ({ game }) => {
     await game.newGameToMap();
     await game.startBattle();
-    await game.tap('card');
     await game.waitPhase('speak');
     const word = (await game.battle()).word!;
     await game.say(['zzzz', word.toUpperCase() + '.']);
@@ -215,7 +210,7 @@ test.describe('party', () => {
     expect((await game.save()).players[0].level).toBe(2);
   });
 
-  test('two players take turns; the next one defends; each gets cards for their own level', async ({ game }) => {
+  test('avatars switch who is up: each player gets a word at their own level, and the turn stays with them', async ({ game }) => {
     await game.open();
     await game.tap('PARTY');
     await game.tap('+ ADD PLAYER');
@@ -230,26 +225,72 @@ test.describe('party', () => {
     await game.tap('NO CAMERA');
     await game.waitFor('FIGHT!');
     await game.tap('FIGHT!');
-    await game.waitPhase('pick');
-
-    const first = await game.battle();
-    expect(first.attacker).not.toBe(first.defender);
+    await game.waitPhase('speak');
     await game.setMonsterHp(9999);
 
-    // player 1 (level 1) sees level 1–2 cards
-    const lvls1 = await game.eval((a) => a.scene.cards.map((c: any) => c.word.lv));
-    expect(Math.max(...lvls1)).toBeLessThanOrEqual(2);
+    const players = (await game.save()).players;
+    const first = await game.battle();
+    expect(first.attacker).toBe(players[0].name);
+    expect(first.defender).toBe(players[0].name);
+    expect(await game.eval((a) => a.scene.sel.word.lv)).toBe(1);
 
+    // tap player 2: a fresh word at level 3 is dealt, with no card to pick
+    await game.switchTo(1);
+    const second = await game.battle();
+    expect(second.attacker).toBe(players[1].name);
+    expect(second.phase).toBe('speak');
+    expect(await game.eval((a) => a.scene.sel.word.lv)).toBeGreaterThanOrEqual(2);
+
+    // the same player stays on the shield
     await game.cast();
     await game.waitPhase('defend');
-    expect((await game.battle()).defender).toBe((await game.save()).players[1].name);
+    expect((await game.battle()).defender).toBe(players[1].name);
     await game.shield();
-    await game.waitPhase('pick');
+    await game.waitPhase('speak');
+    expect((await game.battle()).attacker).toBe(players[1].name);
+  });
 
-    const second = await game.battle();
-    expect(second.attacker).toBe((await game.save()).players[1].name);
-    const lvls2 = await game.eval((a) => a.scene.cards.map((c: any) => c.word.lv));
-    expect(Math.min(...lvls2)).toBeGreaterThanOrEqual(2);
+  test('tapping the player who is already up only repeats the word aloud', async ({ game }) => {
+    await game.newGameToMap();
+    await game.startBattle();
+    const before = await game.battle();
+    await game.switchTo(0);
+    const after = await game.battle();
+    expect(after.word).toBe(before.word);
+    expect(after.phase).toBe('speak');
+  });
+
+  test('switching during the shield round hands it to the new player and restarts the clock', async ({ game }) => {
+    test.slow();
+    await game.open();
+    await game.tap('PARTY');
+    await game.tap('+ ADD PLAYER');
+    await game.tap('level+0');
+    await game.tap('level+1');
+    await game.tap('DONE');
+    await game.tap('START');
+    await game.waitScene('map');
+    await game.tap('node');
+    await game.tap('NO CAMERA');
+    await game.waitFor('FIGHT!');
+    await game.tap('FIGHT!');
+    await game.waitPhase('speak');
+    await game.setMonsterHp(9999);
+    await game.cast();
+    await game.waitPhase('defend');
+    const players = (await game.save()).players;
+    expect((await game.battle()).defender).toBe(players[0].name);
+    expect(await game.eval((a) => a.scene.defLimit)).toBeGreaterThan(0);
+    await game.page.waitForTimeout(2500);
+    const left = await game.eval((a) => a.scene.defLeft);
+    await game.switchTo(1);
+    const b = await game.battle();
+    expect(b.phase).toBe('defend');
+    expect(b.defender).toBe(players[1].name);
+    const limit = await game.eval((a) => a.scene.defLimit);
+    const now = await game.eval((a) => a.scene.defLeft);
+    expect(now).toBeGreaterThan(left);
+    expect(now).toBeGreaterThan(limit - 1); // a fresh clock, give or take a few frames
   });
 });
 
@@ -269,7 +310,7 @@ test.describe('map stops', () => {
     await game.tap('NO CAMERA');
     await game.waitFor('FIGHT!');
     await game.tap('FIGHT!');
-    await game.waitPhase('pick');
+    await game.waitPhase('speak');
     expect((await game.battle()).boss).toBe(true);
 
     await game.setMonsterHp(1);
@@ -279,7 +320,11 @@ test.describe('map stops', () => {
     expect((await game.battle()).hp).toBe(1);
     expect(await game.has('CONTINUE')).toBe(false);
 
-    await game.shield(); // the second player now acts → the reflected hit finishes it
+    await game.shield(); // player 1's shield reflects, but the boss still holds at 1 HP
+    await game.waitPhase('speak');
+    expect((await game.battle()).hp).toBe(1);
+    await game.switchTo(1); // tap player 2's avatar: they have not acted yet
+    await game.cast();
     await game.waitPhase('victory');
     await game.tap('CONTINUE');
     await game.waitScene('finish');
@@ -357,7 +402,7 @@ test.describe('camera', () => {
     await game.waitFor('FIGHT!', 20_000);
     await game.tap('FIGHT!');
     await game.waitScene('battle');
-    await game.waitPhase('pick');
+    await game.waitPhase('speak');
   });
 
   test('a blocked camera offers the summon fallback', async ({ game, page }) => {
