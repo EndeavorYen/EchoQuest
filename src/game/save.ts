@@ -1,6 +1,7 @@
 import { MAX_PLAYERS, newPlayer, type Player } from './model';
 import { newRun, type Run } from './run';
 import { legacyIdMap } from '../data/bank';
+import type { MonsterSpec } from '../gfx/monster';
 
 export interface Save {
   v: 3;
@@ -11,6 +12,8 @@ export interface Save {
   /** word ids the party has defeated monsters with */
   collection: string[];
   relics: string[];
+  /** monsters the little ones grew into stickers (toddler mode), newest first */
+  stickers: MonsterSpec[];
   treks: number;
   sound: boolean;
   music: boolean;
@@ -28,6 +31,7 @@ export function defaultSave(): Save {
     run: null,
     collection: [],
     relics: [],
+    stickers: [],
     treks: 0,
     sound: true,
     music: true,
@@ -81,6 +85,7 @@ function normalise(data: Raw): Save {
     run: data.run ?? null,
     collection: data.collection ?? [],
     relics: data.relics ?? [],
+    stickers: Array.isArray(data.stickers) ? data.stickers : [],
   };
 }
 

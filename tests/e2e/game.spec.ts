@@ -572,6 +572,39 @@ test.describe('saves', () => {
   });
 });
 
+test.describe('toddler mode', () => {
+  test('scan, tap the friend five times, get a sticker — no speaking, no battle, no run touched', async ({ game }) => {
+    await game.open();
+    await game.tap('TODDLER');
+    await game.waitScene('scan');
+    await game.tap('NO CAMERA');
+    await game.waitFor('PLAY!');
+    await game.tap('PLAY!');
+    await game.waitScene('toddler');
+    const looks: string[] = [];
+    for (let i = 1; i <= 5; i++) {
+      await game.tap('friend');
+      const t = await game.eval((a) => a.scene.taps);
+      expect(t).toBe(i);
+      looks.push(await game.eval((a) => { const m = a.scene.monster; return `${m.spec.ramp}/${m.spec.accessory}`; }));
+    }
+    // every tap changed the look
+    expect(new Set(looks.slice(0, 4)).size).toBe(4);
+    await game.waitFor('again');
+    const s = await game.save();
+    expect(s.stickers).toHaveLength(1);
+    expect(s.run).toBeNull();
+
+    // the book shows it, and another round adds a second sticker
+    await game.tap('BOOK');
+    await game.waitScene('stickers');
+    await game.tap('BACK');
+    await game.waitScene('title');
+    await game.reload();
+    expect((await game.save()).stickers).toHaveLength(1);
+  });
+});
+
 test.describe('camera', () => {
   test('scan with the camera: open → viewfinder → shutter → monster → fight', async ({ game }) => {
     await game.newGameToMap();

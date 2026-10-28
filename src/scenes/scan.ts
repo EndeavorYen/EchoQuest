@@ -13,6 +13,8 @@ import { monsterHp, monsterName } from '../game/battle';
 import { backdrop, bob, banner, groundShadow, partyRow } from './common';
 import { MapScene } from './map';
 import { BattleScene } from './battle';
+import { TitleScene } from './title';
+import { ToddlerScene } from './toddler';
 
 type Mode = 'ask' | 'live' | 'fallback' | 'scan' | 'reveal';
 
@@ -30,7 +32,12 @@ export class ScanScene implements Scene {
   private swatches: number[] = [];
   private revealSound = false;
 
-  constructor(private app: App, private boss: boolean) {}
+  constructor(private app: App, private boss: boolean, private toddler = false) {}
+
+  private back(): void {
+    sfx.play('back');
+    this.app.go(this.toddler ? new TitleScene(this.app) : new MapScene(this.app));
+  }
 
   enter(): void {
     sfx.setMusic('map');
@@ -145,7 +152,21 @@ export class ScanScene implements Scene {
     return Math.round(this.app.H * 0.5);
   }
 
+  /** Toddler mode: straight to the tapping game, no battle. */
+  private play(): void {
+    const app = this.app;
+    if (!this.monster || !this.frozen) return;
+    sfx.play('select');
+    const bg = this.frozen.clone();
+    bg.veil(0, 0, bg.w, bg.h, C.ink, 5);
+    app.go(new ToddlerScene(app, bg, this.monster.spec));
+  }
+
   private fight(): void {
+    if (this.toddler) {
+      this.play();
+      return;
+    }
     const app = this.app;
     const run = app.save.run;
     if (!this.monster || !this.frozen || !run) return;
@@ -183,8 +204,7 @@ export class ScanScene implements Scene {
         app.ui.button(fb, 20, H - 62, W - 40, 24, 'SUMMON!', BTN.primary, () => this.summonWithoutCamera());
       }
       app.ui.button(fb, 6, H - 28, 30, 14, 'BACK', BTN.dark, () => {
-        sfx.play('back');
-        app.go(new MapScene(app));
+        this.back();
       });
       partyRow(app, 112, -1);
       return;
@@ -221,8 +241,7 @@ export class ScanScene implements Scene {
       drawText(fb, 'SCAN', cx, cy - 7 + (pressed ? 1 : 0), C.ink, { align: 'center' });
       app.ui.zone(cx - 22, cy - 22, 44, 44, () => this.capture(), 'shutter');
       app.ui.button(fb, 6, H - 22, 30, 14, 'BACK', BTN.dark, () => {
-        sfx.play('back');
-        app.go(new MapScene(app));
+        this.back();
       });
       return;
     }
@@ -254,13 +273,13 @@ export class ScanScene implements Scene {
       const y = gy - monster.groundY + bob(app.t, 1.5, 3);
       fb.blit(monster.frames.idle, Math.round(W / 2 - monster.size / 2), y, { alpha: Math.round(p * 16) });
       if (this.t > 0.5) {
-        banner(app, this.boss ? 'BOSS!' : 'A WILD ONE!', 30, this.boss ? C.berry : C.sun, 2);
+        banner(app, this.toddler ? 'HELLO!' : this.boss ? 'BOSS!' : 'A WILD ONE!', 30, this.boss ? C.berry : C.sun, 2);
         drawText(fb, this.name, W / 2, 30 + 38, C.snow, { align: 'center', outline: C.ink });
-        drawText(fb, `HP ${this.hp}`, W / 2, 30 + 54, C.lime, { align: 'center', outline: C.ink });
+        if (!this.toddler) drawText(fb, `HP ${this.hp}`, W / 2, 30 + 54, C.lime, { align: 'center', outline: C.ink });
       }
       if (this.t > 1.0) {
         app.ui.zone(0, 0, W, H, () => this.fight());
-        app.ui.button(fb, 20, H - 44, W - 40, 24, 'FIGHT!', this.boss ? BTN.danger : BTN.primary, () => this.fight());
+        app.ui.button(fb, 20, H - 44, W - 40, 24, this.toddler ? 'PLAY!' : 'FIGHT!', this.boss ? BTN.danger : BTN.primary, () => this.fight());
       }
     }
   }

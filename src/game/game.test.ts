@@ -7,6 +7,8 @@ import { advance, isFinished, newRun, nextRelic } from './run';
 import { defaultSave, load, persist, migrateV2 } from './save';
 import { WORDS, WORD_BY_ID, buildBank, wordId, wordsInList, LEVELS, type Pack } from '../data/words';
 import { Revenge } from './revenge';
+import { growthSpecs, addSticker, TODDLER_TAPS, MAX_STICKERS } from './toddler';
+import { randomSpec } from '../gfx/monster';
 import { BossFight, BOSS_LAYERS } from './boss';
 import { Rng } from '../util/rng';
 
@@ -315,5 +317,37 @@ describe('save migration & level stats', () => {
     expect(st).toMatchObject({ seen: 3, learned: 2, mastered: 1 });
     expect(levelStat(pr, WORDS, 2)).toMatchObject({ seen: 1, learned: 1, mastered: 0 });
     expect(levelStat(pr, WORDS, 4)).toMatchObject({ seen: 0, learned: 0, mastered: 0 });
+  });
+});
+
+describe('toddler mode', () => {
+  it('a friend changes look on every tap and ends as itself, crowned', () => {
+    const spec = randomSpec(5, 'leaf');
+    const looks = growthSpecs(spec);
+    expect(looks).toHaveLength(TODDLER_TAPS);
+    const keys = looks.map((l) => `${l.ramp}/${l.accessory}`);
+    expect(new Set(keys).size).toBe(TODDLER_TAPS);
+    const last = looks[TODDLER_TAPS - 1];
+    expect(last.ramp).toBe('leaf');
+    expect(last.accessory).toBe('crown');
+    expect(last.kind).toBe(spec.kind);
+    expect(last.seed).toBe(spec.seed);
+  });
+
+  it('the sticker book keeps the newest and stays small', () => {
+    let book = [] as ReturnType<typeof growthSpecs>;
+    for (let i = 0; i < MAX_STICKERS + 5; i++) book = addSticker(book, randomSpec(i, 'fire'));
+    expect(book).toHaveLength(MAX_STICKERS);
+    expect(book[0].seed).toBe(MAX_STICKERS + 4);
+  });
+
+  it('old saves without a sticker book load with an empty one', () => {
+    const mem = new Map<string, string>();
+    const s = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v) };
+    const save = defaultSave();
+    const raw = JSON.parse(JSON.stringify(save));
+    delete raw.stickers;
+    mem.set('echoquest.v3', JSON.stringify(raw));
+    expect(load(s).stickers).toEqual([]);
   });
 });

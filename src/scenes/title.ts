@@ -12,6 +12,7 @@ import { backdrop, bob, groundShadow } from './common';
 import { PlayersScene } from './players';
 import { MapScene } from './map';
 import { PracticeScene } from './practice';
+import { ScanScene } from './scan';
 
 export class TitleScene implements Scene {
   readonly id = 'title';
@@ -115,6 +116,12 @@ export class TitleScene implements Scene {
     app.ui.button(fb, bx + half + 4, by, half, 20, 'PRACTICE', BTN.green, () => {
       sfx.play('select');
       app.go(new PracticeScene(app));
+    });
+    by += 24;
+    app.ui.button(fb, bx, by, bw, 18, 'TODDLER', BTN.gold, () => {
+      sfx.unlock();
+      sfx.play('select');
+      app.go(new ScanScene(app, false, true));
     });
 
     // ---- sound toggles
