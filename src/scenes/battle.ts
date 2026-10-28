@@ -13,6 +13,7 @@ import { Battle, attackName, type MonsterState } from '../game/battle';
 import { dealCard, pickDefenseWord, type Card } from '../game/deck';
 import { record } from '../game/progress';
 import { Revenge, REVENGE_MULT } from '../game/revenge';
+import { BossFight } from '../game/boss';
 import { advance } from '../game/run';
 import type { Word } from '../data/words';
 import { bob, groundShadow, levelPips } from './common';
@@ -57,6 +58,10 @@ export class BattleScene implements Scene {
   private recent: string[] = [];
   private revenge = new Revenge();
   /** The party panel (add players, change levels) is open; the battle clock is paused. */
+  /** Co-op boss state (null for ordinary monsters). */
+  private boss: BossFight | null = null;
+  /** Seconds since the bounced player was launched; -1 when nobody is down. */
+  private bounceT = -1;
   private manage = false;
   private manageLevel = 1;
   /** The current spell is a word the player missed earlier in this battle. */
@@ -91,6 +96,7 @@ export class BattleScene implements Scene {
     this.shownHp = init.hp;
     this.chipHp = init.hp;
     this.attackLabel = attackName(init.monster.spec.ramp);
+    if (init.boss) this.boss = new BossFight();
   }
 
   enter(): void {
@@ -128,10 +134,22 @@ export class BattleScene implements Scene {
 
   /** Deal the selected player a word at their own difficulty. */
   private dealSpell(): void {
+    const boss = this.boss;
+    if (boss) {
+      const n = this.app.save.players.length;
+      const who = boss.nextActor(this.b.turn, n);
+      if (who !== this.b.turn) {
+        this.b.select(who);
+        this.app.save = { ...this.app.save, active: who };
+        this.app.persist();
+      }
+    }
     const att = this.b.attacker;
     const back = this.revenge.take(att.id, this.b.round);
     this.isRevenge = back !== null;
-    this.sel = back ? { word: back } : dealCard(att, Date.now(), this.app.rng, this.recent);
+    // the super spell and the finisher are a stretch: one band harder than the player's own
+    const stretch = boss && (boss.stage === 'launch' || boss.stage === 'finish') ? Math.min(4, att.level + 1) : att.level;
+    this.sel = back ? { word: back } : dealCard(att, Date.now(), this.app.rng, this.recent, stretch);
     this.tries = 0;
     this.note = '';
     this.speaker.cancel();
@@ -144,6 +162,12 @@ export class BattleScene implements Scene {
   private selectPlayer(i: number): void {
     if (this.phase !== 'speak' && this.phase !== 'defend') return;
     sfx.unlock();
+    if (this.boss && !this.boss.canAct(i, this.app.save.players.length)) {
+      const pos = this.heroPos(i);
+      sfx.play('miss');
+      this.app.fx.float(pos.x, pos.y - 26, this.boss.stage === 'finish' ? 'Not yet!' : 'Resting…', C.mist, 1);
+      return;
+    }
     this.speaker.cancel();
     stopSay();
     if (i === this.b.turn) {
@@ -275,7 +299,8 @@ export class BattleScene implements Scene {
     const j = judge(card.word.w, cand, att.level);
     if (j.tier !== 'miss') {
       att.progress = record(att.progress, card.word.id, true, Date.now());
-      this.strike(card, j.tier, this.isRevenge);
+      if (this.boss) this.bossStrike(card, j.tier, this.isRevenge);
+      else this.strike(card, j.tier, this.isRevenge);
       return;
     }
     this.tries += 1;
@@ -317,9 +342,6 @@ export class BattleScene implements Scene {
           app.fx.float(this.monsterX, this.groundY - this.init.monster.size - 32, `COMBO x${res.combo}`, C.sun, 1);
           sfx.play('combo', res.combo);
         }
-        if (res.held) {
-          app.fx.float(this.monsterX, this.groundY - this.init.monster.size - 46, `Needs ${res.waitingFor[0]}!`, C.ice, 1);
-        }
         this.defer(res.killed ? 0.7 : 0.9, () => (res.killed ? this.victory() : this.startDefense()));
       },
     };
@@ -336,7 +358,91 @@ export class BattleScene implements Scene {
     this.app.fx.burst(hero.x, hero.y - 6, 8, [C.mist, C.slate], 30, 40, 0.5);
     this.app.fx.float(hero.x, hero.y - 22, 'Good try!', C.mist, 1);
     say(card.word.w);
-    this.defer(1.2, () => this.startDefense());
+    this.defer(1.2, () => {
+      if (this.boss) this.afterBossTurn();
+      else this.startDefense();
+    });
+  }
+
+  // ---- co-op boss ----------------------------------------------------------
+
+  private afterBossTurn(): void {
+    this.b.nextRound();
+    this.openT = 0;
+    this.dealSpell();
+  }
+
+  private bossStrike(card: Card, tier: Tier, revenge: boolean): void {
+    const app = this.app;
+    const boss = this.boss!;
+    const att = this.b.attacker;
+    const idx = this.b.turn;
+    const stage = boss.stage;
+    this.phase = 'strike';
+    this.pt = 0;
+    this.speaker.cancel();
+    this.recent = [card.word.id, ...this.recent].slice(0, 8);
+    this.used.set(card.word.id, card.word);
+    const hero = this.heroPos(idx);
+    this.heroCast = 0.35;
+    sfx.play(tier === 'perfect' ? 'perfect' : 'good');
+    const color: PalIndex = stage === 'launch' ? C.orange : stage === 'finish' ? C.sun : ([C.sun, C.lime, C.sky] as PalIndex[])[(boss.maxLayers - boss.layers) % 3];
+    const cy = this.groundY - this.init.monster.size * 0.45;
+    this.proj = {
+      x0: hero.x, y0: hero.y - 10, x1: this.monsterX, y1: cy,
+      t: 0, dur: stage === 'launch' ? 0.3 : 0.42, color, arc: stage === 'launch' ? 6 : 26, big: stage !== 'rescue',
+      onHit: () => {
+        att.stats.words += 1;
+        if (tier === 'perfect') att.stats.perfect += 1;
+        const top = this.groundY - this.init.monster.size;
+        if (stage === 'launch') {
+          // the shield throws the hero back
+          sfx.play('hit', 4);
+          app.fx.hitstop(0.12);
+          app.fx.shake(6, 0.5);
+          app.fx.flash(C.snow, 0.2);
+          app.fx.ring(this.monsterX, cy, C.ice, 120, 0.5);
+          app.fx.burst(this.monsterX, cy, 24, [C.ice, C.snow, C.sky], 110, 90, 0.8);
+          app.fx.float(this.monsterX, top - 6, 'BOUNCED!', C.orange, 2, C.ink);
+          boss.launch(idx);
+          this.bounceT = 0;
+          this.defer(2.2, () => {
+            app.fx.float(this.monsterX, top - 6, 'Help! Break the shield!', C.ice, 1);
+            this.afterBossTurn();
+          });
+        } else if (stage === 'rescue') {
+          const move = boss.move;
+          const last = boss.breakLayer();
+          this.b.combo += 1;
+          this.b.chip(0.1);
+          att.stats.dealt += 1;
+          sfx.play('hit', 2);
+          app.fx.hitstop(0.08);
+          app.fx.shake(3, 0.3);
+          app.fx.ring(this.monsterX, cy, color, 100, 0.5);
+          app.fx.burst(this.monsterX, cy, 22, [color, C.snow, C.ice], 90, 90, 0.7);
+          app.fx.float(this.monsterX, top - 6, `${move.name}!`, color, 2, C.ink);
+          app.fx.float(this.monsterX, top - 22, last ? 'SHIELD DOWN!' : 'Shield cracked!', C.snow, 1);
+          this.hurtT = 0.3;
+          this.flashT = 0.06;
+          const lp = this.heroPos(boss.launcher ?? 0);
+          app.fx.float(lp.x, lp.y - 30, 'Feeling better!', C.lime, 1);
+          sfx.play('heal');
+          this.defer(last ? 1.3 : 0.9, () => {
+            if (last) app.fx.float(this.monsterX, top - 6, 'FINISH IT!', C.sun, 2, C.ink);
+            this.afterBossTurn();
+          });
+        } else {
+          const dmg = this.b.finisher();
+          att.stats.dealt += dmg;
+          boss.finish();
+          this.impact(dmg, 4, 'perfect');
+          app.fx.float(this.monsterX, top - 22, 'FINISHER!', C.sun, 2, C.ink);
+          this.defer(0.9, () => this.victory());
+        }
+        if (revenge) app.fx.float(this.monsterX, top - 40, 'REVENGE!', C.berry, 2);
+      },
+    };
   }
 
   private impact(damage: number, lv: number, tier: Tier): void {
@@ -508,6 +614,7 @@ export class BattleScene implements Scene {
     if (this.heroShield > 0) this.heroShield -= dt;
     if (this.heroHurt > 0) this.heroHurt -= dt;
     if (this.heroCast > 0) this.heroCast -= dt;
+    if (this.bounceT >= 0 && this.bounceT < 90) this.bounceT += dt;
     if (this.openT > 0 && this.openT < 90) this.openT -= dt;
 
     // health bars chase the real value
@@ -599,6 +706,16 @@ export class BattleScene implements Scene {
         tint: this.flashT > 0 ? C.snow : undefined,
         alpha,
       });
+      if (this.boss && this.boss.layers > 0 && this.phase !== 'victory') {
+        // one bubble per shield layer, popping off as they are broken
+        const cyb = gy - Math.round(m.size * 0.5) + off.y;
+        const rings: PalIndex[] = [C.ice, C.sky, C.royal];
+        for (let li = 0; li < this.boss.layers; li++) {
+          const r = Math.round(m.size * 0.62) + li * 4 + (Math.floor(app.t * 3 + li) % 2);
+          fb.ring(mx + off.x, cyb, r, rings[li % 3]);
+          fb.ring(mx + off.x, cyb, r - 1, rings[li % 3]);
+        }
+      }
       if (this.phase === 'defend') {
         // danger aura
         fb.veil(0, 0, W, this.panelY, C.berry, 2 + (Math.floor(app.t * 6) % 2) * 2);
@@ -617,10 +734,38 @@ export class BattleScene implements Scene {
       if (isAtt) hop = bob(app.t, 1.2, 8) - 1;
       if (i === this.b.turn && this.heroCast > 0) hop = -4;
       const hurt = isDef && this.heroHurt > 0 && Math.floor(app.t * 20) % 2 === 0;
-      const x = pos.x - Math.floor((sp.w * HS) / 2) + off.x + (isDef && this.heroHurt > 0 ? app.rng.int(-2, 2) : 0);
+      let bx = 0;
+      let by = 0;
+      let alpha = 16;
+      const down = this.boss && this.boss.launcher === i && this.boss.stage !== 'launch' && this.boss.stage !== 'done' && this.bounceT >= 0 && players.length >= 1;
+      if (down && this.boss) {
+        const bt = this.bounceT;
+        const dir = pos.x < W / 2 ? -1 : 1;
+        if (bt < 0.6) {
+          const k = bt / 0.6;
+          bx = dir * 50 * k;
+          by = -120 * Math.sin(k * Math.PI * 0.5);
+        } else if (bt < 1.4) {
+          const k = (bt - 0.6) / 0.8;
+          bx = dir * 50 * (1 - k);
+          by = -120 * (1 - k) * (1 - k);
+        } else {
+          by = 6 - Math.abs(Math.sin((bt - 1.4) * 9)) * Math.max(0, 6 - (bt - 1.4) * 8);
+        }
+        alpha = 8 + Math.round(8 * this.boss.recovery);
+        hop = 0;
+      }
+      const x = pos.x - Math.floor((sp.w * HS) / 2) + off.x + bx + (isDef && this.heroHurt > 0 ? app.rng.int(-2, 2) : 0);
       groundShadow(fb, pos.x + off.x, pos.y + 9 + off.y, 10, 2);
       if (!this.manage && (this.phase === 'speak' || this.phase === 'defend')) app.ui.zone(pos.x - 16, pos.y - 20, 32, 36, () => this.selectPlayer(i), 'hero');
-      fb.blit(sp, x, pos.y - 16 + hop + off.y, { scale: HS, tint: hurt ? C.snow : undefined, alpha: 16 });
+      fb.blit(sp, x, pos.y - 16 + hop + by + off.y, { scale: HS, tint: hurt ? C.snow : undefined, alpha });
+      if (down && this.boss && this.bounceT > 1.2) {
+        for (let j = 0; j < 3; j++) {
+          const a = app.t * 5 + j * 2.1;
+          fb.blit(ICON.star, Math.round(pos.x - 4 + Math.cos(a) * 11) + off.x, Math.round(pos.y - 24 + Math.sin(a) * 3) + off.y, { alpha: 16 });
+        }
+        bar(fb, pos.x - 11 + off.x, pos.y + 14 + off.y, 22, 4, this.boss.recovery, C.lime, C.dusk);
+      }
       if (isAtt && !this.manage) {
         fb.blit(ICON.arrowR, pos.x - 2 + off.x, pos.y - 30 + bob(app.t, 1, 6) + off.y, { alpha: 16 });
         drawText(fb, p.name, pos.x + off.x, pos.y + 12, C.snow, { align: 'center', outline: C.ink });
@@ -692,6 +837,7 @@ export class BattleScene implements Scene {
       const x = x0 + i * (cw + 3);
       const y = 37;
       const on = i === this.b.turn;
+      const locked = !!this.boss && !this.boss.canAct(i, n);
       const tint = faceTint(p.face);
       const pressed = canTap && app.ui.isPressed(x, y, cw, ch);
       const lift = on ? -2 : 0;
@@ -701,7 +847,8 @@ export class BattleScene implements Scene {
       if (on) fb.frame(x, y + lift + 1, cw, ch, C.snow);
       const sp = avatarSprite(p.face);
       const ax = x + Math.round((cw - sp.w * 2) / 2);
-      fb.blit(sp, ax, y + lift + 4 + (pressed ? 1 : 0), { scale: 2, alpha: on ? 16 : 11 });
+      fb.blit(sp, ax, y + lift + 4 + (pressed ? 1 : 0), { scale: 2, alpha: locked ? 6 : on ? 16 : 11 });
+      if (locked) fb.blit(ICON.star, x + Math.round(cw / 2) - 4, y + 6 + Math.round(Math.sin(app.t * 4 + i)), { alpha: 16 });
       levelPips(fb, x + Math.round((cw - 15) / 2), y + lift + ch - 6, p.level);
       if (canTap) app.ui.zone(x - 1, y - 3, cw + 2, ch + 4, () => this.selectPlayer(i), 'player');
     });
@@ -741,7 +888,15 @@ export class BattleScene implements Scene {
     }
   }
 
-  private answerBlock(py: number, word: Word, level: number, shield: boolean): void {
+  private bossHint(): string | undefined {
+    const boss = this.boss;
+    if (!boss) return undefined;
+    if (boss.stage === 'launch') return 'Grown-up: super spell!';
+    if (boss.stage === 'rescue') return `${boss.move.name}! Break the shield!`;
+    return 'FINISH IT!';
+  }
+
+  private answerBlock(py: number, word: Word, level: number, shield: boolean, hint?: string): void {
     const app = this.app;
     const fb = app.fb;
     const { W } = app;
@@ -769,7 +924,7 @@ export class BattleScene implements Scene {
       if (this.note && !this.speaker.listening) {
         lines.slice(0, 2).forEach((ln, i) => drawText(fb, ln, W / 2, py + 73 + i * 12, C.orange, { align: 'center', outline: C.ink }));
       } else {
-        statusLine(app, this.speaker, py + 80, shield ? 'Tap the shield and say it!' : 'Tap the mic and say it!');
+        statusLine(app, this.speaker, py + 80, shield ? 'Tap the shield and say it!' : hint ?? 'Tap the mic and say it!');
       }
       micButton(app, Math.round(W / 2), py + 117, this.speaker, () => this.mic(), 14, shield);
     }
@@ -781,7 +936,7 @@ export class BattleScene implements Scene {
   private drawSpeak(py: number): void {
     const card = this.sel;
     if (!card) return;
-    this.answerBlock(py, card.word, this.b.attacker.level, false);
+    this.answerBlock(py, card.word, this.b.attacker.level, false, this.bossHint());
   }
 
   private drawDefend(py: number): void {

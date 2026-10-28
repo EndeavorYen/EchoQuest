@@ -16,10 +16,6 @@ export interface AttackResult {
   tier: Tier;
   combo: number;
   killed: boolean;
-  /** a boss refused to fall because someone has not taken a turn yet */
-  held: boolean;
-  /** names of players still needed for the final blow */
-  waitingFor: string[];
 }
 
 export interface DefenseResult {
@@ -65,7 +61,6 @@ export class Battle {
   turn = 0;
   combo = 0;
   round = 1;
-  private acted = new Set<string>();
 
   constructor(monster: MonsterState, players: Player[], startIndex = 0) {
     this.monster = monster;
@@ -88,34 +83,34 @@ export class Battle {
     this.turn = ((index % this.players.length) + this.players.length) % this.players.length;
   }
 
-  private unacted(): Player[] {
-    return this.players.filter((p) => !this.acted.has(p.id));
+  /** Take a bite out of the monster without touching combos (shield breaks in the boss fight). */
+  chip(fraction: number): number {
+    const dmg = Math.min(this.monster.hp - 1, Math.round(this.monster.maxHp * fraction));
+    if (dmg > 0) this.monster.hp -= dmg;
+    return Math.max(0, dmg);
+  }
+
+  /** The finishing blow. Returns the damage dealt. */
+  finisher(): number {
+    const dmg = this.monster.hp;
+    this.monster.hp = 0;
+    this.combo += 1;
+    return dmg;
   }
 
   attack(word: Word, tier: Tier, bonus = 1): AttackResult {
     const lv = word.lv;
     if (tier === 'miss') {
       this.combo = 0;
-      return { damage: 0, tier, combo: 0, killed: false, held: false, waitingFor: [] };
+      return { damage: 0, tier, combo: 0, killed: false };
     }
     this.combo += 1;
-    this.acted.add(this.attacker.id);
     const damage = Math.max(1, Math.round(BASE_DAMAGE[lv] * TIER_MULT[tier] * comboMult(this.combo - 1) * bonus));
-    let held = false;
-    let waitingFor: string[] = [];
     this.monster.hp -= damage;
     if (this.monster.hp <= 0) {
-      const pending = this.unacted();
-      if (this.monster.boss && pending.length > 0) {
-        // co-op rule: nobody gets to watch from the sofa
-        this.monster.hp = 1;
-        held = true;
-        waitingFor = pending.map((p) => p.name);
-      } else {
-        this.monster.hp = 0;
-      }
+      this.monster.hp = 0;
     }
-    return { damage, tier, combo: this.combo, killed: this.monster.hp === 0, held, waitingFor };
+    return { damage, tier, combo: this.combo, killed: this.monster.hp === 0 };
   }
 
   /** An attacker gave up or ran out of tries. */
@@ -124,11 +119,10 @@ export class Battle {
   }
 
   defend(blocked: boolean): DefenseResult {
-    this.acted.add(this.defender.id);
     if (blocked) {
       this.combo += 1;
       const reflect = Math.max(1, Math.round(BASE_DAMAGE[this.defender.level] * 0.4));
-      this.monster.hp = Math.max(this.monster.boss && this.unacted().length ? 1 : 0, this.monster.hp - reflect);
+      this.monster.hp = Math.max(0, this.monster.hp - reflect);
       return { blocked: true, reflect, combo: this.combo, healed: 0, killed: this.monster.hp === 0 };
     }
     // a hit gets through: combo resets and the monster recovers a little (never a defeat)

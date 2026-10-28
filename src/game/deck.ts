@@ -31,9 +31,9 @@ function pickFrom(
  * Deal one spell at the player's own difficulty. Words the player is still
  * learning (or has missed) come first; `recent` keeps repeats away.
  */
-export function dealCard(player: Player, now: number, rng: Rng, recent: string[] = []): Card {
+export function dealCard(player: Player, now: number, rng: Rng, recent: string[] = [], lv: number = player.level): Card {
   const word =
-    pickFrom(player, player.level, now, rng, new Set(recent)) ??
+    pickFrom(player, lv, now, rng, new Set(recent)) ??
     pickFrom(player, 1, now, rng, new Set()) ??
     WORDS[0];
   return { word };

@@ -383,7 +383,8 @@ test.describe('party management during a battle', () => {
 });
 
 test.describe('map stops', () => {
-  test('the boss cannot fall until everyone has acted, then the trek is cleared', async ({ game }) => {
+  test('co-op boss: the launcher is bounced, the others strip the shield, the launcher finishes', async ({ game }) => {
+    test.slow();
     await game.open();
     await game.tap('PARTY');
     await game.tap('+ ADD PLAYER');
@@ -400,28 +401,79 @@ test.describe('map stops', () => {
     await game.tap('FIGHT!');
     await game.waitPhase('speak');
     expect((await game.battle()).boss).toBe(true);
+    const stage = () => game.eval((a) => a.scene.boss.stage);
+    const layers = () => game.eval((a) => a.scene.boss.layers);
+    expect(await stage()).toBe('launch');
+    expect(await layers()).toBe(3);
+    const full = await game.battle();
 
-    await game.setMonsterHp(1);
+    // 1. player 1 charges in with a super spell (one band harder) and is bounced; nobody takes damage
+    expect(await game.eval((a) => a.scene.sel.word.lv)).toBe(2);
     await game.cast();
-    await game.waitPhase('defend');
-    // a lethal hit was held back: the second player has not acted yet
-    expect((await game.battle()).hp).toBe(1);
-    expect(await game.has('CONTINUE')).toBe(false);
-
-    await game.shield(); // player 1's shield reflects, but the boss still holds at 1 HP
+    await expect.poll(stage).toBe('rescue');
     await game.waitPhase('speak');
-    expect((await game.battle()).hp).toBe(1);
-    await game.switchTo(1); // tap player 2's avatar: they have not acted yet
+    expect((await game.battle()).hp).toBe(full.hp);
+
+    // 2. the bounced player is out; the other player is up and can't be swapped for the launcher
+    const players = (await game.save()).players;
+    expect((await game.battle()).attacker).toBe(players[1].name);
+    await game.switchTo(0);
+    expect((await game.battle()).attacker).toBe(players[1].name);
+
+    // a miss costs nothing: the shield stays and a new word comes around
+    await game.say('zzzz', 'qqqq');
+    await game.tap('mic');
+    await expect.poll(async () => (await game.battle()).tries).toBe(1);
+    await game.tap('mic');
+    await game.waitPhase('strike');
+    await game.waitPhase('speak');
+    expect(await layers()).toBe(3);
+    expect(await stage()).toBe('rescue');
+
+    // each success strips one layer
+    for (const left of [2, 1]) {
+      await game.cast();
+      await expect.poll(layers).toBe(left);
+      await game.waitPhase('speak');
+    }
+    await game.cast();
+    await expect.poll(stage).toBe('finish');
+    await game.waitPhase('speak');
+    expect((await game.battle()).hp).toBeLessThan(full.hp);
+    expect((await game.battle()).hp).toBeGreaterThan(0);
+
+    // 3. only the launcher can finish, with a harder word
+    expect((await game.battle()).attacker).toBe(players[0].name);
+    await game.switchTo(1);
+    expect((await game.battle()).attacker).toBe(players[0].name);
     await game.cast();
     await game.waitPhase('victory');
+    expect((await game.battle()).hp).toBe(0);
     await game.tap('CONTINUE');
     await game.waitScene('finish');
     expect(await game.has('NEW TREK')).toBe(true);
     await game.tap('NEW TREK');
     await game.waitScene('map');
-    const s = await game.save();
-    expect(s.run.idx).toBe(0);
-    expect(s.treks).toBe(1);
+    const sv = await game.save();
+    expect(sv.run.idx).toBe(0);
+    expect(sv.treks).toBe(1);
+  });
+
+  test('co-op boss with a single player: they play every role', async ({ game }) => {
+    test.slow();
+    await game.newGameToMap();
+    await game.jumpToNode(9);
+    await game.tap('CONTINUE');
+    await game.waitScene('map');
+    await game.tap('BOSS BATTLE!');
+    await game.waitScene('scan');
+    await game.tap('NO CAMERA');
+    await game.waitFor('FIGHT!');
+    await game.tap('FIGHT!');
+    await game.waitPhase('speak');
+    await game.winBattle();
+    expect((await game.battle()).hp).toBe(0);
+    expect(await game.eval((a) => a.scene.boss.stage)).toBe('done');
   });
 
   test('a chest gives a relic and moves on', async ({ game }) => {

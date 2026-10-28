@@ -7,6 +7,7 @@ import { advance, isFinished, newRun, nextRelic } from './run';
 import { defaultSave, load, persist, migrateV2 } from './save';
 import { WORDS, WORD_BY_ID, buildBank, wordId, wordsInList, LEVELS, type Pack } from '../data/words';
 import { Revenge } from './revenge';
+import { BossFight, BOSS_LAYERS } from './boss';
 import { Rng } from '../util/rng';
 
 const word = (lv: 1 | 2 | 3 | 4) => WORDS.find((w) => w.lv === lv)!;
@@ -77,6 +78,63 @@ describe('revenge', () => {
   });
 });
 
+describe('co-op boss', () => {
+  it('goes launch → rescue (strip every layer) → finish → done', () => {
+    const f = new BossFight();
+    expect(f.stage).toBe('launch');
+    f.launch(0);
+    expect(f.stage).toBe('rescue');
+    expect(f.launcher).toBe(0);
+    for (let i = 0; i < BOSS_LAYERS - 1; i++) expect(f.breakLayer()).toBe(false);
+    expect(f.stage).toBe('rescue');
+    expect(f.breakLayer()).toBe(true);
+    expect(f.stage).toBe('finish');
+    f.finish();
+    expect(f.stage).toBe('done');
+  });
+
+  it('each layer has its own status move, and the bounced player recovers as layers fall', () => {
+    const f = new BossFight();
+    f.launch(1);
+    const moves = [f.move.id];
+    expect(f.recovery).toBe(0);
+    f.breakLayer();
+    moves.push(f.move.id);
+    expect(f.recovery).toBeCloseTo(1 / BOSS_LAYERS);
+    f.breakLayer();
+    moves.push(f.move.id);
+    expect(new Set(moves).size).toBe(3);
+  });
+
+  it('kids rescue, the bounced player finishes; a solo player plays every role', () => {
+    const f = new BossFight();
+    expect(f.canAct(0, 2)).toBe(true);
+    expect(f.canAct(1, 2)).toBe(true);
+    f.launch(0);
+    expect(f.canAct(0, 3)).toBe(false);
+    expect(f.canAct(1, 3)).toBe(true);
+    expect(f.nextActor(0, 3)).toBe(1);
+    f.breakLayer(); f.breakLayer(); f.breakLayer();
+    expect(f.canAct(1, 3)).toBe(false);
+    expect(f.canAct(0, 3)).toBe(true);
+    expect(f.nextActor(1, 3)).toBe(0);
+    expect(f.canAct(0, 1)).toBe(true);
+  });
+
+  it('layers cannot be stripped before the launch, and breaking one only chips the boss', () => {
+    const f = new BossFight();
+    expect(f.breakLayer()).toBe(false);
+    expect(f.layers).toBe(BOSS_LAYERS);
+    const b = new Battle({ name: 'King', hp: 100, maxHp: 100, boss: true }, [newPlayer(0, 1)]);
+    b.chip(0.1);
+    expect(b.monster.hp).toBe(90);
+    b.chip(5);
+    expect(b.monster.hp).toBe(1);
+    expect(b.finisher()).toBe(1);
+    expect(b.monster.hp).toBe(0);
+  });
+});
+
 describe('progress', () => {
   it('prioritises missed words over mastered ones', () => {
     let pr = record({}, 'a', false, 0);
@@ -142,18 +200,6 @@ describe('battle', () => {
     const solo = [newPlayer(0, 1)];
     const b = new Battle({ name: 'x', hp: 100, maxHp: 100, boss: false }, solo);
     expect(b.defender.id).toBe(b.attacker.id);
-  });
-
-  it('the boss will not fall until every player has acted', () => {
-    const b = new Battle({ name: 'King', hp: 10, maxHp: 10, boss: true }, party);
-    const r = b.attack(word(4), 'perfect');
-    expect(r.killed).toBe(false);
-    expect(r.held).toBe(true);
-    expect(r.waitingFor).toEqual([party[1].name]);
-    expect(b.monster.hp).toBe(1);
-    b.select(1);
-    expect(b.attacker.id).toBe(party[1].id);
-    expect(b.attack(word(1), 'perfect').killed).toBe(true);
   });
 
   it('scales monster hp with the party and the stage', () => {
