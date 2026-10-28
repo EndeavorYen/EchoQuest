@@ -12,6 +12,7 @@ import { Speaker, type SpeakResult } from '../speech/speaker';
 import { Battle, attackName, type MonsterState } from '../game/battle';
 import { dealCard, pickDefenseWord, type Card } from '../game/deck';
 import { record } from '../game/progress';
+import { Revenge, REVENGE_MULT } from '../game/revenge';
 import { advance } from '../game/run';
 import type { Word } from '../data/words';
 import { bob, groundShadow, levelPips } from './common';
@@ -52,6 +53,9 @@ export class BattleScene implements Scene {
   private tries = 0;
   private note = '';
   private recent: string[] = [];
+  private revenge = new Revenge();
+  /** The current spell is a word the player missed earlier in this battle. */
+  private isRevenge = false;
   private used = new Map<string, Word>();
   private shownHp: number;
   private chipHp: number;
@@ -120,7 +124,9 @@ export class BattleScene implements Scene {
   /** Deal the selected player a word at their own difficulty. */
   private dealSpell(): void {
     const att = this.b.attacker;
-    this.sel = dealCard(att, Date.now(), this.app.rng, this.recent);
+    const back = this.revenge.take(att.id, this.b.round);
+    this.isRevenge = back !== null;
+    this.sel = back ? { word: back } : dealCard(att, Date.now(), this.app.rng, this.recent);
     this.tries = 0;
     this.note = '';
     this.speaker.cancel();
@@ -142,6 +148,8 @@ export class BattleScene implements Scene {
       return;
     }
     sfx.play('select');
+    // a revenge word that was waiting on the table goes back in line for its player
+    if (this.phase === 'speak' && this.isRevenge && this.sel) this.revenge.miss(this.b.attacker.id, this.sel.word, this.b.round, 0);
     this.b.select(i);
     const app = this.app;
     app.save = { ...app.save, active: i };
@@ -194,12 +202,13 @@ export class BattleScene implements Scene {
     const j = judge(card.word.w, cand, att.level);
     if (j.tier !== 'miss') {
       att.progress = record(att.progress, card.word.id, true, Date.now());
-      this.strike(card, j.tier);
+      this.strike(card, j.tier, this.isRevenge);
       return;
     }
     this.tries += 1;
     if (this.tries >= 2) {
       att.progress = record(att.progress, card.word.id, false, Date.now());
+      this.revenge.miss(att.id, card.word, this.b.round);
       this.fizzle(card);
     } else {
       this.note = `I heard “${j.heard || '…'}”.\nListen and try again!`;
@@ -208,7 +217,7 @@ export class BattleScene implements Scene {
     }
   }
 
-  private strike(card: Card, tier: Tier): void {
+  private strike(card: Card, tier: Tier, revenge = false): void {
     const app = this.app;
     const att = this.b.attacker;
     this.phase = 'strike';
@@ -225,11 +234,12 @@ export class BattleScene implements Scene {
       x1: this.monsterX, y1: this.groundY - this.init.monster.size * 0.45,
       t: 0, dur: 0.42, color: LEVEL_COLOR[lv] ?? C.sun, arc: 26, big: tier === 'perfect',
       onHit: () => {
-        const res = this.b.attack(card.word, tier);
+        const res = this.b.attack(card.word, tier, revenge ? REVENGE_MULT : 1);
         att.stats.dealt += res.damage;
         att.stats.words += 1;
         if (tier === 'perfect') att.stats.perfect += 1;
         this.impact(res.damage, lv, tier);
+        if (revenge) app.fx.float(this.monsterX, this.groundY - this.init.monster.size - 60, 'REVENGE!', C.berry, 2);
         if (res.combo >= 2) {
           app.fx.float(this.monsterX, this.groundY - this.init.monster.size - 32, `COMBO x${res.combo}`, C.sun, 1);
           sfx.play('combo', res.combo);
@@ -659,6 +669,10 @@ export class BattleScene implements Scene {
     const fb = app.fb;
     const { W } = app;
     this.wordArt(word, Math.round(W / 2 - 17), py + 6, 34);
+    if (!shield && this.isRevenge) {
+      drawText(fb, 'REVENGE!', 8, py + 8, C.berry, { outline: C.snow, pixel: true });
+      drawText(fb, 'x1.5', 8, py + 20, C.sun, { outline: C.ink, pixel: true });
+    }
     app.ui.zone(Math.round(W / 2 - 60), py + 4, 120, 70, () => { sfx.unlock(); sfx.play('tap'); say(word.w); }, 'word');
     const lv1 = level === 1;
     const big = measure(word.w, 2) <= W - 24;

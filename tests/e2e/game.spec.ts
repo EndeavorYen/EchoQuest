@@ -145,6 +145,41 @@ test.describe('shield timer', () => {
   });
 });
 
+test.describe('missed words come back', () => {
+  test('a word that got away returns as REVENGE two rounds later, and tapping to hear costs nothing', async ({ game }) => {
+    test.slow();
+    await game.newGameToMap();
+    await game.startBattle();
+    await game.setMonsterHp(9999);
+    const missed = (await game.battle()).word!;
+
+    // listening is free practice: no attempt is recorded
+    await game.tap('hear');
+    await game.tap('word');
+    expect(Object.keys((await game.save()).players[0].progress)).toHaveLength(0);
+
+    await game.say('zzzz', 'qqqq');
+    await game.tap('mic');
+    await expect.poll(async () => (await game.battle()).tries).toBe(1);
+    await game.tap('mic');
+    await game.waitPhase('defend');
+    await game.shield();
+    await game.waitPhase('speak'); // round 2: an ordinary new word
+    expect(await game.eval((a) => a.scene.isRevenge)).toBe(false);
+    await game.cast();
+    await game.shield();
+    await game.waitPhase('speak'); // round 3: the missed word is back
+    expect(await game.eval((a) => a.scene.isRevenge)).toBe(true);
+    expect((await game.battle()).word).toBe(missed);
+    await game.cast();
+    await game.waitPhase('defend');
+    // beating it clears the flag; the next word is a normal one
+    await game.shield();
+    await game.waitPhase('speak');
+    expect(await game.eval((a) => a.scene.isRevenge)).toBe(false);
+  });
+});
+
 test.describe('voice and fallbacks', () => {
   test('a silent mic asks to try again and keeps the word', async ({ game }) => {
     await game.newGameToMap();

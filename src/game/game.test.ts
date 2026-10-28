@@ -6,6 +6,7 @@ import { record, priority } from './progress';
 import { advance, isFinished, newRun, nextRelic } from './run';
 import { defaultSave, load, persist } from './save';
 import { WORDS } from '../data/words';
+import { Revenge } from './revenge';
 import { Rng } from '../util/rng';
 
 const word = (lv: 1 | 2 | 3 | 4) => WORDS.find((w) => w.lv === lv)!;
@@ -44,6 +45,35 @@ describe('deck', () => {
       expect(w.lv).toBe(3);
       expect(w.w.length).toBeLessThanOrEqual(7);
     }
+  });
+});
+
+describe('revenge', () => {
+  const w = WORDS[0];
+  it('a missed word comes back two rounds later, for that player only', () => {
+    const r = new Revenge();
+    r.miss('a', w, 1);
+    expect(r.take('a', 1)).toBeNull();
+    expect(r.take('a', 2)).toBeNull();
+    expect(r.take('b', 3)).toBeNull();
+    expect(r.take('a', 3)?.id).toBe(w.id);
+    expect(r.take('a', 4)).toBeNull();
+  });
+
+  it('missing it again does not duplicate it', () => {
+    const r = new Revenge();
+    r.miss('a', w, 1);
+    r.miss('a', w, 3);
+    expect(r.pending('a')).toBe(1);
+    expect(r.take('a', 4)).toBeNull();
+    expect(r.take('a', 5)?.id).toBe(w.id);
+  });
+
+  it('revenge hits are stronger', () => {
+    const mk = () => new Battle({ name: 'x', hp: 500, maxHp: 500, boss: false }, [newPlayer(0, 2)]);
+    const plain = mk().attack(word(2), 'perfect').damage;
+    const sweet = mk().attack(word(2), 'perfect', 1.5).damage;
+    expect(sweet).toBeGreaterThan(plain);
   });
 });
 

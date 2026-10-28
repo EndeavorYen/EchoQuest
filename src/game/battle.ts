@@ -92,7 +92,7 @@ export class Battle {
     return this.players.filter((p) => !this.acted.has(p.id));
   }
 
-  attack(word: Word, tier: Tier): AttackResult {
+  attack(word: Word, tier: Tier, bonus = 1): AttackResult {
     const lv = word.lv;
     if (tier === 'miss') {
       this.combo = 0;
@@ -100,7 +100,7 @@ export class Battle {
     }
     this.combo += 1;
     this.acted.add(this.attacker.id);
-    const damage = Math.max(1, Math.round(BASE_DAMAGE[lv] * TIER_MULT[tier] * comboMult(this.combo - 1)));
+    const damage = Math.max(1, Math.round(BASE_DAMAGE[lv] * TIER_MULT[tier] * comboMult(this.combo - 1) * bonus));
     let held = false;
     let waitingFor: string[] = [];
     this.monster.hp -= damage;
