@@ -1,0 +1,25 @@
+{
+  "name": "echoquest",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Speak the spell, beat the monster. A pixel-art English word adventure for kids and families.",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vp-tw/cjk-web-fonts-fusion-pixel-font": "0.0.1"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.0.13",
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.5.3",
+    "vite": "^8.3.5",
+    "vitest": "^3.2.4"
+  }
+}
