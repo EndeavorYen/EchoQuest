@@ -1,79 +1,37 @@
 # EchoQuest
 
-> **TL;DR** — EchoQuest is a local-first family English game. A toddler, early reader, and adult can take turns inside one shared rescue mission without losing the current word or progress.
+A phone-first English spelling-the-world game in pixel art. Point the camera at
+anything around you, a cute monster pops out of it, and you beat it by **saying
+English words out loud**. Win fights to walk a map toward the treasure.
 
-EchoQuest is a local-first English learning adventure game for a family audience: toddlers, young kids, and adults share the same vocabulary and quest content while playing through different challenge modes.
+- **Scan once, meet a monster.** The photo becomes a 16-colour pixel backdrop and
+  its colours decide the monster's colour family.
+- **Cast spells with your voice.** Pick one of three spell cards (easier / on-level /
+  harder — harder words hit harder), tap the mic, say the word.
+- **You can't lose.** The monster telegraphs an attack; the next player says a shield
+  word. Miss it and the combo resets and the monster heals a little — nobody gets hurt.
+- **Take turns.** Up to 4 players share one trek, each with their own level
+  (幼兒園 → 國小 → 國中 → 高中). A parent can join at 高中 for review.
+- **Practice mode** never touches the map but still builds word mastery.
+- Words you cast with are collected; mastery feeds which cards you are offered next.
 
-## Family Relay Rescue
+## Run
 
-- A mission seed chooses three rescue events, Boss hazards, and vocabulary.
-- Switch `2y 圖像`, `5y 單字`, and `成人/家長` at any point; the target word and world progress stay shared.
-- Correct answers visibly change the scene, then the mission advances automatically.
-- During the Boss event, answer the word to charge magic, read the danger hint, then choose fire, shield, or healing.
-- Reloading an unfinished mission offers `繼續救援`; `新的救援` creates a different event and vocabulary plan.
-- Missed or weak words are stored in browser `localStorage` and prioritized for review.
-
-## Learner Profiles
-
-| Profile | Intended Player | Challenge Style |
-| --- | --- | --- |
-| `2y 圖像` | toddler / pre-reader | choose the matching picture; wrong answers do not cost hearts |
-| `5y 單字` | early reader | tap letter tiles to assemble the English word; optional voice input is available |
-| `成人/家長` | adult practice | fast typing practice; optional voice input is available |
-
-Progress is stored in browser `localStorage`, including the exact active mission, vocabulary, learner profile, recognition language, and per-word mastery.
-
-## Family Vocabulary Library
-
-Open the library with the settings button to search, filter, edit, enable, or remove words. Image and folder imports skip duplicate words case-insensitively and report added, skipped, and failed files inline without interrupting play.
-
-## Voice Input
-
-Voice is implemented as a safe optional input path:
-
-- Click `說出單字`; while the browser asks for access, the button shows `等待麥克風權限`.
-- After permission is granted, the button shows `聆聽中`.
-- Speak the English word shown by the picture.
-- EchoQuest displays `聽到：...` for review.
-- Click `確認送出` to use the answer, or `重試` to listen again.
-
-If speech recognition is unsupported, blocked by microphone permission, or temporarily unavailable, the app keeps the spelling/typing controls usable. For the best chance of voice support, run in Chrome or Edge from `localhost` or HTTPS and allow microphone access when prompted.
-
-If permission was denied, open the site's microphone settings from the address bar, allow access, and reload. On Windows, also enable microphone access for desktop apps under **Settings > Privacy & security > Microphone**.
-
-## Development
-
-```powershell
-cd web
+```bash
 npm install
-npm test -- --runInBand
-npm run build
-npm start
+npm run dev      # http://localhost:5173
+npm test
+npm run build    # static site in dist/
 ```
 
-`npm start` prints a local URL such as `http://127.0.0.1:8000` or `http://localhost:8000`. Open that URL in Chrome or Edge to play and test microphone input.
+Speech recognition uses the browser's Web Speech API (Chrome / Edge / Safari over
+HTTPS). Where it's unavailable or the mic is blocked, a typing box takes over.
 
-The app uses React 18, TypeScript, Jest, esbuild, and static generated PNG assets under `web/public/assets/generated/`.
+## Notes
 
-## Verification
-
-Before merging gameplay changes, run:
-
-```powershell
-cd web
-npm test -- --runInBand
-npm run build
-```
-
-From the repository root:
-
-```powershell
-git diff --check
-```
-
-## Design Notes
-
-The current relay design and implementation plan live at:
-
-- `docs/superpowers/specs/2026-07-11-family-relay-rescue-design.md`
-- `docs/superpowers/plans/2026-07-11-family-relay-rescue.md`
+- Everything is drawn into a 180×(320–420) indexed framebuffer with the Sweetie 16
+  palette and scaled by whole numbers; monsters, backdrops, icons and sound are all
+  generated in code (no image or audio assets).
+- Pixel font: [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font) (OFL).
+- Add `?debug` to the URL to expose the app as `window.__eq` for automated tests.
+- Deploy: import the repo in Vercel (it's a plain Vite static site; `vercel.json` sets the build and allows camera/microphone). CI (`.github/workflows/ci.yml`) runs tests and a build on every PR.

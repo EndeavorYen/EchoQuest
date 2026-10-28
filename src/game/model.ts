@@ -1,0 +1,43 @@
+import type { Progress } from './progress';
+
+export type Level = 1 | 2 | 3 | 4;
+
+export interface Player {
+  id: string;
+  name: string;
+  level: Level;
+  /** avatar look index */
+  face: number;
+  progress: Progress;
+  stats: { dealt: number; perfect: number; blocks: number; words: number };
+}
+
+export const PLAYER_NAMES = [
+  'Pixel', 'Nova', 'Mochi', 'Bean', 'Pepper', 'Luna', 'Taro', 'Momo', 'Ziggy', 'Coco', 'Rio', 'Juju',
+  'Sunny', 'Berry', 'Otto', 'Kiki',
+];
+
+export const MAX_PLAYERS = 4;
+
+let counter = 0;
+
+export function newPlayer(index: number, level: Level = 1): Player {
+  counter += 1;
+  return {
+    id: `p${Date.now().toString(36)}${counter}`,
+    name: PLAYER_NAMES[index % PLAYER_NAMES.length],
+    level,
+    face: index % 6,
+    progress: {},
+    stats: { dealt: 0, perfect: 0, blocks: 0, words: 0 },
+  };
+}
+
+/** Damage a perfect hit of a word of this level does. */
+export const BASE_DAMAGE: Record<Level, number> = { 1: 12, 2: 20, 3: 32, 4: 48 };
+
+export const TIER_MULT = { perfect: 1, good: 0.6, miss: 0 } as const;
+
+export function comboMult(combo: number): number {
+  return 1 + 0.15 * Math.min(combo, 6);
+}
