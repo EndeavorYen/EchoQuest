@@ -51,11 +51,11 @@ export class PlayersScene implements Scene {
     fb.copyFrom(backdrop(app, 'night', 33));
     fb.veil(0, 0, W, H, C.ink, 11);
 
-    drawText(fb, 'PARTY', W / 2, 8, C.sun, { align: 'center', scale: 2, outline: C.ink });
+    drawText(fb, 'PARTY', W / 2, 8, C.sun, { align: 'center', scale: 2, outline: C.ink, pixel: true });
     drawText(fb, '每個人選自己的等級，隨時可以換', W / 2, 36, C.mist, { align: 'center' });
 
     const players = app.save.players;
-    const rowH = 50;
+    const rowH = 54;
     players.forEach((p, i) => {
       const y = 54 + i * (rowH + 2);
       panel(fb, 8, y, W - 16, rowH, C.dusk, C.slate);
@@ -65,17 +65,17 @@ export class PlayersScene implements Scene {
       fb.blit(avatarSprite(p.face), 14, y + 8, { scale: 2 });
       app.ui.zone(13, y + 6, 26, 24, () => this.patch(i, { face: (p.face + 1) % AVATAR_COUNT }));
       // name (tap to cycle)
-      drawText(fb, p.name, 46, y + 6, C.snow);
+      drawText(fb, p.name, 46, y + 5, C.snow);
       const idx = PLAYER_NAMES.indexOf(p.name);
       app.ui.zone(44, y + 4, 70, 16, () => this.patch(i, { name: PLAYER_NAMES[(idx + 1) % PLAYER_NAMES.length] }));
-      drawText(fb, '點名字可換', 46, y + 20, C.slate);
+      drawText(fb, '點名字可換', 46, y + 19, C.mist);
       // level
-      const ly = y + 31;
+      const ly = y + 35;
       app.ui.button(fb, 14, ly, 18, 15, '', BTN.gray, () => this.change(i, -1), { icon: ICON.arrowL, disabled: p.level <= 1 });
       app.ui.button(fb, W - 8 - 5 - 18, ly, 18, 15, '', BTN.gray, () => this.change(i, 1), { icon: ICON.arrowR, disabled: p.level >= 4 });
       const info = LEVELS[p.level - 1];
       drawText(fb, `Lv.${p.level} ${info.name}`, W / 2, ly + 1, C.sun, { align: 'center' });
-      levelPips(fb, Math.round(W / 2 - 7), ly - 4, p.level);
+      levelPips(fb, W - 8 - 5 - 15, y + 24, p.level);
       // remove
       if (players.length > 1) {
         app.ui.button(fb, W - 8 - 5 - 14, y + 5, 14, 13, 'x', BTN.danger, () => {

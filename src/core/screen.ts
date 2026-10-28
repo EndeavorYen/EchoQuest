@@ -1,4 +1,5 @@
 import { FB } from '../gfx/fb';
+import { TextLayer, setTextLayer } from '../gfx/text';
 
 export const W = 180;
 export const MIN_H = 320;
@@ -16,6 +17,7 @@ export class Screen {
   private sctx: CanvasRenderingContext2D;
   private img!: ImageData;
   fb: FB;
+  readonly text: TextLayer;
   H = MIN_H;
   scale = 1;
   private offX = 0;
@@ -29,6 +31,9 @@ export class Screen {
     this.small = document.createElement('canvas');
     this.sctx = this.small.getContext('2d')!;
     this.fb = new FB(W, MIN_H);
+    this.text = new TextLayer(() => document.createElement('canvas'));
+    setTextLayer(this.text);
+    this.text.target = this.fb;
     this.resize();
     window.addEventListener('resize', () => this.resize());
     window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 120));
@@ -47,6 +52,7 @@ export class Screen {
     if (newH !== this.H || this.fb.w !== W) {
       this.H = newH;
       this.fb = new FB(W, newH);
+      this.text.target = this.fb;
     }
     this.small.width = W;
     this.small.height = this.H;
@@ -70,5 +76,6 @@ export class Screen {
     c.fillStyle = '#1a1c2c';
     c.fillRect(0, 0, this.canvas.width, this.canvas.height);
     c.drawImage(this.small, this.offX, this.offY, W * this.scale, this.H * this.scale);
+    this.text.flush(c, this.offX, this.offY, this.scale);
   }
 }

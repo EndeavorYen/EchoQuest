@@ -1,11 +1,11 @@
-import '@vp-tw/cjk-web-fonts-fusion-pixel-font/dist/12px/proportional/zh_hant/Fusion-Pixel-12px-Proportional-Traditional-Chinese.css';
+import './pixel-font.css';
 import { App } from './core/app';
 import { canvasRasterizer, clearGlyphCache, FONT_FAMILY, setRasterizer } from './gfx/text';
 import { sfx } from './audio/sfx';
 import { TitleScene } from './scenes/title';
 
 async function loadFont(): Promise<void> {
-  const sample = ` ${'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'}${__CJK__}`;
+  const sample = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 …“”';
   try {
     await Promise.race([
       document.fonts.load(`12px ${FONT_FAMILY}`, sample),

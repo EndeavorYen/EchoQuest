@@ -126,7 +126,7 @@ export class Fx {
     }
     for (const f of this.floaters) {
       if (f.life < 0.2 && (Math.floor(f.life * 30) & 1) === 0) continue;
-      drawText(fb, f.text, Math.round(f.x), Math.round(f.y), f.c, { align: 'center', scale: f.scale, outline: f.outline });
+      drawText(fb, f.text, Math.round(f.x), Math.round(f.y), f.c, { align: 'center', scale: f.scale, outline: f.outline, pixel: f.scale >= 2 });
     }
     if (this.flashT > 0) {
       const lvl = Math.round((this.flashT / this.flashMax) * 16);

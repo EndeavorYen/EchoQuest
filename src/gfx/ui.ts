@@ -86,8 +86,13 @@ export class UI {
     if (o.icon) {
       fb.blit(o.icon, x + Math.round((w - o.icon.w) / 2), y + Math.round((h - o.icon.h) / 2) + dy);
     } else if (label) {
-      const sc = o.textScale ?? 1;
-      const tw = measure(label, sc);
+      let sc = o.textScale ?? 1;
+      let tw = measure(label, sc);
+      // smooth text is wider than the old bitmap font: shrink long labels to fit the button
+      if (tw > w - 4) {
+        sc = (sc * (w - 4)) / tw;
+        tw = measure(label, sc);
+      }
       const ty = y + Math.round((h - 14 * sc) / 2) + dy;
       drawText(fb, label, x + Math.round((w - tw) / 2), ty, o.disabled ? C.slate : st.text, { scale: sc, shadow: o.disabled ? undefined : st.dark });
     }

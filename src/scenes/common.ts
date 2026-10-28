@@ -76,12 +76,13 @@ export function partyRow(app: App, y: number, highlight = -1, opts: { pips?: boo
 /** Big banner text with a dark strip behind it. */
 export function banner(app: App, text: string, y: number, color: number, scale = 2): void {
   const fb = app.fb;
-  const w = measure(text, scale);
+  const pixel = scale >= 2;
+  const w = measure(text, scale, 0, pixel);
   const h = 14 * scale + 6;
   fb.veil(0, y - 3, app.W, h, C.ink, 13);
   fb.rect(0, y - 3, app.W, 1, color);
   fb.rect(0, y - 3 + h - 1, app.W, 1, color);
-  drawText(fb, text, Math.round((app.W - w) / 2), y, color, { scale, outline: C.ink });
+  drawText(fb, text, Math.round((app.W - w) / 2), y, color, { scale, outline: C.ink, pixel });
 }
 
 export function playerLabel(p: Player): string {

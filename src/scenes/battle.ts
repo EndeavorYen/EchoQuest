@@ -568,7 +568,7 @@ export class BattleScene implements Scene {
     // combo badge
     if (this.b.combo >= 2) {
       const t = `x${this.b.combo}`;
-      drawText(fb, t, W - 6, 36, C.sun, { align: 'right', outline: C.ink, scale: 2 });
+      drawText(fb, t, W - 6, 36, C.sun, { align: 'right', outline: C.ink, scale: 2, pixel: true });
     }
   }
 
@@ -585,9 +585,9 @@ export class BattleScene implements Scene {
     else if (this.phase === 'victory') this.drawVictory(py);
     else if (this.phase === 'strike' || this.phase === 'resolve') {
       const who = this.phase === 'strike' ? this.b.attacker : this.b.defender;
-      drawText(fb, this.phase === 'strike' ? `${who.name} casts!` : `${this.attackLabel}!`, W / 2, py + 56, this.phase === 'strike' ? C.sun : C.berry, { align: 'center', scale: 2, outline: C.ink });
+      drawText(fb, this.phase === 'strike' ? `${who.name} casts!` : `${this.attackLabel}!`, W / 2, py + 56, this.phase === 'strike' ? C.sun : C.berry, { align: 'center', scale: 2, outline: C.ink, pixel: true });
     } else if (this.phase === 'intro') {
-      drawText(fb, 'Get ready!', W / 2, py + 56, C.sun, { align: 'center', scale: 2, outline: C.ink });
+      drawText(fb, 'Get ready!', W / 2, py + 56, C.sun, { align: 'center', scale: 2, outline: C.ink, pixel: true });
     }
   }
 
@@ -707,7 +707,7 @@ export class BattleScene implements Scene {
     const app = this.app;
     const fb = app.fb;
     const { W } = app;
-    drawText(fb, 'VICTORY!', W / 2, py + 6, C.sun, { align: 'center', scale: 2, outline: C.ink });
+    drawText(fb, 'VICTORY!', W / 2, py + 6, C.sun, { align: 'center', scale: 2, outline: C.ink, pixel: true });
     drawText(fb, 'New spell cards:', W / 2, py + 40, C.mist, { align: 'center' });
     const words = [...this.used.values()].slice(0, 6);
     const cols = Math.min(words.length, 3);

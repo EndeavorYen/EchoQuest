@@ -185,7 +185,7 @@ export class ScanScene implements Scene {
         sfx.play('back');
         app.go(new MapScene(app));
       });
-      partyRow(app, 90, -1);
+      partyRow(app, 112, -1);
       return;
     }
 

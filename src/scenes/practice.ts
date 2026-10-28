@@ -183,7 +183,7 @@ export class PracticeScene implements Scene {
       const msg = this.result === 'perfect' ? 'PERFECT!' : this.result === 'good' ? 'GOOD!' : 'Not quite…';
       const col = this.result === 'perfect' ? C.sun : this.result === 'good' ? C.ice : C.orange;
       const pop = this.result === 'miss' ? 0 : Math.max(0, 3 - Math.floor(this.resultT * 14));
-      drawText(fb, msg, W / 2, by - 6 - pop, col, { align: 'center', scale: 2, outline: C.ink });
+      drawText(fb, msg, W / 2, by - 6 - pop, col, { align: 'center', scale: 2, outline: C.ink, pixel: true });
       if (this.result === 'miss') drawText(fb, `I heard “${this.heard || '…'}”`, W / 2, by + 16, C.mist, { align: 'center', outline: C.ink });
       app.ui.button(fb, 20, H - 40, W - 40, 24, 'NEXT', BTN.primary, () => {
         sfx.play('select');

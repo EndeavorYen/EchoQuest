@@ -56,12 +56,12 @@ export class TitleScene implements Scene {
 
     // ---- logo
     const wave = (text: string, y: number, color: number, shadow: number, scale: number) => {
-      const total = measure(text, scale, 1);
+      const total = measure(text, scale, 1, true);
       let x = Math.round((W - total) / 2);
       let i = 0;
       for (const ch of text) {
         const dy = bob(app.t, 2, 3, i * 0.7);
-        const w = drawText(fb, ch, x, y + dy, color, { scale, outline: C.ink, shadow });
+        const w = drawText(fb, ch, x, y + dy, color, { scale, outline: C.ink, shadow, pixel: true });
         x += w + scale + 1;
         i += 1;
       }
@@ -118,10 +118,10 @@ export class TitleScene implements Scene {
 
     // ---- sound toggles
     const tog = (x: number, on: boolean, label: string, cb: () => void) => {
-      app.ui.button(fb, x, 6, 22, 16, label, on ? BTN.gray : BTN.dark, cb);
+      app.ui.button(fb, x, 6, 26, 16, label, on ? BTN.gray : BTN.dark, cb);
     };
-    tog(W - 50, app.save.sound, app.save.sound ? 'SFX' : 'sfx', () => { sfx.unlock(); app.setSound(!app.save.sound); sfx.play('tap'); });
-    tog(W - 26, app.save.music, app.save.music ? 'BGM' : 'bgm', () => {
+    tog(W - 58, app.save.sound, app.save.sound ? 'SFX' : 'sfx', () => { sfx.unlock(); app.setSound(!app.save.sound); sfx.play('tap'); });
+    tog(W - 30, app.save.music, app.save.music ? 'BGM' : 'bgm', () => {
       sfx.unlock();
       app.setMusic(!app.save.music);
       sfx.refreshMusic();

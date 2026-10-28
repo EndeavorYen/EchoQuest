@@ -1,0 +1,17 @@
+/* Only the Latin + punctuation shards of Fusion Pixel are needed: pixel text is used for display headings only. */
+@font-face {
+  font-family: "EQ Pixel";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("@vp-tw/cjk-web-fonts-fusion-pixel-font/dist/12px/proportional/zh_hant/Fusion-Pixel-12px-Proportional-Traditional-Chinese.Basic-Latin.woff2") format("woff2");
+  unicode-range: U+20-7E;
+}
+@font-face {
+  font-family: "EQ Pixel";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("@vp-tw/cjk-web-fonts-fusion-pixel-font/dist/12px/proportional/zh_hant/Fusion-Pixel-12px-Proportional-Traditional-Chinese.General-Punctuation.woff2") format("woff2");
+  unicode-range: U+2000-206F;
+}
