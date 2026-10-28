@@ -17,6 +17,7 @@ import { BattleScene } from './battle';
 type Mode = 'ask' | 'live' | 'fallback' | 'scan' | 'reveal';
 
 export class ScanScene implements Scene {
+  readonly id = 'scan';
   private mode: Mode = 'ask';
   private live: FB | null = null;
   private lastGrab = 0;
@@ -218,7 +219,7 @@ export class ScanScene implements Scene {
       fb.disc(cx, cy + (pressed ? 1 : 0), 15, pressed ? C.orange : C.sun);
       fb.ring(cx, cy, 15, C.orange);
       drawText(fb, 'SCAN', cx, cy - 7 + (pressed ? 1 : 0), C.ink, { align: 'center' });
-      app.ui.zone(cx - 22, cy - 22, 44, 44, () => this.capture());
+      app.ui.zone(cx - 22, cy - 22, 44, 44, () => this.capture(), 'shutter');
       app.ui.button(fb, 6, H - 22, 30, 14, 'BACK', BTN.dark, () => {
         sfx.play('back');
         app.go(new MapScene(app));

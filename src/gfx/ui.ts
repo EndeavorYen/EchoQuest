@@ -21,7 +21,7 @@ export const BTN = {
 } satisfies Record<string, BtnStyle>;
 
 interface Hit {
-  x: number; y: number; w: number; h: number; cb: () => void;
+  x: number; y: number; w: number; h: number; cb: () => void; label?: string;
 }
 
 export interface ButtonOpts {
@@ -31,6 +31,8 @@ export interface ButtonOpts {
   /** extra pixel offset for the label (e.g. a bounce) */
   dy?: number;
   textScale?: number;
+  /** test-facing name for icon-only buttons */
+  name?: string;
 }
 
 /**
@@ -49,8 +51,14 @@ export class UI {
     this.hits = [];
   }
 
-  zone(x: number, y: number, w: number, h: number, cb: () => void): void {
-    this.hits.push({ x, y, w, h, cb });
+  /** `label` only names the zone for automated tests (see `list`). */
+  zone(x: number, y: number, w: number, h: number, cb: () => void, label?: string): void {
+    this.hits.push({ x, y, w, h, cb, label });
+  }
+
+  /** The tappable zones drawn in the last frame (used by the end-to-end tests). */
+  list(): Array<{ x: number; y: number; w: number; h: number; label?: string }> {
+    return this.hits.map(({ x, y, w, h, label }) => ({ x, y, w, h, label }));
   }
 
   /** Invoke the top-most zone under the point. Returns whether anything was hit. */
@@ -96,7 +104,7 @@ export class UI {
       const ty = y + Math.round((h - 14 * sc) / 2) + dy;
       drawText(fb, label, x + Math.round((w - tw) / 2), ty, o.disabled ? C.slate : st.text, { scale: sc, shadow: o.disabled ? undefined : st.dark });
     }
-    if (!o.disabled) this.zone(x, y, w, h, cb);
+    if (!o.disabled) this.zone(x, y, w, h, cb, o.name ?? label);
   }
 }
 

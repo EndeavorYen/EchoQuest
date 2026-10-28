@@ -60,6 +60,11 @@ export class Screen {
     this.onResize?.();
   }
 
+  /** Framebuffer coordinates → window (CSS px). */
+  toClient(lx: number, ly: number): { x: number; y: number } {
+    return { x: (this.offX + lx * this.scale) / this.dpr, y: (this.offY + ly * this.scale) / this.dpr };
+  }
+
   /** Window (CSS px) → framebuffer coordinates. */
   toLogical(clientX: number, clientY: number): { x: number; y: number } {
     return {

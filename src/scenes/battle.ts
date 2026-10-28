@@ -44,6 +44,7 @@ const DEFENSE_TIME: Record<number, number> = { 1: 0, 2: 8, 3: 7, 4: 6 };
 const LEVEL_COLOR: Record<number, PalIndex> = { 1: C.lime, 2: C.sun, 3: C.ice, 4: C.orange };
 
 export class BattleScene implements Scene {
+  readonly id = 'battle';
   private b: Battle;
   private speaker: Speaker;
   private phase: Phase = 'intro';
@@ -636,7 +637,7 @@ export class BattleScene implements Scene {
       const tagC = c.tag === 'easy' ? C.lime : c.tag === 'mid' ? C.sun : C.orange;
       drawText(fb, tag, cx + cw - 5, cy + 4 + oy, tagC, { align: 'right', outline: C.navy });
       drawText(fb, `${BASE_DAMAGE[c.word.lv]}`, cx + cw - 5, cy + 20 + oy, C.snow, { align: 'right', outline: C.navy });
-      app.ui.zone(cx, cy, cw, 37, () => this.selectCard(c));
+      app.ui.zone(cx, cy, cw, 37, () => this.selectCard(c), 'card');
     });
   }
 
@@ -668,8 +669,8 @@ export class BattleScene implements Scene {
       micButton(app, Math.round(W / 2), py + 117, this.speaker, () => this.mic(), 14, shield);
     }
     // hear again / keyboard
-    app.ui.button(fb, W - 34, py + 98, 26, 20, '', BTN.blue, () => { sfx.unlock(); sfx.play('tap'); say(word.w); }, { icon: ICON.speaker });
-    app.ui.button(fb, 8, py + 98, 26, 20, '', BTN.gray, () => this.toggleTyping(), { icon: ICON.kbd });
+    app.ui.button(fb, W - 34, py + 98, 26, 20, '', BTN.blue, () => { sfx.unlock(); sfx.play('tap'); say(word.w); }, { icon: ICON.speaker, name: 'hear' });
+    app.ui.button(fb, 8, py + 98, 26, 20, '', BTN.gray, () => this.toggleTyping(), { icon: ICON.kbd, name: 'keyboard' });
   }
 
   private drawSpeak(py: number): void {

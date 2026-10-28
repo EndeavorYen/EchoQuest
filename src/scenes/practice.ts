@@ -20,6 +20,7 @@ import { TitleScene } from './title';
  * each player's mastery, so it feeds the real game's card selection.
  */
 export class PracticeScene implements Scene {
+  readonly id = 'practice';
   private speaker: Speaker;
   private word: Word | null = null;
   private recent: string[] = [];
@@ -151,8 +152,8 @@ export class PracticeScene implements Scene {
     app.ui.zone(4, 24, 90, 32, () => this.cycleActive());
     drawText(fb, p.name, 8 + sp.w + 4, 28, C.snow, { outline: C.ink });
     drawText(fb, app.save.players.length > 1 ? '點我換人' : '', 8 + sp.w + 4, 42, C.slate);
-    app.ui.button(fb, W - 88, 28, 16, 15, '', BTN.gray, () => this.changeLv(-1), { icon: ICON.arrowL, disabled: this.lv <= 1 });
-    app.ui.button(fb, W - 22, 28, 16, 15, '', BTN.gray, () => this.changeLv(1), { icon: ICON.arrowR, disabled: this.lv >= 4 });
+    app.ui.button(fb, W - 88, 28, 16, 15, '', BTN.gray, () => this.changeLv(-1), { icon: ICON.arrowL, disabled: this.lv <= 1, name: 'level-' });
+    app.ui.button(fb, W - 22, 28, 16, 15, '', BTN.gray, () => this.changeLv(1), { icon: ICON.arrowR, disabled: this.lv >= 4, name: 'level+' });
     drawText(fb, LEVELS[this.lv - 1].name, W - 55, 29, C.sun, { align: 'center' });
     levelPips(fb, W - 62, 45, this.lv);
 
@@ -189,7 +190,7 @@ export class PracticeScene implements Scene {
         sfx.play('select');
         this.next();
       });
-      app.ui.button(fb, W - 34, H - 72, 26, 20, '', BTN.blue, () => { sfx.unlock(); say(w.w); }, { icon: ICON.speaker });
+      app.ui.button(fb, W - 34, H - 72, 26, 20, '', BTN.blue, () => { sfx.unlock(); say(w.w); }, { icon: ICON.speaker, name: 'hear' });
       if (this.result === 'miss') {
         app.ui.button(fb, 8, H - 72, 60, 20, 'RETRY', BTN.green, () => {
           sfx.play('tap');
@@ -210,8 +211,8 @@ export class PracticeScene implements Scene {
       }
       micButton(app, Math.round(W / 2), H - 54, this.speaker, () => this.mic(), 18);
     }
-    app.ui.button(fb, W - 34, H - 68, 26, 20, '', BTN.blue, () => { sfx.unlock(); sfx.play('tap'); say(w.w); }, { icon: ICON.speaker });
-    app.ui.button(fb, 8, H - 68, 26, 20, '', BTN.gray, () => this.toggleTyping(), { icon: ICON.kbd });
+    app.ui.button(fb, W - 34, H - 68, 26, 20, '', BTN.blue, () => { sfx.unlock(); sfx.play('tap'); say(w.w); }, { icon: ICON.speaker, name: 'hear' });
+    app.ui.button(fb, 8, H - 68, 26, 20, '', BTN.gray, () => this.toggleTyping(), { icon: ICON.kbd, name: 'keyboard' });
   }
 
   private changeLv(d: number): void {

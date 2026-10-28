@@ -22,6 +22,7 @@ function nodePos(app: App, i: number, total: number): { x: number; y: number } {
 }
 
 export class MapScene implements Scene {
+  readonly id = 'map';
   private walk = 1;
   private from = 0;
 
@@ -111,7 +112,7 @@ export class MapScene implements Scene {
       fb.disc(x, y + oy, r - 1, face);
       const icon = done ? ICON.check : n.type === 'chest' ? ICON.chest : n.type === 'boss' ? ICON.skull : ICON.question;
       fb.blit(icon, x - Math.floor(icon.w / 2), y - Math.floor(icon.h / 2) + oy, { alpha: done || cur ? 16 : 7 });
-      if (cur) app.ui.zone(x - 14, y - 14, 28, 28, () => this.go());
+      if (cur) app.ui.zone(x - 14, y - 14, 28, 28, () => this.go(), 'node');
     });
 
     // ---- the party token walks along the trail
@@ -206,6 +207,7 @@ function drawChest(fb: FB, cx: number, by: number, open: number): void {
 }
 
 export class ChestScene implements Scene {
+  readonly id = 'chest';
   private phase: 'closed' | 'opening' | 'open' = 'closed';
   private t = 0;
   private relic: ReturnType<typeof nextRelic>;
@@ -289,6 +291,7 @@ export class ChestScene implements Scene {
 // ---------------------------------------------------------------------------
 
 export class FinishScene implements Scene {
+  readonly id = 'finish';
   private t = 0;
   private done = false;
 
@@ -298,6 +301,12 @@ export class FinishScene implements Scene {
     sfx.setMusic('map');
     sfx.play('win');
     this.app.fx.flash(C.snow, 0.4);
+    // count the finished trek right away: a quick tap on NEW TREK must not skip it
+    if (!this.done) {
+      this.done = true;
+      this.app.save = { ...this.app.save, treks: this.app.save.treks + 1, run: null };
+      this.app.persist();
+    }
   }
 
   update(dt: number): void {
@@ -305,12 +314,6 @@ export class FinishScene implements Scene {
     const app = this.app;
     if (Math.floor(this.t * 12) !== Math.floor((this.t - dt) * 12)) {
       app.fx.burst(app.rng.range(20, app.W - 20), app.rng.range(30, 120), 8, [C.sun, C.orange, C.ice, C.lime, C.berry, C.snow], 70, 90, 1);
-    }
-    if (!this.done && this.t > 0.2) {
-      this.done = true;
-      const app2 = this.app;
-      app2.save = { ...app2.save, treks: app2.save.treks + 1, run: null };
-      app2.persist();
     }
   }
 

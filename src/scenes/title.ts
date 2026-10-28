@@ -14,6 +14,7 @@ import { MapScene } from './map';
 import { PracticeScene } from './practice';
 
 export class TitleScene implements Scene {
+  readonly id = 'title';
   private mascot: Monster;
   private friends: Monster[];
   private blink = 0;

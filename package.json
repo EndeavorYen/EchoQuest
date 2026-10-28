@@ -9,13 +9,15 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@vp-tw/cjk-web-fonts-fusion-pixel-font": "0.0.1"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^1.0.13",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.5",
     "tsx": "^4.23.15",
     "typescript": "^5.5.3",

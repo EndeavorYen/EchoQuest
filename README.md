@@ -20,7 +20,8 @@ English words out loud**. Win fights to walk a map toward the treasure.
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test
+npm test         # unit tests
+npm run test:e2e # plays the whole game in a phone-sized browser (fake mic + camera)
 npm run build    # static site in dist/
 ```
 

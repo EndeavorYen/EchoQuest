@@ -10,6 +10,8 @@ import type { Player } from '../game/model';
 import { Rng } from '../util/rng';
 
 export interface Scene {
+  /** stable name (class names are minified in production); used by the end-to-end tests */
+  readonly id?: string;
   enter?(): void;
   leave?(): void;
   update(dt: number): void;

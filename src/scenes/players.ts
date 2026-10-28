@@ -13,6 +13,7 @@ import { backdrop, levelPips } from './common';
  * time — a parent who wants to revise can simply set themselves to 高中.
  */
 export class PlayersScene implements Scene {
+  readonly id = 'players';
   constructor(private app: App, private back: () => void) {}
 
   enter(): void {
@@ -71,8 +72,8 @@ export class PlayersScene implements Scene {
       drawText(fb, '點名字可換', 46, y + 19, C.mist);
       // level
       const ly = y + 35;
-      app.ui.button(fb, 14, ly, 18, 15, '', BTN.gray, () => this.change(i, -1), { icon: ICON.arrowL, disabled: p.level <= 1 });
-      app.ui.button(fb, W - 8 - 5 - 18, ly, 18, 15, '', BTN.gray, () => this.change(i, 1), { icon: ICON.arrowR, disabled: p.level >= 4 });
+      app.ui.button(fb, 14, ly, 18, 15, '', BTN.gray, () => this.change(i, -1), { icon: ICON.arrowL, disabled: p.level <= 1, name: `level-${i}` });
+      app.ui.button(fb, W - 8 - 5 - 18, ly, 18, 15, '', BTN.gray, () => this.change(i, 1), { icon: ICON.arrowR, disabled: p.level >= 4, name: `level+${i}` });
       const info = LEVELS[p.level - 1];
       drawText(fb, `Lv.${p.level} ${info.name}`, W / 2, ly + 1, C.sun, { align: 'center' });
       levelPips(fb, W - 8 - 5 - 15, y + 24, p.level);

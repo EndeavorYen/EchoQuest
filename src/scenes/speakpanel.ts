@@ -25,7 +25,7 @@ export function micButton(app: App, cx: number, cy: number, speaker: Speaker, on
   if (!pressed) fb.ring(cx, cy, r - 1, hi);
   const icon = shield ? ICON.shield : ICON.mic;
   fb.blit(icon, cx - Math.floor(icon.w / 2), cy - Math.floor(icon.h / 2) + oy);
-  app.ui.zone(cx - r - 4, cy - r - 4, (r + 4) * 2, (r + 4) * 2, onTap);
+  app.ui.zone(cx - r - 4, cy - r - 4, (r + 4) * 2, (r + 4) * 2, onTap, 'mic');
 }
 
 export function statusLine(app: App, speaker: Speaker, y: number, idle: string): void {
