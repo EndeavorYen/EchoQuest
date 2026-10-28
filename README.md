@@ -34,4 +34,4 @@ HTTPS). Where it's unavailable or the mic is blocked, a typing box takes over.
   generated in code (no image or audio assets).
 - Pixel font: [Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font) (OFL).
 - Add `?debug` to the URL to expose the app as `window.__eq` for automated tests.
-- Deployed by `.github/workflows/deploy.yml` (GitHub Pages, source: GitHub Actions).
+- Deploy: import the repo in Vercel (it's a plain Vite static site; `vercel.json` sets the build and allows camera/microphone). CI (`.github/workflows/ci.yml`) runs tests and a build on every PR.
