@@ -8,13 +8,15 @@ export type ScreenName = 'home' | 'trek' | 'scan' | 'battle' | 'dex' | 'party' |
 export interface ScanParams {
   kind: 'trek' | 'toddler';
   boss?: boolean;
+  /** the champion at the end of a region (a boss, but the last one) */
+  final?: boolean;
   rare?: boolean;
   /** the creature to meet (the trek decides it from the place); without it the scan screen picks one with the camera */
   foe?: Mon;
   /** the ground the encounter happens on: decides who lives there when the party does not use the camera */
   place?: { key: 'meadow' | 'forest' | 'lake' | 'cave' | 'gym'; types: string[]; maxRarity: number; minRarity?: number; label?: string; icon?: string };
 }
-export interface BattleParams { foe: Mon; boss?: boolean; trek?: boolean }
+export interface BattleParams { foe: Mon; boss?: boolean; final?: boolean; trek?: boolean }
 export interface ScreenParams { scan?: ScanParams; battle?: BattleParams; toddler?: { foe?: Mon; book?: boolean } }
 
 export interface Ctx {

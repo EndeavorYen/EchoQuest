@@ -1,6 +1,7 @@
 import { nextRelic } from '../../game/run';
 import { retreat, winEntering } from '../../game/townmap';
 import { sfx } from '../../audio/sfx';
+import { battleTrack } from '../../audio/songs';
 import { BattleView } from '../battle-view';
 import { BattleController } from '../battle-controller';
 import { pickWild, TYPES } from '../../mon/dex';
@@ -10,8 +11,8 @@ import type { BattleParams, ScreenFactory } from '../ctx';
 export const battle: ScreenFactory = (root, ctx, params: BattleParams) => {
   const view = new BattleView(root);
   const ctl = new BattleController(view, ctx.save, ctx.rec, (s) => ctx.update(() => s));
-  sfx.setMusic('battle');
   const boss = !!params.boss;
+  sfx.setMusic(battleTrack(boss, !!params.final));
   let finished = false;
 
   ctl.onWin = (foe) => {

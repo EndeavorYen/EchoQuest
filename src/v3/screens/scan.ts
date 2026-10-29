@@ -92,7 +92,8 @@ export const scan: ScreenFactory = (root, ctx, params: ScanParams) => {
       </div>
       <button class="btn" id="go" disabled>${params.kind === 'toddler' ? '一起玩！' : params.boss ? '挑戰首領！' : '戰鬥！'}</button>
       ${params.foe ? '' : '<button class="btn ghost" id="again">再拍一次</button>'}</div>`;
-    sfx.play('appear');
+    if (params.boss) sfx.play('boss', params.final ? 1 : 0);
+    else sfx.play('appear');
     if (word && params.kind === 'toddler') say(word.en, 0.7);
     window.setTimeout(() => {
       const art = root.querySelector('#art') as HTMLImageElement | null;
@@ -104,7 +105,7 @@ export const scan: ScreenFactory = (root, ctx, params: ScanParams) => {
     }, 900);
     root.querySelector('#go')!.addEventListener('click', () => {
       if (params.kind === 'toddler') ctx.go('toddler', { foe: mon });
-      else ctx.go('battle', { foe: mon, boss: !!params.boss, trek: true });
+      else ctx.go('battle', { foe: mon, boss: !!params.boss, final: !!params.final, trek: true });
     });
     root.querySelector('#again')?.addEventListener('click', () => ask());
   }

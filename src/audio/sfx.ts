@@ -3,42 +3,21 @@
  * are no audio files to download and everything has that 8-bit bleep.
  */
 
+import { HOLD, SONGS, type SongName } from './songs';
+
 type Wave = 'square' | 'triangle' | 'sawtooth' | 'sine';
 
 export type SfxName =
   | 'tap' | 'select' | 'back' | 'listen' | 'hit' | 'perfect' | 'good' | 'miss' | 'combo'
   | 'appear' | 'monsterAttack' | 'warn' | 'shield' | 'block' | 'hurt' | 'win' | 'chest'
-  | 'step' | 'scan' | 'shutter' | 'heal' | 'boss';
+  | 'step' | 'scan' | 'shutter' | 'heal' | 'boss'
+  | 'dodge' | 'reflect' | 'shieldBreak' | 'status' | 'lose';
 
 const midiToHz = (m: number): number => 440 * Math.pow(2, (m - 69) / 12);
 
-type Song = { bpm: number; lead: Array<number | null>; bass: Array<number | null> };
-
-// 32 eighth-note steps each. null = rest. Numbers are MIDI notes.
-const SONGS: Record<'map' | 'battle', Song> = {
-  map: {
-    bpm: 104,
-    lead: [
-      72, null, 76, null, 79, null, 76, null, 81, null, 79, null, 76, 74, null, null,
-      72, null, 76, null, 79, null, 84, null, 83, null, 79, null, 76, 74, 72, null,
-    ],
-    bass: [
-      48, null, 55, null, 48, null, 55, null, 45, null, 52, null, 45, null, 52, null,
-      41, null, 48, null, 41, null, 48, null, 43, null, 50, null, 43, null, 50, null,
-    ],
-  },
-  battle: {
-    bpm: 148,
-    lead: [
-      69, 72, 76, 72, 69, 72, 76, 72, 67, 71, 74, 71, 67, 71, 74, 71,
-      65, 69, 72, 69, 65, 69, 72, 69, 64, 68, 71, 68, 64, 68, 71, 76,
-    ],
-    bass: [
-      45, 45, null, 45, 45, null, 45, 45, 43, 43, null, 43, 43, null, 43, 43,
-      41, 41, null, 41, 41, null, 41, 41, 40, 40, null, 40, 40, null, 40, 52,
-    ],
-  },
-};
+/** Music sits well under the effects so a spoken answer and its feedback are never drowned out. */
+export const MASTER_GAIN = 0.32;
+export const MUSIC_GAIN = 0.22;
 
 class Sfx {
   private ctx: AudioContext | null = null;
@@ -47,7 +26,7 @@ class Sfx {
   private noiseBuf: AudioBuffer | null = null;
   enabled = true;
   musicOn = true;
-  private song: 'map' | 'battle' | null = null;
+  private song: SongName | null = null;
   private step = 0;
   private nextTime = 0;
   private timer: number | null = null;
@@ -59,10 +38,10 @@ class Sfx {
       if (!AC) return;
       this.ctx = new AC();
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.32;
+      this.master.gain.value = MASTER_GAIN;
       this.master.connect(this.ctx.destination);
       this.musicGain = this.ctx.createGain();
-      this.musicGain.gain.value = 0.35;
+      this.musicGain.gain.value = MUSIC_GAIN;
       this.musicGain.connect(this.master);
       const len = this.ctx.sampleRate;
       this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
@@ -89,7 +68,7 @@ class Sfx {
     o.stop(t0 + dur + 0.02);
   }
 
-  private noise(dur: number, vol: number, when = 0, lowpass = 3000): void {
+  private noise(dur: number, vol: number, when = 0, lowpass = 3000, dest?: AudioNode): void {
     if (!this.ctx || !this.master || !this.noiseBuf) return;
     const t0 = this.ctx.currentTime + when;
     const src = this.ctx.createBufferSource();
@@ -102,7 +81,7 @@ class Sfx {
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     src.connect(f);
     f.connect(g);
-    g.connect(this.master);
+    g.connect(dest ?? this.master);
     src.start(t0);
     src.stop(t0 + dur + 0.02);
   }
@@ -127,9 +106,15 @@ class Sfx {
         this.tone(n(91), 0.16, 'square', 0.2, 0.58);
         break;
       case 'boss':
-        this.tone(n(36), 0.9, 'sawtooth', 0.25, 0, n(30));
-        this.tone(n(43), 0.9, 'square', 0.18, 0.1, n(38));
-        this.noise(0.6, 0.25, 0, 600);
+        // arg 1 is the champion: lower, longer, with an extra rising sting
+        this.tone(n(36), 0.9, 'sawtooth', 0.3, 0, n(30));
+        this.tone(n(43), 0.9, 'square', 0.22, 0.1, n(38));
+        this.noise(0.6, 0.32, 0, 600);
+        [55, 58, 62, 67].forEach((m, i) => this.tone(n(m), 0.14, 'square', 0.26, 0.55 + i * 0.1));
+        if (arg) {
+          this.tone(n(31), 1.2, 'sawtooth', 0.28, 0.2, n(26));
+          [67, 70, 74, 79, 82].forEach((m, i) => this.tone(n(m), 0.12, 'square', 0.24, 1.0 + i * 0.08));
+        }
         break;
       case 'hit': {
         const base = 220 + arg * 90;
@@ -189,11 +174,85 @@ class Sfx {
         for (let i = 0; i < 7; i++) this.tone(n(84 + (i % 4) * 3), 0.1, 'square', 0.2, i * 0.06);
         break;
       case 'step': this.tone(n(64 + (arg % 4) * 2), 0.06, 'square', 0.2); break;
+      case 'dodge':
+        this.noise(0.22, 0.35, 0, 2500);
+        this.tone(n(72), 0.22, 'triangle', 0.3, 0, n(91));
+        break;
+      case 'reflect':
+        this.tone(n(96), 0.07, 'square', 0.3);
+        this.tone(n(84), 0.07, 'square', 0.3, 0.07);
+        this.tone(n(91), 0.07, 'square', 0.3, 0.14);
+        this.tone(n(100), 0.2, 'triangle', 0.35, 0.21, n(88));
+        break;
+      case 'shieldBreak': {
+        // arg 0: a crack; arg 1: the whole layer shatters
+        this.noise(arg ? 0.35 : 0.14, arg ? 0.55 : 0.4, 0, 8000);
+        this.tone(n(arg ? 96 : 88), arg ? 0.3 : 0.12, 'square', 0.3, 0, n(arg ? 60 : 76));
+        if (arg) [91, 84, 79, 72].forEach((m, i) => this.tone(n(m), 0.1, 'triangle', 0.3, 0.05 + i * 0.05));
+        break;
+      }
+      case 'status': {
+        // each condition has its own colour of sound; arg picks it
+        const base = 60 + (arg % 7) * 2;
+        this.tone(n(base + 12), 0.12, 'square', 0.22, 0, n(base + 5));
+        this.tone(n(base + 7), 0.12, 'triangle', 0.3, 0.1, n(base));
+        this.tone(n(base + 12), 0.2, 'triangle', 0.3, 0.2, n(base + 3));
+        break;
+      }
+      case 'lose':
+        [67, 64, 60, 55].forEach((m, i) => this.tone(n(m), 0.28, 'triangle', 0.34, i * 0.22, n(m - 2)));
+        this.tone(n(43), 0.9, 'square', 0.14, 0.5, n(38));
+        break;
+    }
+  }
+
+  /** The sound of a spell, by the look of its move (flame, bubble, bolt…). */
+  cast(style: string): void {
+    if (!this.enabled || !this.ctx) return;
+    const n = midiToHz;
+    switch (style) {
+      case 'flame':
+        this.noise(0.45, 0.4, 0, 1800);
+        this.tone(n(55), 0.4, 'sawtooth', 0.2, 0, n(79));
+        break;
+      case 'bubble': case 'wave': case 'jet':
+        [72, 76, 79, 84].forEach((m, i) => this.tone(n(m), 0.09, 'sine', 0.38, i * 0.06, n(m + 5)));
+        if (style !== 'bubble') this.noise(0.35, 0.22, 0.05, 1400);
+        break;
+      case 'bolt':
+        [96, 84, 98, 82, 100].forEach((m, i) => this.tone(n(m), 0.045, 'square', 0.26, i * 0.04));
+        this.noise(0.1, 0.3, 0.18, 7000);
+        break;
+      case 'ice':
+        [100, 96, 103, 98, 107].forEach((m, i) => this.tone(n(m), 0.14, 'triangle', 0.3, i * 0.05));
+        break;
+      case 'leaf': case 'swarm':
+        for (let i = 0; i < 6; i++) this.tone(n(79 + (i % 3) * 4), 0.05, 'square', 0.16, i * 0.045);
+        this.noise(0.25, 0.14, 0, 3500);
+        break;
+      case 'boulder': case 'fist':
+        this.tone(n(40), 0.25, 'square', 0.34, 0, n(30));
+        this.noise(0.18, 0.4, 0, 700);
+        break;
+      case 'tornado':
+        this.tone(n(52), 0.55, 'sawtooth', 0.18, 0, n(80));
+        this.tone(n(80), 0.3, 'sawtooth', 0.14, 0.4, n(55));
+        this.noise(0.6, 0.18, 0, 2000);
+        break;
+      case 'crescent': case 'wisp':
+        this.tone(n(79), 0.5, 'triangle', 0.3, 0, n(60));
+        this.tone(n(67), 0.5, 'triangle', 0.22, 0.12, n(48));
+        break;
+      case 'ricochet':
+        [93, 88, 93, 86, 93].forEach((m, i) => this.tone(n(m), 0.05, 'square', 0.24, i * 0.07));
+        break;
+      default: // star, charm, twin and anything new
+        [84, 88, 91, 96].forEach((m, i) => this.tone(n(m), 0.1, 'triangle', 0.3, i * 0.06));
     }
   }
 
   // ---- music ----
-  setMusic(which: 'map' | 'battle' | null): void {
+  setMusic(which: SongName | null): void {
     if (this.song === which) return;
     this.song = which;
     this.step = 0;
@@ -206,18 +265,34 @@ class Sfx {
     this.timer = window.setInterval(() => this.schedule(), 80);
   }
 
+  /** The tune that is playing (or should be, once the browser lets audio start). */
+  get playing(): SongName | null {
+    return this.song;
+  }
+
   private schedule(): void {
     if (!this.ctx || !this.song || !this.musicGain) return;
-    const song = SONGS[this.song];
+    const song = SONGS[this.song] as import('./songs').Song;
     const eighth = 60 / song.bpm / 2;
+    const len = song.lead.length;
+    // how many steps a note lasts: itself plus the holds that follow it
+    const span = (line: Array<number | null>, i: number): number => {
+      let k = 1;
+      while (line[(i + k) % len] === HOLD && k < len) k++;
+      return k;
+    };
     while (this.nextTime < this.ctx.currentTime + 0.25) {
-      const i = this.step % song.lead.length;
+      const i = this.step % len;
       const when = Math.max(0, this.nextTime - this.ctx.currentTime);
       if (this.enabled && this.musicOn) {
         const l = song.lead[i];
         const b = song.bass[i];
-        if (l !== null) this.tone(midiToHz(l), eighth * 0.9, 'square', 0.16, when, undefined, this.musicGain);
-        if (b !== null) this.tone(midiToHz(b), eighth * 1.6, 'triangle', 0.3, when, undefined, this.musicGain);
+        if (l !== null && l !== HOLD) this.tone(midiToHz(l), eighth * span(song.lead, i) * 0.92, 'square', 0.16, when, undefined, this.musicGain);
+        if (b !== null && b !== HOLD) this.tone(midiToHz(b), eighth * Math.max(1.6, span(song.bass, i) * 0.95), 'triangle', 0.3, when, undefined, this.musicGain);
+        const d = song.drums?.[i];
+        if (d === 'k') this.tone(130, 0.11, 'triangle', 0.5, when, 45, this.musicGain);
+        else if (d === 's') this.noise(0.1, 0.35, when, 5000, this.musicGain);
+        else if (d === 'h') this.noise(0.035, 0.12, when, 9000, this.musicGain);
       }
       this.nextTime += eighth;
       this.step += 1;

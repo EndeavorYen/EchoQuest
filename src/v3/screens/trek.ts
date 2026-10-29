@@ -7,11 +7,14 @@ import { artUrl, DEX, pickEncounter, TYPES } from '../../mon/dex';
 import type { Habitat } from '../../mon/habitat';
 import { partnerMon } from '../partner';
 import { sfx } from '../../audio/sfx';
+import { mapTrack, type Scene } from '../../audio/songs';
 import { bar, esc, type ScanParams, type ScreenFactory } from '../ctx';
 
 /** the zoom the player last used on the map: 1 = the map fills the width, and it stays that way between visits */
 let lastZoom = 1.6;
 const MIN_ZOOM = 1, MAX_ZOOM = 2.5;
+/** each change of scenery to open country moves on to the other outdoor tune */
+let tuneVisit = 0;
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => window.setTimeout(r, ms));
 
@@ -23,15 +26,15 @@ function sceneOf(m: TownMap, n: MapNode, foe: number): ScanParams {
   const mon = DEX.find((d) => d.id === foe)!;
   const boss = n.kind === 'city' || n.kind === 'league';
   const key = n.kind === 'wild' ? HABITAT[m.roads[n.road].kind] : n.kind === 'cave' || n.kind === 'forest' || n.kind === 'lake' ? n.kind : 'gym';
-  return { kind: 'trek', boss, foe: mon, place: { key, types: n.types, maxRarity: 5, label: n.name, icon: n.kind === 'wild' ? undefined : n.icon } };
+  return { kind: 'trek', boss, final: n.kind === 'league', foe: mon, place: { key, types: n.types, maxRarity: 5, label: n.name, icon: n.kind === 'wild' ? undefined : n.icon } };
 }
 
 /** The town map: tap a place next to where you are, go there, and meet whoever lives there. */
 export const trek: ScreenFactory = (root, ctx) => {
   if (!ctx.save.townmap) ctx.update((s) => ({ ...s, townmap: generateTownMap(Math.floor(Math.random() * 2 ** 31)) }));
   else if (ctx.save.townmap.entering !== null) ctx.update((s) => ({ ...s, townmap: retreat(s.townmap!) })); // came back without winning
-  sfx.setMusic('map');
   let dead = false;
+  let scene: Scene | null = null;
   let busy = false;
   let picked: number | null = null;
   const M = (): TownMap => ctx.save.townmap!;
@@ -166,7 +169,18 @@ export const trek: ScreenFactory = (root, ctx) => {
   const typeDots = (n: MapNode): string => n.types.map((t) => `<b style="background:${TYPES[t]?.color ?? '#999'}" title="${esc(TYPES[t]?.name ?? t)}"></b>`).join('');
   const typeNames = (n: MapNode): string => n.types.map((t) => TYPES[t]?.name ?? t).join('、');
 
+  /** the music follows the ground the party stands on: towns, open country, caves and mountains */
+  function music(): void {
+    const m = M();
+    const n = N(m.at);
+    const now: Scene = n.kind === 'cave' || (n.kind === 'wild' && m.roads[n.road].kind === 'mountain') ? 'cave'
+      : n.kind === 'town' || n.kind === 'city' || n.kind === 'special' || n.kind === 'league' ? 'town' : 'outdoors';
+    if (now !== scene) { scene = now; tuneVisit += 1; }
+    sfx.setMusic(mapTrack(now, tuneVisit));
+  }
+
   function render(): void {
+    music();
     const m = M();
     const here = N(m.at);
     const near = new Set(neighbors(m, m.at));

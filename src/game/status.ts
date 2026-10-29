@@ -31,6 +31,9 @@ export const STATUS: Record<StatusId, StatusInfo> = {
   stun: { id: 'stun', zh: '暈眩', icon: '💥', color: '#8a7f6d', turns: 1, skip: 1 },
 };
 
+/** A stable order for the conditions (the sound of each is picked by its place here). */
+export const STATUS_ORDER = Object.keys(STATUS) as StatusId[];
+
 /** Which condition each type tends to cause. */
 export const TYPE_STATUS: Record<string, StatusId> = {
   fire: 'burn', poison: 'poison', bug: 'poison', electric: 'paralysis', steel: 'paralysis',

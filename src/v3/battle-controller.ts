@@ -1,7 +1,7 @@
 import { Battle } from '../game/battle';
 import { Shield } from '../game/shield';
 import { DEFENSE, rollDefense, type DefenseKind } from '../game/defense';
-import { Afflictions, STATUS, rollStatus } from '../game/status';
+import { Afflictions, STATUS, STATUS_ORDER, rollStatus } from '../game/status';
 import { foeHp, typicalHit, TIRED_ROUND } from './pacing';
 import { dealCard, pickDefenseWord } from '../game/deck';
 import { Revenge, REVENGE_MULT } from '../game/revenge';
@@ -301,6 +301,7 @@ export class BattleController {
     if (outcome === 'bounce') {
       this.mark(this.word, true, tier);
       this.battle.combo = 0;
+      sfx.cast(fx.style);
       this.view.cast('me', fx.style, fx.colors, power, () => {
         sfx.play('shield');
         this.view.blockSpark('foe', '#4a90e2');
@@ -315,6 +316,7 @@ export class BattleController {
     const res = this.battle.attack(this.word, tier, mult);
     if (wasUp && this.battle.monster.hp <= 0) { this.battle.monster.hp = 1; res.killed = false; }
     this.mark(this.word, true, tier, res.damage);
+    sfx.cast(fx.style);
     this.view.cast('me', fx.style, fx.colors, power, () => {
       sfx.play('hit', power === 2 ? 4 : 2);
       this.view.hurt('foe');
@@ -323,7 +325,7 @@ export class BattleController {
       if (outcome === 'break' && sh) {
         this.view.setShields(sh.layers, sh.max);
         this.view.floatText('foe', sh.up ? '護盾裂開了！' : '護盾破了！', '#2e9e5b', true, 54);
-        sfx.play('heal');
+        sfx.play('shieldBreak', sh.up ? 0 : 1);
       }
       this.view.setFoeHp(this.battle.monster.hp, this.battle.monster.maxHp);
       if (!res.killed) this.tryStatus(tier === 'perfect' ? 'perfect' : 'good');
@@ -349,6 +351,7 @@ export class BattleController {
     if (id && this.aff.apply(id)) {
       const st = STATUS[id];
       this.view.floatText('foe', `${st.icon} ${st.zh}！`, st.color, true, 56);
+      sfx.play('status', STATUS_ORDER.indexOf(id));
       this.refreshStatus();
     }
   }
@@ -489,6 +492,7 @@ export class BattleController {
     };
 
     if (!kind) {
+      sfx.cast(foeFx.style);
       this.view.cast('foe', foeFx.style, foeFx.colors, 1, () => {
         sfx.play('hurt');
         this.view.flash('#d9534f', 0.25);
@@ -504,9 +508,10 @@ export class BattleController {
       });
       return;
     }
-    sfx.play('shield');
+    sfx.play(kind === 'dodge' ? 'dodge' : 'shield');
     if (kind === 'counter') {
       // no waiting for the hit: the partner answers with its own move
+      sfx.cast(mine.fx.style);
       this.view.cast('me', mine.fx.style, mine.fx.colors, 2, () => {
         sfx.play('hit', 4);
         label();
@@ -517,6 +522,7 @@ export class BattleController {
     }
     if (kind === 'dodge') this.view.dodge(); else this.view.raiseShield(mine.color);
     window.setTimeout(() => {
+      sfx.cast(foeFx.style);
       this.view.cast('foe', foeFx.style, foeFx.colors, 1, () => {
         if (kind === 'dodge') {
           label();
@@ -529,6 +535,7 @@ export class BattleController {
         label();
         if (kind === 'reflect') {
           // the creature's own move comes back at it
+          sfx.play('reflect');
           this.view.cast('me', foeFx.style, foeFx.colors, 1, () => {
             sfx.play('hit', 2);
             this.view.hurt('foe');
@@ -555,7 +562,8 @@ export class BattleController {
     this.speaker.cancel();
     this.phase = 'lost';
     this.view.setCharging(false);
-    sfx.play('hurt');
+    sfx.setMusic(null);
+    sfx.play('lose');
     this.view.showDefeat(this.foe);
   }
 
@@ -566,6 +574,7 @@ export class BattleController {
     this.stopTimer();
     this.phase = 'victory';
     this.view.faintFoe();
+    sfx.setMusic(null);
     sfx.play('win');
     const seen = new Set<string>();
     const words = this.learned.filter((w) => !seen.has(w.id) && seen.add(w.id));
