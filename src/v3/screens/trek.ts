@@ -1,83 +1,221 @@
-import { arrive, begin, generateTrail, options, stay, type Kind, type Stop, type Trail } from '../../game/trail';
+import {
+  atTown, CELL, canGift, canInfo, canQuiz, catOf, generateTownMap, isBig, isRevealed, kindLabel, moveTo, needsFight, neighbors, progressOf, rememberFoe,
+  retreat, rollRarity, roadIcon, SIZE_NAME, startEntering, takeGift, useInfo, type MapNode, type RoadKind, type TownMap,
+} from '../../game/townmap';
 import { nextRelic } from '../../game/run';
-import { artUrl } from '../../mon/dex';
+import { artUrl, DEX, pickEncounter, TYPES } from '../../mon/dex';
+import type { Habitat } from '../../mon/habitat';
 import { partnerMon } from '../partner';
 import { sfx } from '../../audio/sfx';
-import { bar, esc, type ScreenFactory } from '../ctx';
+import { bar, esc, type ScanParams, type ScreenFactory } from '../ctx';
 
-const ICON: Record<Kind, string> = { start: '🚩', monster: '🐾', rare: '🌟', chest: '🎁', boss: '👑' };
-const LABEL: Record<Kind, string> = { start: '出發點', monster: '野生寶可夢', rare: '稀有寶可夢', chest: '寶箱', boss: '首領' };
-const CTA: Record<Kind, string> = { start: '', monster: '拍照找寶可夢', rare: '拍照找稀有寶可夢', chest: '打開寶箱', boss: '挑戰首領！' };
-const ROW_H = 88;
+const sleep = (ms: number): Promise<void> => new Promise((r) => window.setTimeout(r, ms));
 
-/** The branching trek map: pick which way to go; every map is generated fresh. */
+const HABITAT: Record<RoadKind, Habitat> = { grass: 'meadow', water: 'lake', forest: 'forest', mountain: 'cave' };
+const ROAD_COLOR: Record<RoadKind, string> = { grass: '#e8d28a', water: '#4a90e2', forest: '#3f8f4f', mountain: '#a39aa6' };
+
+/** How the scan screen should present the creature of a node. */
+function sceneOf(m: TownMap, n: MapNode, foe: number): ScanParams {
+  const mon = DEX.find((d) => d.id === foe)!;
+  const boss = n.kind === 'city' || n.kind === 'league';
+  const key = n.kind === 'wild' ? HABITAT[m.roads[n.road].kind] : n.kind === 'cave' || n.kind === 'forest' || n.kind === 'lake' ? n.kind : 'gym';
+  return { kind: 'trek', boss, foe: mon, place: { key, types: n.types, maxRarity: 5, label: n.name, icon: n.kind === 'wild' ? undefined : n.icon } };
+}
+
+/** The town map: tap a place next to where you are, go there, and meet whoever lives there. */
 export const trek: ScreenFactory = (root, ctx) => {
-  if (!ctx.save.trail) ctx.update((s) => ({ ...s, trail: generateTrail(Math.floor(Math.random() * 2 ** 31), s.treks + 1) }));
-  else if (ctx.save.trail.target !== null) ctx.update((s) => ({ ...s, trail: stay(s.trail!) })); // came back from a fight that didn't end in a win
-  const trail: Trail = ctx.save.trail!;
+  if (!ctx.save.townmap) ctx.update((s) => ({ ...s, townmap: generateTownMap(Math.floor(Math.random() * 2 ** 31)) }));
+  else if (ctx.save.townmap.entering !== null) ctx.update((s) => ({ ...s, townmap: retreat(s.townmap!) })); // came back without winning
   sfx.setMusic('map');
-
-  const opts = options(trail);
-  let sel: Stop | null = opts.length === 1 ? opts[0] : null;
-
-  const rows = Math.max(...trail.stops.map((s) => s.row)) + 1;
-  const H = rows * ROW_H;
-  const width = (r: number): number => trail.stops.filter((s) => s.row === r).length;
-  const xPct = (s: Stop): number => ((s.col + 0.5) / width(s.row)) * 100;
-  const y = (s: Stop): number => H - (s.row + 0.5) * ROW_H;
+  let dead = false;
+  let busy = false;
+  let picked: number | null = null;
+  const M = (): TownMap => ctx.save.townmap!;
+  const m0 = M();
   const mon = partnerMon(ctx.save.players[Math.min(ctx.save.active, ctx.save.players.length - 1)], ctx.save.active);
+  const H = m0.height;
+  const pos = (p: { x: number; y: number }): string => `left:${p.x}%;top:${(p.y / H) * 100}%`;
+  const N = (id: number): MapNode => m0.nodes[id];
 
-  function draw(): void {
-    const isOpt = (s: Stop): boolean => opts.some((o) => o.id === s.id);
-    const lines = trail.stops
-      .flatMap((a) => a.next.map((n) => {
-        const b = trail.stops[n];
-        const walked = trail.cleared.includes(a.id) && trail.cleared.includes(b.id);
-        const live = a.id === trail.at && isOpt(b);
-        return `<line class="${walked ? 'walked' : live ? 'live' : ''}" x1="${xPct(a)}" y1="${y(a)}" x2="${xPct(b)}" y2="${y(b)}"/>`;
-      }))
-      .join('');
-    const dots = trail.stops
-      .map((s) => {
-        const done = trail.cleared.includes(s.id);
-        const here = s.id === trail.at;
-        const cls = ['stop', s.kind, done && !here ? 'done' : '', here ? 'here' : '', isOpt(s) ? 'opt' : '', sel?.id === s.id ? 'sel' : ''].join(' ');
-        const inner = here ? `<img src="${artUrl(mon.id)}" alt="" onerror="this.style.visibility='hidden'">` : done ? '✓' : ICON[s.kind];
-        return `<button class="${cls}" data-stop="${s.id}" style="left:${xPct(s)}%;top:${y(s)}px" ${isOpt(s) ? '' : 'disabled'} aria-label="${LABEL[s.kind]}">${inner}</button>`;
-      })
-      .join('');
-    const cta = sel ? CTA[sel.kind] : '選一條路';
-    root.innerHTML = `<div class="app" data-screen="trek">${bar('冒險')}
-      <div class="mapnote"><b>第 ${trail.region} 張地圖</b><span class="muted">亮起來的地方可以走${opts.length > 1 ? '，選一條路' : ''}</span></div>
-      <div class="screen scroll" id="mapscroll"><div class="trail" style="height:${H}px">
-        <svg viewBox="0 0 100 ${H}" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${dots}</div></div>
-      <button class="btn" id="go" ${sel ? '' : 'disabled'}>${esc(cta)}</button></div>`;
-    root.querySelectorAll<HTMLElement>('[data-stop]').forEach((b) => b.addEventListener('click', () => {
-      sel = trail.stops[Number(b.dataset.stop)];
-      sfx.play('select');
-      draw();
-    }));
-    root.querySelector('#go')!.addEventListener('click', () => sel && start(sel));
-    const box = root.querySelector<HTMLElement>('#mapscroll');
-    const here = root.querySelector<HTMLElement>('.stop.here');
-    if (box && here) box.scrollTop = Math.max(0, here.offsetTop - box.clientHeight * 0.6);
+  // ---- static drawing: sea with a grid of squares, land under the roads, the roads (only north, south, east, west) ----
+  const cx = (c: number): number => Math.round((c + 0.5) * CELL * 10) / 10;
+  const pts = (path: [number, number][]): string => path.map(([c, r]) => `${cx(c)},${cx(r)}`).join(' ');
+  const landRoads = m0.roads.filter((r) => r.kind !== 'water');
+  const svg = `<svg viewBox="0 0 100 ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <defs><pattern id="grid" width="${CELL}" height="${CELL}" patternUnits="userSpaceOnUse"><path d="M${CELL} 0H0V${CELL}" fill="none" stroke="#b7dbee" stroke-width=".25"/></pattern></defs>
+    <rect width="100" height="${H}" fill="#cfeaf7"/><rect width="100" height="${H}" fill="url(#grid)"/>
+    ${m0.nodes.filter(isBig).map((p) => `<rect x="${cx(p.col) - (p.w / 2 + 0.35) * CELL}" y="${cx(p.row) - 0.85 * CELL}" width="${(p.w + 0.7) * CELL}" height="${1.7 * CELL}" rx="2.5" fill="#d6efb4"/>`).join('')}
+    ${landRoads.map((r) => `<polyline points="${pts(r.path)}" fill="none" stroke="#d6efb4" stroke-width="${CELL * 0.85}" stroke-linejoin="round"/>`).join('')}
+    ${m0.roads.map((r) => {
+      const dash = r.kind === 'water' ? 'stroke-dasharray="1.2 2.2"' : r.kind === 'mountain' ? 'stroke-dasharray="3 1.6"' : '';
+      return `<polyline points="${pts(r.path)}" fill="none" stroke="#fff" stroke-width="3.4" stroke-linejoin="round" ${r.kind === 'water' ? 'opacity="0"' : ''}/>
+        <polyline class="road" data-road="${r.id}" points="${pts(r.path)}" fill="none" stroke="${ROAD_COLOR[r.kind]}" stroke-width="${r.kind === 'water' ? 2.2 : 1.9}" stroke-linejoin="round" ${dash}/>`;
+    }).join('')}
+  </svg>`;
+  const labelAt = (r: TownMap['roads'][number]): { x: number; y: number } => {
+    const [c, row] = r.path[Math.floor(r.path.length / 2)];
+    return { x: cx(c) + 3.5, y: cx(row) };
+  };
+
+  root.innerHTML = `<div class="app" data-screen="trek">${bar('冒險')}
+    <div class="mapnote"><b>${esc(m0.title)}　<small>${SIZE_NAME[m0.size]}</small></b><span class="muted" id="here"></span></div>
+    <div class="screen scroll" id="mapscroll"><div class="townmap" id="tm" style="aspect-ratio:100/${H}">
+      ${svg}
+      ${m0.roads.map((r) => `<span class="rlabel" data-road="${r.id}" style="${pos(labelAt(r))}" hidden>${esc(r.name)}</span>`).join('')}
+      ${m0.nodes.map((n) => `<button class="tnode ${isBig(n) ? 'big' : 'small'}${n.w > 1 ? ' wide' : ''}" data-id="${n.id}" data-kind="${n.kind}" style="${pos(n)}" aria-label="${esc(n.name)}"><i>${n.icon}</i>${isBig(n) ? `<span class="tname">${esc(n.name)}</span>` : ''}<span class="ttypes"></span><em class="gift" hidden>🎁</em></button>`).join('')}
+      <div class="partner" id="partner"><img src="${artUrl(mon.id)}" alt="" onerror="this.style.visibility='hidden'"></div>
+    </div></div>
+    <div class="tpanel" id="panel"></div></div>`;
+
+  const tm = root.querySelector<HTMLElement>('#tm')!;
+  const box = root.querySelector<HTMLElement>('#mapscroll')!;
+  const partner = root.querySelector<HTMLElement>('#partner')!;
+  const panel = root.querySelector<HTMLElement>('#panel')!;
+
+  function toast(text: string): void {
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = text;
+    root.querySelector('.app')!.appendChild(t);
+    window.setTimeout(() => t.remove(), 1800);
   }
 
-  function start(s: Stop): void {
-    ctx.update((st) => ({ ...st, trail: begin(st.trail!, s.id) }));
-    if (s.kind === 'chest') return openChest(s);
-    ctx.go('scan', { kind: 'trek', boss: s.kind === 'boss', rare: s.kind === 'rare' });
+  function placePartner(smooth: boolean): void {
+    const a = N(M().at);
+    partner.style.left = `${a.x}%`;
+    partner.style.top = `${(a.y / H) * 100}%`;
+    box.scrollTo({ top: Math.max(0, (a.y / H) * tm.clientHeight - box.clientHeight * 0.6), behavior: smooth ? 'smooth' : 'auto' });
   }
 
-  function openChest(s: Stop): void {
-    const relic = nextRelic(ctx.save.relics, ctx.save.treks * 7 + s.id);
+  const typeDots = (n: MapNode): string => n.types.map((t) => `<b style="background:${TYPES[t]?.color ?? '#999'}" title="${esc(TYPES[t]?.name ?? t)}"></b>`).join('');
+  const typeNames = (n: MapNode): string => n.types.map((t) => TYPES[t]?.name ?? t).join('、');
+
+  function render(): void {
+    const m = M();
+    const here = N(m.at);
+    const near = new Set(neighbors(m, m.at));
+    root.querySelector('#here')!.textContent = `${here.icon || '📍'} ${here.name}`;
+    root.querySelectorAll<HTMLElement>('.tnode').forEach((el) => {
+      const id = Number(el.dataset.id);
+      const n = N(id);
+      el.dataset.state = id === m.at ? 'here' : near.has(id) ? 'out' : m.visited.includes(id) ? 'seen' : 'far';
+      el.dataset.done = m.cleared.includes(id) ? '1' : '0';
+      el.dataset.pick = picked === id ? '1' : '0';
+      const shown = isRevealed(m, id) && n.types.length > 0;
+      el.querySelector('.ttypes')!.innerHTML = shown ? typeDots(n) : '';
+      el.dataset.known = shown ? '1' : '0';
+      if (!isBig(n)) el.style.setProperty('--ring', shown ? (TYPES[n.types[0]]?.color ?? '#9fb3c8') : '#9fb3c8');
+      (el.querySelector('.gift') as HTMLElement).hidden = !(n.gift && !m.gifts.includes(id) && m.visited.includes(id) && id !== m.at);
+    });
+    root.querySelectorAll<HTMLElement>('.rlabel').forEach((el) => {
+      const r = m0.roads[Number(el.dataset.road)];
+      el.hidden = ![r.a, r.b, ...r.nodes].some((id) => m.visited.includes(id));
+    });
+    root.querySelectorAll<SVGElement>('.road').forEach((el) => {
+      const r = m0.roads[Number(el.dataset.road)];
+      el.classList.toggle('walked', r.nodes.every((id) => m.cleared.includes(id)));
+    });
+    placePartner(true);
+    renderPanel();
+  }
+
+  function renderPanel(): void {
+    const m = M();
+    const here = N(m.at);
+    if (picked !== null) {
+      const n = N(picked);
+      const fight = needsFight(m, picked);
+      const who = n.kind === 'town' ? '安全的城鎮，可以休息一下' :
+        !fight ? '這裡的寶可夢已經打敗了' :
+        isRevealed(m, picked) ? `住著「${esc(typeNames(n))}」系的寶可夢` : '住著誰？到了才知道（城鎮可以打聽情報）';
+      const extra = n.kind === 'city' ? '　·　道館首領在這裡！' : n.kind === 'league' ? '　·　冠軍在這裡！' : '';
+      const title = n.kind === 'wild' ? `${roadIcon[m0.roads[n.road].kind]} ${esc(n.name)}` : `${n.icon} ${esc(n.name)} <small>${kindLabel[n.kind]}</small>`;
+      panel.innerHTML = `<div class="ttitle">${title}</div><div class="tsub">${who}${extra}</div>
+        <div class="trow"><button class="btn" id="go">${fight ? '前往！' : '走過去'}</button></div>`;
+      panel.querySelector('#go')!.addEventListener('click', () => void goTo(picked!));
+      return;
+    }
+    if (atTown(m)) {
+      const svc = [
+        canGift(m) ? '<button class="btn" id="svc-gift">🎁 拿小禮物</button>' : '',
+        canInfo(m) ? '<button class="btn" id="svc-info">🔭 聽聽情報</button>' : '',
+        canQuiz(m) ? '<button class="btn" id="svc-quiz">💬 村民考考你</button>' : '',
+      ].join('');
+      panel.innerHTML = `<div class="ttitle">${here.icon} ${esc(here.name)} <small>${kindLabel[here.kind]}</small></div>
+        <div class="tsub">${svc ? '這裡可以做的事：' : '都做完了！點亮著的地方繼續走'}</div>${svc ? `<div class="trow wrap">${svc}</div>` : ''}`;
+      panel.querySelector('#svc-gift')?.addEventListener('click', openGift);
+      panel.querySelector('#svc-info')?.addEventListener('click', () => {
+        sfx.play('good');
+        ctx.update((s) => ({ ...s, townmap: useInfo(s.townmap!) }));
+        toast('附近的寶可夢屬性都顯示出來了！');
+        render();
+      });
+      panel.querySelector('#svc-quiz')?.addEventListener('click', () => ctx.go('practice', { quiz: true }));
+      return;
+    }
+    panel.innerHTML = `<div class="ttitle">${here.kind === 'wild' ? '📍' : here.icon} ${esc(here.name)}</div><div class="tsub">點亮著的地方，再按「前往」</div>`;
+  }
+
+  function pick(id: number): void {
+    const m = M();
+    if (busy || id === m.at) return;
+    if (!neighbors(m, m.at).includes(id)) { toast('太遠了，先走到相鄰的地方'); return; }
+    sfx.play('select');
+    picked = id;
+    render();
+  }
+
+  /** the creature of a node is rolled once and then remembered, so backing out doesn't re-roll it */
+  function foeFor(id: number): number {
+    const m = M();
+    const known = m.foes[id];
+    if (known) return known;
+    const n = N(id);
+    const owned = new Set(ctx.save.caught);
+    const pickMon = pickEncounter(ctx.rng, { rarity: rollRarity(ctx.rng, catOf(n), progressOf(m, n)), types: n.types, owned });
+    ctx.update((s) => ({ ...s, townmap: rememberFoe(s.townmap!, id, pickMon.id) }));
+    return pickMon.id;
+  }
+
+  async function goTo(id: number): Promise<void> {
+    if (busy || dead) return;
+    busy = true;
+    picked = null;
+    const m = M();
+    if (needsFight(m, id)) {
+      ctx.update((s) => ({ ...s, townmap: startEntering(s.townmap!, id) }));
+      const a = N(id);
+      partner.style.left = `${a.x}%`;
+      partner.style.top = `${(a.y / H) * 100}%`;
+      sfx.play('warn');
+      await sleep(600);
+      if (!dead) ctx.go('scan', sceneOf(M(), a, foeFor(id)));
+      return;
+    }
+    ctx.update((s) => ({ ...s, townmap: moveTo(s.townmap!, id) }));
+    sfx.play('step');
+    render();
+    await sleep(450);
+    busy = false;
+    if (!dead && atTown(M()) && (canGift(M()) || canInfo(M()))) toast('到城鎮了！');
+  }
+
+  function openGift(): void {
+    const m = M();
+    const relic = nextRelic(ctx.save.relics, ctx.save.treks * 7 + m.at * 3 + m.seed % 97);
     sfx.play('chest');
-    ctx.update((st) => ({ ...st, relics: st.relics.includes(relic.id) ? st.relics : [...st.relics, relic.id], trail: arrive(st.trail!, s.id) }));
-    root.innerHTML = `<div class="app" data-screen="chest">${bar('寶箱', null)}
-      <div class="screen" style="justify-content:center;align-items:center;text-align:center">
-        <div class="relic">${relic.icon}</div><div class="big">${esc(relic.zh)}</div><div class="muted">${esc(relic.name)}</div></div>
-      <button class="btn" data-go="trek">繼續冒險</button></div>`;
+    ctx.update((s) => ({ ...s, relics: s.relics.includes(relic.id) ? s.relics : [...s.relics, relic.id], townmap: takeGift(s.townmap!) }));
+    render();
+    const el = document.createElement('div');
+    el.className = 'modal';
+    el.innerHTML = `<div class="card" style="text-align:center"><div class="relic">${relic.icon}</div><div class="big">${esc(relic.zh)}</div><div class="muted">${esc(relic.name)}</div><button class="btn" data-close>收下！</button></div>`;
+    el.querySelector('[data-close]')!.addEventListener('click', () => el.remove());
+    root.querySelector('.app')!.appendChild(el);
   }
 
-  draw();
+  root.querySelectorAll<HTMLElement>('.tnode').forEach((el) => el.addEventListener('click', () => pick(Number(el.dataset.id))));
+
+  placePartner(false);
+  render();
+  return { destroy: () => { dead = true; } };
 };

@@ -18,10 +18,31 @@ const go = (page: Page, name: string, params?: unknown) => page.evaluate(([n, p]
 const ctl = <T>(page: Page, fn: (c: any) => T): Promise<T> => page.evaluate(`(${fn.toString()})(window.__v3)`) as Promise<T>;
 const save = <T>(page: Page, fn: (s: any) => T): Promise<T> => page.evaluate(`(${fn.toString()})(window.__app.save)`) as Promise<T>;
 
-/** On the trek map: pick the first lit-up stop and head there. */
-async function startFirstStop(page: Page): Promise<void> {
-  await page.locator('[data-screen=trek] .stop.opt').first().click();
-  await page.click('[data-screen=trek] #go');
+/** Step onto the first neighbour of the start town; the creature of that place is shown. */
+async function walkToFight(page: Page): Promise<void> {
+  await page.locator('.tnode[data-state=out]').first().click();
+  await page.click('#go');
+  await expect(page.locator('[data-screen=reveal]')).toBeVisible({ timeout: 10_000 });
+}
+/** From the reveal to the battle. */
+async function startFight(page: Page): Promise<void> {
+  await page.click('[data-screen=reveal] #go:not([disabled])');
+  await page.waitForFunction(() => (window as any).__v3?.battle);
+}
+
+/** Put the party on a place next to `id`, then tap `id` and "go". */
+async function approach(page: Page, id: number): Promise<void> {
+  await page.evaluate((target) => {
+    const a = (window as any).__app;
+    const m = a.save.townmap;
+    const link = m.links.find((l: number[]) => l.includes(target));
+    const from = link[0] === target ? link[1] : link[0];
+    a.update((s: any) => ({ ...s, townmap: { ...m, at: from, visited: [...new Set([...m.visited, from])] } }));
+    a.go('trek');
+  }, id);
+  await page.locator(`.tnode[data-id="${id}"]`).click();
+  await page.click('#go');
+  await expect(page.locator('[data-screen=reveal]')).toBeVisible({ timeout: 10_000 });
 }
 
 async function sayWord(game: any, page: Page): Promise<void> {
@@ -35,7 +56,7 @@ test.describe('home and menus', () => {
     const p = game.page;
     await open(p);
     await expect(p.locator('[data-screen=home]')).toBeVisible();
-    for (const [btn, screen] of [['dex', 'dex'], ['practice', 'practice'], ['toddler', 'toddler'], ['party', 'party'], ['trek', 'trek']] as const) {
+    for (const [btn, screen] of [['dex', 'dex'], ['practice', 'practice'], ['party', 'party'], ['trek', 'trek']] as const) {
       await p.click(`.menu [data-go=${btn}]`);
       await expect(p.locator(`[data-screen=${screen}]`)).toBeVisible();
       await p.click('[data-screen] .bar [data-go]');
@@ -45,30 +66,17 @@ test.describe('home and menus', () => {
 });
 
 test.describe('scan and battle', () => {
-  test('no camera needed: summon a creature, then fight it with spoken words', async ({ game }) => {
+  test('the place decides who turns up (no camera); then fight it with spoken words', async ({ game }) => {
     const p = game.page;
     await open(p);
     await p.click('[data-go=trek]');
-    await startFirstStop(p);
-    await p.click('#summon');
-    await expect(p.locator('[data-screen=reveal] #go')).toBeEnabled();
-    await p.click('[data-screen=reveal] #go');
+    await walkToFight(p);
+    await expect(p.locator('#cam')).toHaveCount(0);
+    await startFight(p);
     await expect(p.locator('#theWord')).toBeVisible();
     const before = await ctl(p, (c) => c.battle.monster.hp);
     await sayWord(game, p);
     await expect.poll(() => ctl(p, (c) => c.battle.monster.hp)).toBeLessThan(before);
-  });
-
-  test('the camera path: shutter, colours pick a creature, reveal', async ({ game }) => {
-    const p = game.page;
-    await open(p);
-    await p.click('[data-go=trek]');
-    await startFirstStop(p);
-    await p.click('#cam');
-    await expect(p.locator('#shot')).toBeVisible();
-    await p.click('#shot');
-    await expect(p.locator('[data-screen=reveal] .swatches i').first()).toBeVisible();
-    await expect(p.locator('[data-screen=reveal] #go')).toBeEnabled();
   });
 
   test('three misses, then a grown-up confirms; the heard word is learned', async ({ game }) => {
@@ -91,20 +99,19 @@ test.describe('scan and battle', () => {
     const p = game.page;
     await open(p);
     await p.click('[data-go=trek]');
-    await startFirstStop(p);
-    await p.click('#summon');
-    await p.click('[data-screen=reveal] #go:not([disabled])');
-    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await walkToFight(p);
+    const target = await save(p, (s) => s.townmap.entering);
+    await startFight(p);
     await ctl(p, (c) => { c.battle.monster.hp = 1; });
     await sayWord(game, p);
     await expect(p.locator('.victory')).toBeVisible({ timeout: 8000 });
     await expect(p.locator('.newmon')).toBeVisible();
     expect(await save(p, (s) => s.caught.length)).toBe(1);
-    expect(await save(p, (s) => s.trail.cleared.length)).toBe(2);
+    expect(await save(p, (s) => s.townmap.cleared)).toEqual([target]);
+    expect(await save(p, (s) => s.townmap.at)).toBe(target);
     await p.click('[data-act=next]');
-    await expect(p.locator('[data-screen=trek] .stop.here')).toBeVisible();
-    await expect(p.locator('[data-screen=trek] .stop.done')).toHaveCount(1);
-    expect(await save(p, (s) => s.trail.at)).toBeGreaterThan(0);
+    await expect(p.locator('[data-screen=trek] .townmap')).toBeVisible();
+    expect(await save(p, (s) => s.townmap.entering)).toBeNull();
   });
 });
 
@@ -313,7 +320,7 @@ test.describe('practice and toddler', () => {
   test('toddler: tap a friend five times, get a sticker, no microphone involved', async ({ game }) => {
     const p = game.page;
     await open(p);
-    await p.click('.menu [data-go=toddler]');
+    await go(p, 'toddler');
     await p.click('#photo');
     await p.click('#summon');
     await p.click('[data-screen=reveal] #go:not([disabled])');
@@ -326,57 +333,109 @@ test.describe('practice and toddler', () => {
 });
 
 
-test.describe('trek map', () => {
-  test('a branching map: only the stops next to the party are lit, and choosing one is needed to go', async ({ game }) => {
+test.describe('town map', () => {
+  test('places joined by roads with names; only the neighbours of where you are light up', async ({ game }) => {
     const p = game.page;
     await open(p);
     await p.click('[data-go=trek]');
-    await expect(p.locator('[data-screen=trek] .stop.here')).toBeVisible();
-    const lit = await p.locator('[data-screen=trek] .stop.opt').count();
-    expect(lit).toBeGreaterThanOrEqual(2);
-    await expect(p.locator('[data-screen=trek] #go')).toBeDisabled();
-    expect(await p.locator('[data-screen=trek] .stop').count()).toBeGreaterThan(8);
-    await p.locator('[data-screen=trek] .stop.opt').nth(1).click();
-    await expect(p.locator('[data-screen=trek] #go')).toBeEnabled();
+    await expect(p.locator('[data-screen=trek] .tnode').first()).toBeVisible();
+    const n = await save(p, (s) => s.townmap.nodes.length);
+    await expect(p.locator('.tnode')).toHaveCount(n);
+    await expect(p.locator('.tnode[data-state=here]')).toHaveCount(1);
+    expect(await p.locator('.tnode[data-state=out]').count()).toBeGreaterThanOrEqual(2);
+    await expect(p.locator('.rlabel:not([hidden])').first()).toContainText(/號(道路|水路|森林小徑|山路)/);
+    // a far place is not a choice
+    await p.locator('.tnode[data-state=far]').first().evaluate((el) => (el as HTMLElement).click());
+    await expect(p.locator('.toast')).toContainText('太遠');
+    expect(await save(p, (s) => s.townmap.entering)).toBeNull();
   });
 
-  test('every new trek gets a different map', async ({ game }) => {
+  test('picking a place shows what it is; "go" steps there and shows who lives there', async ({ game }) => {
     const p = game.page;
     await open(p);
-    const seeds = new Set<number>();
-    for (let i = 0; i < 3; i++) {
-      await p.click('[data-go=trek]');
-      seeds.add(await save(p, (s) => s.trail.seed));
-      await p.evaluate(() => { const a = (window as any).__app; a.update((s: any) => ({ ...s, trail: null, treks: s.treks + 1 })); a.go('home'); });
+    await p.click('[data-go=trek]');
+    await p.locator('.tnode[data-state=out]').first().click();
+    await expect(p.locator('#panel')).toContainText('住著誰');
+    expect(await save(p, (s) => s.townmap.entering)).toBeNull(); // picking is not going yet
+    await p.click('#go');
+    await expect(p.locator('[data-screen=reveal]')).toBeVisible({ timeout: 10_000 });
+    const id = await save(p, (s) => s.townmap.entering);
+    expect(id).not.toBeNull();
+    expect(await save(p, (s) => s.townmap.foes[s.townmap.entering])).toBeGreaterThan(0);
+    await expect(p.locator('[data-screen=reveal]')).toContainText(/出現了/);
+  });
+
+  test('backing out keeps the party where it was and the same creature waits there', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    await walkToFight(p);
+    const first = await save(p, (s) => ({ id: s.townmap.entering, foes: s.townmap.foes }));
+    await p.click('[data-screen=reveal] .bar [data-go]');
+    await expect(p.locator('[data-screen=trek]')).toBeVisible();
+    expect(await save(p, (s) => ({ at: s.townmap.at, entering: s.townmap.entering }))).toEqual({ at: 0, entering: null });
+    await p.locator(`.tnode[data-id="${first.id}"]`).click();
+    await p.click('#go');
+    await expect(p.locator('[data-screen=reveal]')).toBeVisible({ timeout: 10_000 });
+    expect(await save(p, (s) => s.townmap.foes)).toEqual(first.foes);
+  });
+
+  test('home offers to continue the trip or start a new one (after a check)', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    const first = await save(p, (s) => s.townmap.seed);
+    await p.click('[data-screen=trek] .bar [data-go]');
+    await expect(p.locator('[data-go=trek]')).toContainText('繼續旅程');
+    await p.click('[data-act=newtrip]');
+    await p.click('.modal [data-act=no]');
+    expect(await save(p, (s) => s.townmap.seed)).toBe(first);
+    await p.click('[data-act=newtrip]');
+    await p.click('.modal [data-act=yes]');
+    await expect(p.locator('[data-screen=trek]')).toBeVisible();
+    expect(await save(p, (s) => s.townmap.seed)).not.toBe(first);
+    await expect(p.locator('.menu [data-go=toddler]')).toHaveCount(0);
+  });
+
+  test('who turns up follows the place: its types, never the camera', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    const n = await p.locator('.tnode[data-state=out]').count();
+    for (let i = 0; i < Math.min(3, n); i++) {
+      await p.locator('.tnode[data-state=out]').nth(i).click();
+      await p.click('#go');
+      await expect(p.locator('[data-screen=reveal]')).toBeVisible({ timeout: 10_000 });
+      const types: string[] = await save(p, (s) => s.townmap.nodes[s.townmap.entering].types);
+      await startFight(p);
+      expect(types).toContain(await ctl(p, (c) => c.foe.type));
+      await p.click('[data-act=leave]');
+      await expect(p.locator('[data-screen=trek]')).toBeVisible();
     }
-    expect(seeds.size).toBe(3);
   });
 
-  test('running away goes back to the same stop, and nothing changes', async ({ game }) => {
+  test('running away goes back to where the party was, and nothing else changes', async ({ game }) => {
     const p = game.page;
     await open(p);
     await p.click('[data-go=trek]');
-    const before = await save(p, (s) => ({ at: s.trail.at, cleared: s.trail.cleared }));
-    await startFirstStop(p);
-    await p.click('#summon');
-    await p.click('[data-screen=reveal] #go:not([disabled])');
-    await p.waitForFunction(() => (window as any).__v3?.battle);
+    const snap = () => save(p, (s) => ({ at: s.townmap.at, cleared: s.townmap.cleared, relics: s.relics, caught: s.caught }));
+    const before = await snap();
+    await walkToFight(p);
+    await startFight(p);
     await p.click('[data-act=leave]');
     await expect(p.locator('[data-screen=trek]')).toBeVisible();
-    expect(await save(p, (s) => ({ at: s.trail.at, cleared: s.trail.cleared }))).toEqual(before);
-    expect(await save(p, (s) => s.trail.target)).toBeNull();
-    expect(await save(p, (s) => s.caught.length)).toBe(0);
+    expect(await snap()).toEqual(before);
+    expect(await save(p, (s) => s.townmap.entering)).toBeNull();
   });
 
-  test('losing all hearts ends the fight, back on the same stop, with no other cost', async ({ game }) => {
+  test('losing all hearts ends the fight, back where the party was, with no other cost', async ({ game }) => {
     const p = game.page;
     await open(p);
     await p.click('[data-go=trek]');
-    const before = await save(p, (s) => ({ at: s.trail.at, cleared: s.trail.cleared, relics: s.relics, caught: s.caught }));
-    await startFirstStop(p);
-    await p.click('#summon');
-    await p.click('[data-screen=reveal] #go:not([disabled])');
-    await p.waitForFunction(() => (window as any).__v3?.battle);
+    const snap = () => save(p, (s) => ({ at: s.townmap.at, cleared: s.townmap.cleared, relics: s.relics, caught: s.caught }));
+    const before = await snap();
+    await walkToFight(p);
+    await startFight(p);
     await ctl(p, (c) => { c.statusEnabled = false; c.hearts = 1; });
     await sayWord(game, p);
     await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
@@ -384,7 +443,7 @@ test.describe('trek map', () => {
     await expect(p.locator('[data-act=lose]')).toBeVisible({ timeout: 8000 });
     await p.click('[data-act=lose]');
     await expect(p.locator('[data-screen=trek]')).toBeVisible();
-    expect(await save(p, (s) => ({ at: s.trail.at, cleared: s.trail.cleared, relics: s.relics, caught: s.caught }))).toEqual(before);
+    expect(await snap()).toEqual(before);
   });
 
   test('hearts go down by one each time a hit gets through', async ({ game }) => {
@@ -401,34 +460,82 @@ test.describe('trek map', () => {
     await expect(p.locator('#hearts i.on')).toHaveCount(max - 1, { timeout: 6000 });
   });
 
-  test('the boss stop ends the map and the next one is new and longer', async ({ game }) => {
+  test('a town: news shows the types of the places around it', async ({ game }) => {
     const p = game.page;
     await open(p);
     await p.click('[data-go=trek]');
-    const first = await save(p, (s) => ({ seed: s.trail.seed, n: s.trail.stops.length }));
-    await p.evaluate(() => {
-      const a = (window as any).__app;
-      const t = a.save.trail;
-      const boss = t.stops.find((s: any) => s.kind === 'boss');
-      const pre = t.stops.find((s: any) => s.next.includes(boss.id));
-      a.update((s: any) => ({ ...s, trail: { ...t, at: pre.id, cleared: [0, pre.id] } }));
-      a.go('trek');
-    });
-    await expect(p.locator('[data-screen=trek] .stop.opt')).toHaveCount(1);
-    await startFirstStop(p);
-    await p.click('#summon');
+    await expect(p.locator('.tnode[data-known="1"]')).toHaveCount(0);
+    await p.click('#svc-info');
+    expect(await p.locator('.tnode[data-known="1"]').count()).toBeGreaterThan(3);
+    expect(await save(p, (s) => s.townmap.infoDone)).toEqual([0]);
+    await expect(p.locator('#svc-info')).toHaveCount(0);
+  });
+
+  test('a town: the gift is a relic, once', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    const t = await save(p, (s) => s.townmap.nodes.find((x: any) => x.kind === 'town' && x.gift).id);
+    await p.evaluate((id) => { const a = (window as any).__app; a.update((s: any) => ({ ...s, townmap: { ...s.townmap, at: id, visited: [...s.townmap.visited, id] } })); a.go('trek'); }, t);
+    await p.click('#svc-gift');
+    await expect(p.locator('.modal')).toBeVisible();
+    expect(await save(p, (s) => s.relics.length)).toBe(1);
+    await p.click('.modal [data-close]');
+    expect(await save(p, (s) => s.townmap.gifts)).toEqual([t]);
+    await expect(p.locator('#svc-gift')).toHaveCount(0);
+  });
+
+  test('a town: the villager\'s quiz is three spoken words and a present for two right', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    await p.click('#svc-quiz');
+    await expect(p.locator('[data-screen=practice]')).toContainText('村民考考你');
+    for (let i = 0; i < 3; i++) {
+      await expect(p.locator('#theWord')).toBeVisible();
+      const word = await p.locator('#theWord').innerText();
+      await sayWord(game, p);
+      if (i < 2) await expect(p.locator('#theWord')).not.toHaveText(word, { timeout: 5000 });
+    }
+    await expect(p.locator('[data-quiz-done]')).toBeVisible({ timeout: 5000 });
+    expect(await save(p, (s) => s.townmap.quizDone)).toEqual([0]);
+    expect(await save(p, (s) => s.relics.length)).toBe(1);
+    await p.click('[data-quiz-done] [data-go=trek]');
+    await expect(p.locator('#svc-quiz')).toHaveCount(0);
+  });
+
+  test('a gym city has a boss of its own type behind the gate', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    const city = await save(p, (s) => { const c = s.townmap.nodes.find((x: any) => x.kind === 'city'); return { id: c.id, type: c.types[0] }; });
+    await approach(p, city.id);
     await p.click('[data-screen=reveal] #go:not([disabled])');
     await p.waitForFunction(() => (window as any).__v3?.shield);
+    expect(await ctl(p, (c) => c.foe.type)).toBe(city.type);
+    expect(await ctl(p, (c) => c.foe.rarity)).toBeGreaterThanOrEqual(3);
+  });
+
+  test('beating the league ends the trip; the next map is a new one and the journey is logged', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    const first = await save(p, (s) => ({ seed: s.townmap.seed, league: s.townmap.nodes.find((x: any) => x.kind === 'league') }));
+    await approach(p, first.league.id);
+    await p.click('[data-screen=reveal] #go:not([disabled])');
+    await p.waitForFunction(() => (window as any).__v3?.shield);
+    expect(await ctl(p, (c) => c.foe.type)).toBe(first.league.types[0]);
+    expect(await ctl(p, (c) => c.foe.rarity)).toBeGreaterThanOrEqual(4);
     await ctl(p, (c) => { c.shield.layers = 0; c.battle.monster.hp = 1; });
     await p.evaluate(() => (window as any).__v3.view.setShields(0, 3));
     await playUntil(game, p, async () => (await p.locator('.victory').count()) > 0, 80);
     await p.click('[data-act=next]');
     await expect(p.locator('[data-screen=home]')).toBeVisible();
     expect(await save(p, (s) => s.treks)).toBe(1);
+    expect(await save(p, (s) => s.journeys.length)).toBe(1);
+    expect(await save(p, (s) => s.townmap)).toBeNull();
     await p.click('[data-go=trek]');
-    const second = await save(p, (s) => ({ seed: s.trail.seed, n: s.trail.stops.length }));
-    expect(second.seed).not.toBe(first.seed);
-    expect(second.n).toBeGreaterThan(first.n - 1);
+    expect(await save(p, (s) => s.townmap.seed)).not.toBe(first.seed);
   });
 });
 

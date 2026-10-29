@@ -1,7 +1,8 @@
 import { startCamera, CameraFailure, type CameraHandle } from '../../gfx/camera';
 import { analyzeColors, pickMon, type Swatch } from '../../mon/colorpick';
-import { artUrl, pickWild, typeOf, type Mon } from '../../mon/dex';
+import { artUrl, pickWild, typeOf, TYPES, type Mon } from '../../mon/dex';
 import { sfx, say } from '../../audio/sfx';
+import { PLACES } from '../../mon/habitat';
 import { bar, esc, type ScanParams, type ScreenFactory } from '../ctx';
 
 const N = 48;
@@ -11,23 +12,35 @@ export const scan: ScreenFactory = (root, ctx, params: ScanParams) => {
   let cam: CameraHandle | null = null;
   let dead = false;
   const back = params.kind === 'toddler' ? 'home' : 'trek';
-  const rarity = params.boss ? { minRarity: 3 } : params.rare ? { minRarity: 3, maxRarity: 4 } : params.kind === 'toddler' ? { maxRarity: 2 } : { maxRarity: 3 };
+  const rarity = params.boss ? { minRarity: params.place?.minRarity ?? 3 } : params.rare ? { minRarity: 3, maxRarity: 4 } : params.kind === 'toddler' ? { maxRarity: 2 } : { maxRarity: params.place?.maxRarity ?? 3 };
+  const place = params.place ? PLACES[params.place.key] : null;
+  const placeName = params.place?.label ?? place?.zh ?? '';
+  const where = place ? `${params.place?.icon ?? place.icon} ${placeName}` : '';
+  const title = params.boss ? '道館的首領！' : params.rare ? '山洞深處…' : place ? `${placeName}的寶可夢` : '拍照找寶可夢';
   const owned = new Set(ctx.save.caught);
 
   const stop = (): void => { cam?.stop(); cam = null; };
 
   function ask(msg = ''): void {
     stop();
-    root.innerHTML = `<div class="app" data-screen="scan">${bar(params.boss ? '首領出沒！' : params.rare ? '稀有寶可夢！' : '拍照找寶可夢', back)}
+    const hasPlace = !!place && params.kind === 'trek';
+    const types = (params.place?.types ?? []).map((t) => TYPES[t]?.name).filter(Boolean).join('、');
+    root.innerHTML = `<div class="app" data-screen="scan">${bar(title, back)}
       <div class="screen" style="justify-content:center;text-align:center;gap:14px">
-        <div class="card"><div style="font-size:3rem">📷</div>
-          <p><b>拍一拍身邊的東西</b><br>顏色會決定遇到哪一隻寶可夢！</p>
+        <div class="card">
+          ${hasPlace ? `<div style="font-size:3rem">${place!.icon}</div>
+            <p><b>這裡是${esc(placeName)}</b><br>${params.boss ? `館主擅長「${esc(types)}」系` : `常有「${esc(types)}」系的寶可夢出沒`}</p>
+            <p class="muted">要看看是誰，還是拍張照讓顏色決定？</p>`
+          : `<div style="font-size:3rem">📷</div>
+            <p><b>拍一拍身邊的東西</b><br>顏色會決定遇到哪一隻寶可夢！</p>`}
           ${msg ? `<p class="note">${esc(msg)}</p>` : ''}</div></div>
-      <button class="btn" id="cam">打開相機</button>
-      <button class="btn ghost" id="summon">不用相機，直接召喚</button></div>`;
+      ${hasPlace ? `<button class="btn" id="summon">看看是誰出現了（依地形）</button>
+        <button class="btn ghost" id="cam">📷 拍照看顏色</button>`
+      : `<button class="btn" id="cam">打開相機</button>
+        <button class="btn ghost" id="summon">不用相機，直接召喚</button>`}</div>`;
     root.querySelector('#cam')!.addEventListener('click', openCamera);
     root.querySelector('#summon')!.addEventListener('click', () => {
-      const mon = pickWild(ctx.rng, { owned, ...rarity });
+      const mon = pickWild(ctx.rng, { owned, ...rarity, types: params.place?.types });
       reveal(mon, [], null);
     });
   }
@@ -69,7 +82,7 @@ export const scan: ScreenFactory = (root, ctx, params: ScanParams) => {
     const t = typeOf(mon);
     const word = pal[0]?.word;
     const isNew = !ctx.save.caught.includes(mon.id);
-    root.innerHTML = `<div class="app" data-screen="reveal" style="--type:${t.color}">${bar(night ? '夜裡有東西在動…' : '出現了！', back)}
+    root.innerHTML = `<div class="app" data-screen="reveal" style="--type:${t.color}">${bar(night ? '夜裡有東西在動…' : where ? `${where}出現了！` : '出現了！', back)}
       <div class="reveal">
         ${pal.length ? `<div class="swatches">${pal.slice(0, 3).map((c) => `<i style="background:rgb(${c.rgb.join(',')})"></i>`).join('')}</div>
           <div class="muted">拍到的顏色：${esc(word?.zh ?? '')} <b>${esc(word?.en ?? '')}</b></div>` : ''}
@@ -78,7 +91,7 @@ export const scan: ScreenFactory = (root, ctx, params: ScanParams) => {
         <div><span class="chip" style="background:${t.color}">${t.name}</span> <span class="stars">${'★'.repeat(mon.rarity)}${'☆'.repeat(5 - mon.rarity)}</span> ${isNew ? '<span class="newmon">NEW</span>' : ''}</div>
       </div>
       <button class="btn" id="go" disabled>${params.kind === 'toddler' ? '一起玩！' : params.boss ? '挑戰首領！' : '戰鬥！'}</button>
-      <button class="btn ghost" id="again">再拍一次</button></div>`;
+      ${params.foe ? '' : '<button class="btn ghost" id="again">再拍一次</button>'}</div>`;
     sfx.play('appear');
     if (word && params.kind === 'toddler') say(word.en, 0.7);
     window.setTimeout(() => {
@@ -93,9 +106,10 @@ export const scan: ScreenFactory = (root, ctx, params: ScanParams) => {
       if (params.kind === 'toddler') ctx.go('toddler', { foe: mon });
       else ctx.go('battle', { foe: mon, boss: !!params.boss, trek: true });
     });
-    root.querySelector('#again')!.addEventListener('click', () => ask());
+    root.querySelector('#again')?.addEventListener('click', () => ask());
   }
 
-  ask();
+  if (params.foe) reveal(params.foe, [], null); // the trek has already decided who it is
+  else ask();
   return { destroy: () => { dead = true; stop(); } };
 };

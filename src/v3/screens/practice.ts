@@ -8,6 +8,8 @@ import { logHeard } from '../../speech/heardlog';
 import { Speaker, type SpeakResult } from '../../speech/speaker';
 import { sfx, sayWord, stopSay } from '../../audio/sfx';
 import { artUrl, typeOf } from '../../mon/dex';
+import { nextRelic } from '../../game/run';
+import { doneQuiz } from '../../game/townmap';
 import { partnerMon } from '../partner';
 import { WordPanel } from '../battle-view';
 import { bar, esc, type ScreenFactory } from '../ctx';
@@ -15,7 +17,10 @@ import { bar, esc, type ScreenFactory } from '../ctx';
 const MAX_TRIES = 3;
 
 /** Say words with no monster and no clock: a gentle place to get a hard word right. */
-export const practice: ScreenFactory = (root, ctx) => {
+export const practice: ScreenFactory = (root, ctx, params: { quiz?: boolean } | undefined) => {
+  // "the villager's quiz" in a town: three words, and a small present for getting two right
+  const quiz = params?.quiz ? 3 : 0;
+  let asked = 0;
   let seat = Math.min(ctx.save.active, ctx.save.players.length - 1);
   let level = ctx.save.players[seat].level as Level;
   let word: Word | null = null;
@@ -28,7 +33,7 @@ export const practice: ScreenFactory = (root, ctx) => {
   let timer = 0;
   const speaker = new Speaker(ctx.rec);
 
-  root.innerHTML = `<div class="app" data-screen="practice">${bar('練習')}
+  root.innerHTML = `<div class="app" data-screen="practice">${bar(quiz ? '村民考考你' : '練習', quiz ? 'trek' : 'home')}
     <div class="seg" id="seats"></div><div class="seg" id="levels"></div>
     <div class="arena" id="arena" style="min-height:150px;flex:0 0 150px"><div class="mon me" id="me" style="left:50%;transform:translateX(-50%);width:34%;bottom:6%"></div>
       <div class="plate foe" style="min-width:0"><div class="nm" id="score">答對 0 個</div></div></div>
@@ -41,8 +46,8 @@ export const practice: ScreenFactory = (root, ctx) => {
     (root.querySelector('#arena') as HTMLElement).style.setProperty('--type', typeOf(m).color);
     (root.querySelector('#me') as HTMLElement).innerHTML = `<img src="${artUrl(m.id)}" alt="" onerror="this.style.visibility='hidden'">`;
     (root.querySelector('#score') as HTMLElement).textContent = `答對 ${right} 個`;
-    (root.querySelector('#seats') as HTMLElement).innerHTML = ctx.save.players.length > 1 ? ctx.save.players.map((q, i) => `<button class="${i === seat ? 'on' : ''}" data-seat="${i}">${esc(q.name)}</button>`).join('') : '';
-    (root.querySelector('#levels') as HTMLElement).innerHTML = LEVELS.map((l) => `<button class="${l.lv === level ? 'on' : ''}" data-lv="${l.lv}">${esc(l.name)}</button>`).join('');
+    (root.querySelector('#seats') as HTMLElement).innerHTML = !quiz && ctx.save.players.length > 1 ? ctx.save.players.map((q, i) => `<button class="${i === seat ? 'on' : ''}" data-seat="${i}">${esc(q.name)}</button>`).join('') : '';
+    (root.querySelector('#levels') as HTMLElement).innerHTML = quiz ? '' : LEVELS.map((l) => `<button class="${l.lv === level ? 'on' : ''}" data-lv="${l.lv}">${esc(l.name)}</button>`).join('');
   }
 
   function deal(): void {
@@ -53,6 +58,24 @@ export const practice: ScreenFactory = (root, ctx) => {
     tries = 0; heard = []; typing = false;
     show('說出這個單字');
     sayWord(word.w, word.zh);
+  }
+
+  function after(): void {
+    asked += 1;
+    if (quiz && asked >= quiz) finishQuiz(); else deal();
+  }
+
+  function finishQuiz(): void {
+    const relic = right >= 2 ? nextRelic(ctx.save.relics, ctx.save.treks * 7 + right + 11) : null;
+    ctx.update((s) => ({
+      ...s,
+      relics: relic && !s.relics.includes(relic.id) ? [...s.relics, relic.id] : s.relics,
+      townmap: s.townmap ? doneQuiz(s.townmap) : s.townmap,
+    }));
+    sfx.play(relic ? 'chest' : 'good');
+    (root.querySelector('#panel') as HTMLElement).innerHTML = `<div class="card" style="text-align:center" data-quiz-done>
+      ${relic ? `<div class="relic">${relic.icon}</div><div class="big">答對 ${right} 個，送你${esc(relic.zh)}！</div>` : `<div class="big">謝謝你陪我練習！</div><div class="muted">答對 ${right} 個</div>`}
+      <button class="btn" data-go="trek">回到地圖</button></div>`;
   }
 
   function show(note = ''): void {
@@ -73,7 +96,7 @@ export const practice: ScreenFactory = (root, ctx) => {
     sfx.play('perfect');
     header();
     panel.showWait('答對了！');
-    timer = window.setTimeout(deal, 1100);
+    timer = window.setTimeout(after, 1100);
   }
 
   function answer(r: SpeakResult): void {
@@ -91,7 +114,7 @@ export const practice: ScreenFactory = (root, ctx) => {
       sfx.play('miss');
       panel.showWait(`答案是「${word.w}」，下次再來！`);
       sayWord(word.w, word.zh);
-      timer = window.setTimeout(deal, 1600);
+      timer = window.setTimeout(after, 1600);
     } else {
       sfx.play('miss');
       show(`聽到「${j.heard || '…'}」，再試一次！`);

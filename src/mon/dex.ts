@@ -77,8 +77,11 @@ export function shieldLayers(m: Mon): number {
 const RARITY_WEIGHT = config.rarityWeight as Record<string, number>;
 
 /** A random creature, common ones far more often than rare ones. `owned` creatures show up a bit less. */
-export function pickWild(rng: Rng, opts: { owned?: Set<number>; ownedWeight?: number; minRarity?: number; maxRarity?: number } = {}): Mon {
-  const pool = DEX.filter((m) => m.rarity >= (opts.minRarity ?? 1) && m.rarity <= (opts.maxRarity ?? 5));
+export function pickWild(rng: Rng, opts: { owned?: Set<number>; ownedWeight?: number; minRarity?: number; maxRarity?: number; types?: string[] } = {}): Mon {
+  const inRange = DEX.filter((m) => m.rarity >= (opts.minRarity ?? 1) && m.rarity <= (opts.maxRarity ?? 5));
+  // `types` narrows the pool to creatures that live there; if that leaves nobody, any will do
+  const fitting = opts.types?.length ? inRange.filter((m) => opts.types!.includes(m.type)) : inRange;
+  const pool = fitting.length ? fitting : inRange;
   const w = pool.map((m) => (RARITY_WEIGHT[String(m.rarity)] ?? 0.1) * (opts.owned?.has(m.id) ? (opts.ownedWeight ?? 0.3) : 1));
   const total = w.reduce((a, b) => a + b, 0);
   let r = rng.next() * total;
@@ -87,6 +90,20 @@ export function pickWild(rng: Rng, opts: { owned?: Set<number>; ownedWeight?: nu
     if (r <= 0) return pool[i];
   }
   return pool[pool.length - 1];
+}
+
+/**
+ * The creature met at a node: of that rarity and of the node's types where there is one; if not, the nearest rarity
+ * that has one of the types, and only then any type. Creatures already caught turn up less often.
+ */
+export function pickEncounter(rng: Rng, opts: { rarity: number; types: string[]; owned?: Set<number>; ownedWeight?: number }): Mon {
+  for (let d = 0; d <= 4; d++) {
+    for (const r of d === 0 ? [opts.rarity] : [opts.rarity - d, opts.rarity + d]) {
+      if (r < 1 || r > 5) continue;
+      if (DEX.some((m) => m.rarity === r && opts.types.includes(m.type))) return pickWild(rng, { owned: opts.owned, ownedWeight: opts.ownedWeight, minRarity: r, maxRarity: r, types: opts.types });
+    }
+  }
+  return pickWild(rng, { owned: opts.owned, ownedWeight: opts.ownedWeight });
 }
 
 /** A friendly starter for a new player: common, and of varied types. */

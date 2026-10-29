@@ -293,3 +293,39 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 .hearts i:not(.on) { opacity: .55; }
 .flee-btn { display: inline-flex; align-items: center; gap: 2px; border: 0; background: #eef3f9; color: #4a5a70; font-weight: 800; border-radius: 999px; padding: 6px 12px 6px 6px; font-size: .85rem; }
 .flee-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+/* town map */
+.townmap { flex: none; container-type: inline-size; position: relative; margin: 6px 10px 12px; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 2px 0 rgba(24, 32, 46, .06); }
+.townmap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.townmap .road.walked { opacity: .5; }
+.rlabel { position: absolute; transform: translate(0, -50%); z-index: 1; font-size: .62rem; font-weight: 800; color: #4a5a6e; background: rgba(255, 255, 255, .78); border-radius: 7px; padding: 0 5px; white-space: nowrap; pointer-events: none; }
+.tnode { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; background: none; border: 0; padding: 0; z-index: 2; font: inherit; color: #26323f; }
+.tnode.big i { font-style: normal; width: 9cqw; height: 9cqw; border-radius: 2.6cqw; background: #fff; border: 3px solid #9fb3c8; display: grid; place-items: center; font-size: 1.35rem; box-shadow: 0 2px 0 rgba(24, 32, 46, .15); }
+.tnode[data-kind=city] i, .tnode[data-kind=league] i { border-color: #ffc53d; }
+.tnode.big.wide i { width: 30cqw; }
+.tnode.small { width: 8cqw; height: 8cqw; min-width: 30px; min-height: 30px; justify-content: center; }
+.tnode.small i { width: 4.2cqw; height: 4.2cqw; min-width: 14px; min-height: 14px; border-radius: 1.2cqw; background: #fff; border: 3px solid var(--ring, #9fb3c8); box-shadow: 0 1px 0 rgba(24, 32, 46, .18); font-size: 0; }
+.tnode[data-done="1"] i { background: #b9e3a0; }
+.tnode.big[data-done="1"] i::after { content: '✓'; position: absolute; right: -2px; bottom: 14px; font-size: .8rem; font-style: normal; font-weight: 900; color: #2c8a3a; }
+.tnode[data-state=far] { opacity: .75; }
+.tnode[data-state=out] i, .tnode[data-pick="1"] i { box-shadow: 0 0 0 5px rgba(74, 144, 226, .3); animation: tpulse 1.4s ease-in-out infinite; }
+.tnode.small[data-state=out] i { border-color: #4a90e2; }
+.tnode[data-pick="1"] i { background: #4a90e2; }
+.tnode[data-state=here] i { box-shadow: 0 0 0 5px rgba(255, 197, 61, .4); }
+.tname { margin-top: 2px; font-size: .68rem; font-weight: 800; background: rgba(255, 255, 255, .85); border-radius: 8px; padding: 0 6px; white-space: nowrap; }
+.ttypes { position: absolute; top: 100%; display: flex; gap: 2px; margin-top: 1px; }
+.tnode.big .ttypes { top: auto; bottom: -13px; }
+.tnode.small .ttypes { display: none; }
+.ttypes b { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid #fff; box-shadow: 0 1px 0 rgba(24, 32, 46, .2); }
+.tnode .gift { position: absolute; top: -8px; right: -6px; font-style: normal; font-size: 1rem; }
+.partner { position: absolute; width: 0; height: 0; z-index: 4; pointer-events: none; transition: left .5s ease, top .5s ease; }
+.partner img { position: absolute; width: 14cqw; height: 14cqw; left: -7cqw; top: -13cqw; object-fit: contain; filter: drop-shadow(0 3px 2px rgba(20, 30, 50, .3)); }
+.tpanel { margin: 0 12px 10px; background: var(--card); border: 2px solid var(--line); border-radius: 16px; padding: 10px 14px; text-align: center; }
+.ttitle { font-weight: 900; font-size: 1.05rem; }
+.ttitle small { color: #5b6b80; font-weight: 700; font-size: .75rem; margin-left: 4px; }
+.tsub { color: #5b6b80; font-size: .82rem; font-weight: 700; margin: 2px 0 8px; }
+.trow { display: flex; gap: 8px; }
+.trow.wrap { flex-wrap: wrap; }
+.trow .btn { flex: 1 1 40%; }
+@keyframes tpulse { 50% { box-shadow: 0 0 0 9px rgba(74, 144, 226, .1); } }
+.modal { position: absolute; inset: 0; background: rgba(20, 30, 50, .5); display: grid; place-items: center; z-index: 20; padding: 24px; }

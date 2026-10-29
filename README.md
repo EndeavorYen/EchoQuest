@@ -1,15 +1,15 @@
 # EchoQuest
 
-A phone-first English spelling-the-world game in pixel art. Point the camera at
-anything around you, a cute monster pops out of it, and you beat it by **saying
-English words out loud**. Win fights to walk a map toward the treasure.
+A phone-first English-practice game. Walk a Pokémon-style town map, meet the
+monsters that live in each place, and beat them by **saying English words out
+loud**. Win fights to reach the league at the end of the map.
 
-- **Scan once, meet a monster.** The photo becomes a 16-colour pixel backdrop and
-  its colours decide the monster's colour family.
+- **Walk the map, meet a monster.** Each place on the Town Map decides which kind of monster lives there.
 - **Cast spells with your voice.** Pick one of three spell cards (easier / on-level /
   harder — harder words hit harder), tap the mic, say the word.
-- **You can't lose.** The monster telegraphs an attack; the next player says a shield
-  word. Miss it and the combo resets and the monster heals a little — nobody gets hurt.
+- **Nobody really loses.** The monster telegraphs an attack; the next player says a shield
+  word. Miss it and the party loses a heart; with no hearts left the fight ends and the party
+  simply goes back to the place it came from.
 - **Take turns.** Up to 4 players share one trek, each with their own level
   (幼兒園 → 國小 → 國中 → 高中). A parent can join at 高中 for review.
 - **Practice mode** never touches the map but still builds word mastery.
@@ -40,7 +40,12 @@ HTTPS). Where it's unavailable or the mic is blocked, a typing box takes over.
 ## Two front ends
 
 - `/` — the Pokémon-style app (`src/v3/`): DOM screens, colormon's colour matching (`src/mon/colorpick.ts`) and data (`src/data/mon/`, see its README for the image/IP note).
-  - **Trek map** (`src/game/trail.ts`): a branching map generated from a seed, so every trek is new and each one is longer than the last. Rules: rows of 2–3 stops, paths only go up one row and never cross, every stop is reachable and leads to the single boss at the top, chests are never back to back. The party shares 5 hearts per fight (7 against a boss); a failed shield word costs one. Losing all of them, or running away, just returns to the stop the party came from.
+  - **Town Map** (`src/game/townmap.ts`, drawn by `src/v3/screens/trek.ts`): a map in the spirit of the handheld Pokémon Town Maps — a grid of square cells, places joined by named roads (1號道路, 2號水路…) that only run north, south, east and west. Big places are towns, gym cities (wide blocks), caves, forests, islands, special buildings (power plant, old tower…) and, at the top, the league. Each road has 1–3 small stops; every stop and every big place but a town holds one wild creature (a gym city and the league hold a boss) and, once beaten, it stays beaten. Tap a neighbouring place, press 前往, and the creature of that place appears — there is no camera on the trek.
+    - Every map is generated from a seed and is different: small / medium / large (35 / 45 / 20 %), 0–4 gym cities, forks and optional side roads. Rules (`checkTownMap`, tested on hundreds of seeds): everything reachable, one start and one league, gym cities are bottlenecks, roads never share a cell and never turn diagonally, 1–3 stops per road, at least one town and one gift.
+    - Who turns up: each place has types (`src/mon/habitat.ts` terrain pools, special buildings have their own, drawn from a shuffled bag so every type shows up over time) and a rarity table (small stops mostly ★1–2 with ~1 % ★4+, big places ★2–5, gym bosses ★3–4, the final boss ★4–5; rarer further up the map). Creatures already caught turn up less often.
+    - Towns are safe: 🔭 news (shows the types of the places around), 💬 the villager's quiz (three spoken words, a present for two right) and 🎁 a first-visit present.
+    - The party shares 5 hearts per fight (7 against a boss). Losing all of them, running away or backing out puts the party back on the place it came from; nothing else changes. Beating the league ends the map; only the map in progress is stored on the phone (a one-line log of finished regions is kept), and 展開新旅程 on the home screen starts a new one.
+    - Toddler mode (camera and tap) is still in the code (`/` screen `toddler`) but is not offered on the home screen for now.
 - `/classic.html` — the earlier pixel-art canvas version (`src/main.ts`, `src/scenes/`). Kept for now; same save, same word bank and speech code.
 
 ## Word bank & saves

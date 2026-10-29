@@ -5,7 +5,15 @@ import type { Mon } from '../mon/dex';
 
 export type ScreenName = 'home' | 'trek' | 'scan' | 'battle' | 'dex' | 'party' | 'practice' | 'toddler';
 
-export interface ScanParams { kind: 'trek' | 'toddler'; boss?: boolean; rare?: boolean }
+export interface ScanParams {
+  kind: 'trek' | 'toddler';
+  boss?: boolean;
+  rare?: boolean;
+  /** the creature to meet (the trek decides it from the place); without it the scan screen picks one with the camera */
+  foe?: Mon;
+  /** the ground the encounter happens on: decides who lives there when the party does not use the camera */
+  place?: { key: 'meadow' | 'forest' | 'lake' | 'cave' | 'gym'; types: string[]; maxRarity: number; minRarity?: number; label?: string; icon?: string };
+}
 export interface BattleParams { foe: Mon; boss?: boolean; trek?: boolean }
 export interface ScreenParams { scan?: ScanParams; battle?: BattleParams; toddler?: { foe?: Mon; book?: boolean } }
 

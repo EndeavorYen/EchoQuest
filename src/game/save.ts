@@ -3,7 +3,7 @@ import { newRun, type Run } from './run';
 import { legacyIdMap } from '../data/bank';
 import { LEDGER, BANK_REV } from '../data/ledger';
 import { reconcile } from './reconcile';
-import { isTrail, type Trail } from './trail';
+import { isTownMap, type TownMap } from './townmap';
 import type { MonsterSpec } from '../gfx/monster';
 
 export interface Save {
@@ -12,8 +12,8 @@ export interface Save {
   /** index of the player highlighted in menus */
   active: number;
   run: Run | null;
-  /** the branching trek map of the new front end (the classic game keeps using `run`) */
-  trail: Trail | null;
+  /** the town map of the new front end (the classic game keeps using `run`) */
+  townmap: TownMap | null;
   /** word ids the party has defeated monsters with */
   collection: string[];
   relics: string[];
@@ -28,6 +28,8 @@ export interface Save {
   /** word-bank revision this save has been brought up to (see data/ledger.ts); absent in older saves */
   bankRev?: number;
   treks: number;
+  /** the regions the party has finished, newest last (at most 50) */
+  journeys: { title: string; size: string; date: string }[];
   sound: boolean;
   music: boolean;
 }
@@ -42,7 +44,7 @@ export function defaultSave(): Save {
     players: [newPlayer(0, 1)],
     active: 0,
     run: null,
-    trail: null,
+    townmap: null,
     collection: [],
     relics: [],
     stickers: [],
@@ -51,6 +53,7 @@ export function defaultSave(): Save {
     pals: [],
     bankRev: BANK_REV,
     treks: 0,
+    journeys: [],
     sound: true,
     music: true,
   };
@@ -101,13 +104,14 @@ function normalise(data: Raw): Save {
     })),
     active: Math.min(data.active ?? 0, players.length - 1),
     run: data.run ?? null,
-    trail: isTrail(data.trail) ? data.trail : null,
+    townmap: isTownMap(data.townmap) ? data.townmap : null,
     collection: data.collection ?? [],
     relics: data.relics ?? [],
     stickers: Array.isArray(data.stickers) ? data.stickers : [],
     aliases: data.aliases && typeof data.aliases === 'object' ? data.aliases : {},
     caught: Array.isArray(data.caught) ? data.caught.filter((n) => Number.isInteger(n)) : [],
     pals: Array.isArray(data.pals) ? data.pals.filter((n) => Number.isInteger(n)) : [],
+    journeys: Array.isArray(data.journeys) ? data.journeys.filter((j) => j && typeof j.title === 'string').slice(-50) : [],
     bankRev: Number.isInteger(data.bankRev) ? data.bankRev : 0,
   };
 }

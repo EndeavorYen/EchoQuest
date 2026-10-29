@@ -1,5 +1,5 @@
 import { nextRelic } from '../../game/run';
-import { arrive, stay } from '../../game/trail';
+import { retreat, winEntering } from '../../game/townmap';
 import { sfx } from '../../audio/sfx';
 import { BattleView } from '../battle-view';
 import { BattleController } from '../battle-controller';
@@ -12,6 +12,7 @@ export const battle: ScreenFactory = (root, ctx, params: BattleParams) => {
   const ctl = new BattleController(view, ctx.save, ctx.rec, (s) => ctx.update(() => s));
   sfx.setMusic('battle');
   const boss = !!params.boss;
+  let finished = false;
 
   ctl.onWin = (foe) => {
     const isNew = !ctx.save.caught.includes(foe.id);
@@ -22,22 +23,27 @@ export const battle: ScreenFactory = (root, ctx, params: BattleParams) => {
         caught: isNew ? [...s.caught, foe.id] : s.caught,
         relics: relic && !s.relics.includes(relic.id) ? [...s.relics, relic.id] : s.relics,
       };
-      if (params.trek && s.trail) {
-        // the party walks on to the stop it just cleared; a beaten boss ends the map
-        if (boss) return { ...next, trail: null, treks: s.treks + 1 };
-        return { ...next, trail: s.trail.target === null ? s.trail : arrive(s.trail, s.trail.target) };
+      if (params.trek && s.townmap) {
+        // the win is kept on the map; beating the league ends this region
+        const m = s.townmap;
+        if (m.entering !== null && m.nodes[m.entering].kind === 'league') {
+          finished = true;
+          const journey = { title: m.title, size: m.size, date: new Date().toISOString().slice(0, 10) };
+          return { ...next, townmap: null, treks: s.treks + 1, journeys: [...s.journeys, journey].slice(-50) };
+        }
+        return { ...next, townmap: winEntering(m) };
       }
       return next;
     });
-    return { isNew, nextLabel: params.trek ? (boss ? '完成冒險！' : '繼續冒險') : '再遇見一隻' };
+    return { isNew, nextLabel: params.trek ? (finished ? '完成冒險！' : '繼續冒險') : '再遇見一隻' };
   };
   ctl.onNextFoe = () => {
-    if (params.trek) ctx.go(boss ? 'home' : 'trek');
+    if (params.trek) ctx.go(finished ? 'home' : 'trek');
     else ctl.start(pickWild(ctx.rng, { maxRarity: 3, owned: new Set(ctx.save.caught) }));
   };
-  // running away or losing changes nothing: the party stays on the stop it came from
+  // running away or losing changes nothing: the party goes back to the place it set out from
   const back = (): void => {
-    if (params.trek) ctx.update((s) => (s.trail ? { ...s, trail: stay(s.trail) } : s));
+    if (params.trek) ctx.update((s) => (s.townmap ? { ...s, townmap: retreat(s.townmap) } : s));
     ctx.go(params.trek ? 'trek' : 'home');
   };
   ctl.onLeave = back;
