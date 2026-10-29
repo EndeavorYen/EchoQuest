@@ -283,10 +283,84 @@ test.describe('dex and party', () => {
     await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, caught: [6, 25] })));
     await go(p, 'dex');
     await expect(p.locator('.bar h1')).toContainText('2 /');
-    await expect(p.locator('.dexcell:not(.unknown)')).toHaveCount(2);
+    await expect(p.locator('.dexcell')).toHaveCount(12);
+    await expect(p.locator('.dexcell:not(.unknown)')).toHaveCount(1); // only #6 is on the first page
     await p.click('.dexcell[data-id="6"]');
     await p.click('[data-seat="0"]');
     expect(await save(p, (s) => s.players[0].mon)).toBe(6);
+  });
+
+  test('the dex pages through a generation, by buttons and by swiping', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'dex');
+    await expect(p.locator('#pageinfo')).toHaveText('第 1 頁／共 13 頁'); // 151 creatures, 12 a page
+    await expect(p.locator('#prev')).toBeDisabled();
+    await p.click('#next');
+    await expect(p.locator('#pageinfo')).toHaveText('第 2 頁／共 13 頁');
+    await expect(p.locator('.dexcell').first()).toHaveAttribute('data-id', '13');
+    // swipe left = next page, swipe right = back
+    const drag = (from: number, to: number): Promise<void> =>
+      p.evaluate(([x1, x2]) => {
+        const el = document.querySelector('#dexarea')!;
+        const r = el.getBoundingClientRect();
+        const y = r.top + r.height / 2;
+        const ev = (type: string, x: number): PointerEvent => new PointerEvent(type, { clientX: r.left + r.width * x, clientY: y + 3, bubbles: true, pointerId: 1 });
+        el.dispatchEvent(ev('pointerdown', x1));
+        el.dispatchEvent(ev('pointerup', x2));
+      }, [from, to]);
+    await drag(0.9, 0.1);
+    await expect(p.locator('#pageinfo')).toHaveText('第 3 頁／共 13 頁');
+    await drag(0.1, 0.9);
+    await expect(p.locator('#pageinfo')).toHaveText('第 2 頁／共 13 頁');
+    // changing generation starts again from page 1
+    await p.click('[data-gen="1"]');
+    await expect(p.locator('#pageinfo')).toContainText('第 1 頁');
+    await expect(p.locator('.dexcell').first()).toHaveAttribute('data-id', '152');
+  });
+
+  test('"caught only" hides the rest and pages over what is left', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, caught: [6, 25, 133] })));
+    await go(p, 'dex');
+    await p.check('#only');
+    await expect(p.locator('.dexcell')).toHaveCount(3);
+    await expect(p.locator('.dexcell.unknown')).toHaveCount(0);
+    await expect(p.locator('#pageinfo')).toHaveText('第 1 頁／共 1 頁');
+    await expect(p.locator('#next')).toBeDisabled();
+    await p.uncheck('#only');
+    await expect(p.locator('.dexcell')).toHaveCount(12);
+    // a generation with nothing caught says so instead of showing an empty grid
+    await p.check('#only');
+    await p.click('[data-gen="2"]');
+    await expect(p.locator('.dexcell')).toHaveCount(0);
+    await expect(p.locator('.dexempty')).toBeVisible();
+  });
+
+  test('the sheet shows the evolution family: current one framed, unknown ones hidden', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, caught: [4, 5] })));
+    await go(p, 'dex');
+    await p.click('.dexcell[data-id="5"]');
+    await expect(p.locator('.evo-chip')).toHaveCount(3);
+    await expect(p.locator('.evo-chip.cur')).toContainText('No.5');
+    await expect(p.locator('.evo-chip.unk')).toHaveCount(1); // #6 not caught yet: silhouette and a question mark
+    await expect(p.locator('.evo-chip.unk')).toContainText('？？？');
+    await p.click('.evo-chip[data-evo="4"]'); // a caught relative opens its own sheet
+    await expect(p.locator('.evo-chip.cur')).toContainText('No.4');
+    await p.click('.evo-chip.unk');
+    await expect(p.locator('.toast')).toBeVisible();
+    // a branching family keeps every branch
+    await p.click('[data-close]');
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, caught: [133] })));
+    await go(p, 'home');
+    await go(p, 'dex');
+    await p.check('#only');
+    await p.click('.dexcell[data-id="133"]');
+    await expect(p.locator('.evo-chip')).toHaveCount(9);
+    await expect(p.locator('.evo-chip.cur')).toContainText('No.133');
   });
 
   test('the party screen adds players, changes level and swaps the partner', async ({ game }) => {

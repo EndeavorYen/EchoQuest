@@ -338,3 +338,30 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 .trow .btn { flex: 1 1 40%; }
 @keyframes tpulse { 50% { box-shadow: 0 0 0 9px rgba(74, 144, 226, .1); } }
 .modal { position: absolute; inset: 0; background: rgba(20, 30, 50, .5); display: grid; place-items: center; z-index: 20; padding: 24px; }
+
+/* dex: paging, caught filter and the evolution family */
+.onlycaught { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: .9rem; color: var(--muted); padding: 2px 2px; }
+.onlycaught input { width: 20px; height: 20px; accent-color: var(--good); }
+.dexempty { grid-column: 1 / -1; text-align: center; padding: 24px 0; }
+.pager { display: flex; align-items: center; justify-content: center; gap: 14px; font-weight: 800; padding-top: 4px; }
+.pager .icon-btn { font-size: 1.6rem; line-height: 1; }
+.pager .icon-btn:disabled { opacity: .35; }
+.sheet > div { max-height: 92vh; overflow-y: auto; }
+.sheet img { max-height: 24vh; }
+.evo { width: 100%; text-align: left; }
+.evo small { display: block; font-weight: 800; color: var(--muted); margin-bottom: 4px; font-size: .78rem; }
+.evo-tree { overflow-x: auto; padding: 4px 4px 6px; }
+.evo-node { display: flex; align-items: center; gap: 6px; width: max-content; }
+.evo-node.down { flex-direction: column; align-items: flex-start; }
+.evo-kids { display: flex; flex-direction: column; gap: 6px; }
+.evo-kids.grid { display: grid; grid-template-columns: repeat(4, auto); gap: 6px; }
+.evo-arrow { color: var(--muted); font-size: .8rem; }
+.evo-chip { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 70px; padding: 4px 3px 5px; border: 2px solid var(--line); border-radius: 14px; background: transparent; font: inherit; color: inherit; }
+.evo-chip .pic { position: relative; width: 48px; height: 48px; display: grid; place-items: center; }
+.evo-chip img { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; }
+.evo-chip img.sil { filter: brightness(0) opacity(.22); }
+.evo-chip .q { position: absolute; font-style: normal; font-weight: 900; font-size: 1.2rem; color: var(--muted); }
+.evo-chip b { font-size: .64rem; color: var(--muted); }
+.evo-chip span:last-child { font-size: .76rem; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evo-chip.cur { border-color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); box-shadow: 0 0 0 2px var(--c); }
+.evo-chip.unk { opacity: .7; }
