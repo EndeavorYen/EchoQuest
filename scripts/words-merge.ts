@@ -66,7 +66,8 @@ for (const raw of reply) {
   if (at !== undefined) { pack.words[at] = merged; changed++; } else { index.set(id, pack.words.length); pack.words.push(merged); added++; }
 }
 
-const missing = [...asked].filter((id) => !answered.has(id) && !index.has(id));
+const skippedSet = new Set(skipped.map((s) => s.id));
+const missing = [...asked].filter((id) => !answered.has(id) && !index.has(id) && !skippedSet.has(id));
 writePack(pack);
 if (skipped.length) writeFileSync(skippedFile, JSON.stringify(skipped, null, 1) + '\n');
 console.log(`pack ${packId}: +${added} added, ${changed} changed, ${skips} skipped, ${rejects.length} rejected, ${missing.length} not answered`);
