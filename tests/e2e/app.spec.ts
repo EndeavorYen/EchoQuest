@@ -276,6 +276,24 @@ test.describe('defense', () => {
   });
 });
 
+test.describe('what is new', () => {
+  test('the info button opens the update notes; the red dot goes once they were read', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await expect(p.locator('#infodot')).toBeVisible();
+    await p.click('#info');
+    await expect(p.locator('[data-screen=changelog]')).toContainText('城鎮地圖');
+    await expect(p.locator('.rel-list article.new')).toHaveCount(1);
+    await p.click('[data-screen=changelog] [data-close]');
+    await expect(p.locator('[data-screen=changelog]')).toHaveCount(0);
+    await go(p, 'party');
+    await go(p, 'home');
+    await expect(p.locator('#infodot')).toBeHidden();
+    await p.click('#info');
+    await expect(p.locator('.rel-list article.new')).toHaveCount(0);
+  });
+});
+
 test.describe('dex and party', () => {
   test('the dex marks caught creatures and a caught one can become the partner', async ({ game }) => {
     const p = game.page;

@@ -1,0 +1,57 @@
+/**
+ * What's new, written for the players (and their grown-ups): a few plain lines per version,
+ * newest first, no numbers and no implementation detail. The details live in the README.
+ */
+export interface Release {
+  version: string;
+  date: string;
+  title: string;
+  items: string[];
+}
+
+export const CHANGELOG: Release[] = [
+  {
+    version: '2.1',
+    date: '2026-10-29',
+    title: '城鎮地圖、新音效與圖鑑翻頁',
+    items: [
+      '冒險改成像寶可夢的城鎮地圖：走過道路、洞窟和城鎮，一路挑戰道館，最後打到冠軍',
+      '沒去過的地方藏在烏雲裡；可以拖曳、兩指縮放，打開地圖會自動對準你的位置',
+      '城鎮可以拿小禮物、撥開烏雲，還有村民考考你；每次都是新的地圖，隨時能展開新旅程',
+      '法術照屬性發出不同的聲音；地圖、一般戰鬥、道館和冠軍各有自己的背景音樂',
+      '圖鑑一頁一頁翻，可以左右滑動，也能只看已抓到的；點開寶可夢就看得到整個進化家族',
+    ],
+  },
+  {
+    version: '2.0',
+    date: '2026-10-29',
+    title: '全新的手機畫面',
+    items: ['念英文單字打寶可夢，打贏就收進圖鑑', '可以多位小朋友輪流玩，也能慢慢練習不打怪'],
+  },
+];
+
+export const LATEST = CHANGELOG[0].version;
+const KEY = 'echoquest-seen-version';
+
+/** The version the player last looked at (null if never, or if storage is unavailable). */
+export function seenVersion(): string | null {
+  try {
+    return localStorage.getItem(KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function markSeen(version = LATEST): void {
+  try {
+    localStorage.setItem(KEY, version);
+  } catch {
+    // a red dot that stays is not worth breaking anything over
+  }
+}
+
+/** Releases newer than the one last seen; everything when nothing was ever seen. */
+export function unseen(seen: string | null = seenVersion()): Release[] {
+  const i = CHANGELOG.findIndex((r) => r.version === seen);
+  return i < 0 ? CHANGELOG.slice(0, 1) : CHANGELOG.slice(0, i);
+}
