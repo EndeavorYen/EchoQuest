@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EchoQuest word bank agent reply",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "w",
+      "pos"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "w": {
+        "type": "string",
+        "description": "the English word exactly as given in the input"
+      },
+      "pos": {
+        "enum": [
+          "n",
+          "v",
+          "adj",
+          "adv",
+          "prep",
+          "conj",
+          "pron",
+          "det",
+          "num",
+          "interj",
+          "phr"
+        ]
+      },
+      "zh": {
+        "type": "string",
+        "maxLength": 14,
+        "description": "Traditional Chinese (Taiwan), short everyday meaning"
+      },
+      "lv": {
+        "enum": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "topic": {
+        "enum": [
+          "animal",
+          "plant",
+          "nature",
+          "weather",
+          "food",
+          "produce",
+          "body",
+          "health",
+          "family",
+          "people",
+          "feeling",
+          "clothes",
+          "home",
+          "school",
+          "toy",
+          "tool",
+          "transport",
+          "place",
+          "color",
+          "number",
+          "shape",
+          "time",
+          "sport",
+          "art",
+          "tech",
+          "science",
+          "society",
+          "money",
+          "action",
+          "mind",
+          "quality",
+          "manner",
+          "grammar"
+        ]
+      },
+      "icon": {
+        "type": "string",
+        "description": "one emoji, only if a child would recognise it"
+      },
+      "heard": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 12
+      },
+      "retired": {
+        "type": "boolean"
+      },
+      "replacedBy": {
+        "type": "string",
+        "pattern": "^.+:[a-z]+$"
+      },
+      "skip": {
+        "type": "boolean"
+      },
+      "why": {
+        "type": "string"
+      }
+    }
+  }
+}

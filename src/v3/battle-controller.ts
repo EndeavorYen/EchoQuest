@@ -13,7 +13,7 @@ import { knownHearings, learnHearing } from '../speech/learn';
 import { logHeard } from '../speech/heardlog';
 import { Speaker, type SpeakResult } from '../speech/speaker';
 import type { Recognizer } from '../speech/recognizer';
-import { sfx, say, stopSay } from '../audio/sfx';
+import { sfx, sayWord, stopSay } from '../audio/sfx';
 import { Rng } from '../util/rng';
 import type { Word } from '../data/words';
 import { artUrl, typeOf, type Mon } from '../mon/dex';
@@ -178,7 +178,7 @@ export class BattleController {
 
   private hear(): void {
     sfx.unlock();
-    say(this.phase === 'defend' && this.defWord ? this.defWord.w : this.word.w, 0.7);
+    { const w = this.phase === 'defend' && this.defWord ? this.defWord : this.word; sayWord(w.w, w.zh); }
   }
 
   private mic(): void {
@@ -324,7 +324,7 @@ export class BattleController {
     this.battle.fizzle();
     this.revenge.miss(this.me.id, this.word, this.battle.round);
     this.view.showWait(`咒語是「${this.word.w}」，下次再來！`);
-    say(this.word.w, 0.7);
+    sayWord(this.word.w, this.word.zh);
     window.setTimeout(() => this.afterAttack(), 1400);
   }
 

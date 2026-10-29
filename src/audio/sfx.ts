@@ -268,6 +268,49 @@ export function say(text: string, rate = 0.8): void {
   }
 }
 
+let zhVoice: SpeechSynthesisVoice | null = null;
+
+function pickZhVoice(): void {
+  if (typeof speechSynthesis === 'undefined') return;
+  const voices = speechSynthesis.getVoices();
+  zhVoice =
+    voices.find((v) => /zh[-_]TW/i.test(v.lang)) ??
+    voices.find((v) => /cmn[-_]Hant|zh[-_]HK/i.test(v.lang)) ??
+    voices.find((v) => /^zh/i.test(v.lang)) ??
+    null;
+}
+
+if (typeof speechSynthesis !== 'undefined') {
+  pickZhVoice();
+  speechSynthesis.addEventListener?.('voiceschanged', pickZhVoice);
+}
+
+/**
+ * Say a word the way a learner needs to hear it: English first (slow), then the Chinese
+ * meaning, so even a word with no picture teaches both how it sounds and what it means.
+ */
+export function sayWord(en: string, zh: string, rate = 0.7): void {
+  if (typeof speechSynthesis === 'undefined' || !sfx.enabled) return;
+  try {
+    speechSynthesis.cancel();
+    const a = new SpeechSynthesisUtterance(en);
+    a.lang = 'en-US';
+    if (voice) a.voice = voice;
+    a.rate = rate;
+    a.pitch = 1.1;
+    speechSynthesis.speak(a);
+    if (zh) {
+      const b = new SpeechSynthesisUtterance(zh);
+      b.lang = 'zh-TW';
+      if (zhVoice) b.voice = zhVoice;
+      b.rate = 0.9;
+      speechSynthesis.speak(b);
+    }
+  } catch {
+    // speech is a nicety; never break the game over it
+  }
+}
+
 export function stopSay(): void {
   if (typeof speechSynthesis === 'undefined') return;
   try {

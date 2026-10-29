@@ -6,7 +6,7 @@ import { judge } from '../../speech/match';
 import { knownHearings, learnHearing } from '../../speech/learn';
 import { logHeard } from '../../speech/heardlog';
 import { Speaker, type SpeakResult } from '../../speech/speaker';
-import { sfx, say, stopSay } from '../../audio/sfx';
+import { sfx, sayWord, stopSay } from '../../audio/sfx';
 import { artUrl, typeOf } from '../../mon/dex';
 import { partnerMon } from '../partner';
 import { WordPanel } from '../battle-view';
@@ -52,7 +52,7 @@ export const practice: ScreenFactory = (root, ctx) => {
     recent = [...recent.slice(-8), word.id];
     tries = 0; heard = []; typing = false;
     show('說出這個單字');
-    say(word.w, 0.7);
+    sayWord(word.w, word.zh);
   }
 
   function show(note = ''): void {
@@ -90,7 +90,7 @@ export const practice: ScreenFactory = (root, ctx) => {
       mark(false);
       sfx.play('miss');
       panel.showWait(`答案是「${word.w}」，下次再來！`);
-      say(word.w, 0.7);
+      sayWord(word.w, word.zh);
       timer = window.setTimeout(deal, 1600);
     } else {
       sfx.play('miss');
@@ -98,7 +98,7 @@ export const practice: ScreenFactory = (root, ctx) => {
     }
   }
 
-  panel.onHear = () => { if (word) say(word.w, 0.7); };
+  panel.onHear = () => { if (word) sayWord(word.w, word.zh); };
   panel.onKeyboard = () => { speaker.cancel(); typing = true; show(); };
   panel.onSubmitTyped = (t) => answer({ kind: 'typed', text: t });
   panel.onConfirm = () => {

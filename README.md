@@ -50,3 +50,7 @@ HTTPS). Where it's unavailable or the mic is blocked, a typing box takes over.
 - **Difficulty** (`lv`, the bands in `src/data/levels.json`) and **word lists** (`lists`, e.g. `starter`) are separate:
   one word can sit in several lists.
 - Saves are versioned (`echoquest.v3`). Older saves are migrated on load and the old entry is left in place as a backup.
+
+## Word bank
+
+Words live in `src/data/packs/*.json`; the rules for them are in [docs/word-bank-spec.md](docs/word-bank-spec.md). Packs are append-only: words are retired, never deleted, and every change is recorded in `src/data/bankstate/` so saved progress follows the bank (`src/game/reconcile.ts`). Agent workflow: `npm run words:batches` → `words:prompt` → (Gemini) → `words:merge` → `words:commit`; `words:check` verifies everything.

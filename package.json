@@ -10,7 +10,12 @@
     "preview": "vite preview --host",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "words:batches": "vite-node scripts/words-batches.ts",
+    "words:prompt": "vite-node scripts/words-prompt.ts",
+    "words:merge": "vite-node scripts/words-merge.ts",
+    "words:commit": "vite-node scripts/words-commit.ts",
+    "words:check": "vite-node scripts/words-check.ts"
   },
   "dependencies": {
     "@vp-tw/cjk-web-fonts-fusion-pixel-font": "0.0.1"
@@ -19,6 +24,7 @@
     "@napi-rs/canvas": "^1.0.13",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.5",
+    "opencc-js": "^1.4.2",
     "tsx": "^4.23.15",
     "typescript": "^5.5.3",
     "vite": "^8.3.5",

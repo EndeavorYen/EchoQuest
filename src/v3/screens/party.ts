@@ -1,11 +1,17 @@
 import { MAX_PLAYERS, newPlayer, PLAYER_NAMES, type Level } from '../../game/model';
 import { levelStat } from '../../game/progress';
-import { LEVELS, WORDS } from '../../data/words';
+import { LEVELS, PACKS, WORDS } from '../../data/words';
 import { MON_BY_ID, STARTER_IDS, artUrl, typeOf } from '../../mon/dex';
 import { exportLog } from '../../speech/heardlog';
 import { sfx } from '../../audio/sfx';
 import { partnerMon } from '../partner';
 import { bar, esc, type ScreenFactory } from '../ctx';
+
+/** One line per shipped word source that asks for credit. */
+function credits(): string {
+  const lines = PACKS.filter((p) => p.id !== 'starter').map((p) => (p.id === 'cefrj' ? `${p.name}（Tono Laboratory, TUFS）` : p.name));
+  return (lines.length ? lines : ['自編入門字']).map((l) => `<span class="muted">${esc(l)}</span>`).join('');
+}
 
 /** Party setup: who plays, at which level, with which partner; plus sound and the heard-words log. */
 export const party: ScreenFactory = (root, ctx) => {
@@ -34,7 +40,8 @@ export const party: ScreenFactory = (root, ctx) => {
         <div class="card stack"><div class="row"><span class="grow"><b>音效</b></span><button class="btn sm ${sound ? 'good' : 'ghost'}" id="snd">${sound ? '開' : '關'}</button></div>
           <div class="row"><span class="grow"><b>音樂</b></span><button class="btn sm ${music ? 'good' : 'ghost'}" id="mus">${music ? '開' : '關'}</button></div>
           <div class="row"><span class="grow"><b>辨識紀錄</b><br><span class="muted">複製給開發者調整語音辨識</span></span><button class="btn sm ghost" id="log">複製</button></div>
-          <div class="muted" id="logmsg"></div></div></div></div></div>`;
+          <div class="muted" id="logmsg"></div></div>
+        <div class="card stack"><b>字庫來源</b>${credits()}</div></div></div></div>`;
     root.querySelectorAll<HTMLElement>('[data-lv]').forEach((b) => b.addEventListener('click', () => {
       const i = Number(b.dataset.lv), d = Number(b.dataset.d);
       ctx.update((s) => ({ ...s, players: s.players.map((p, k) => (k === i ? { ...p, level: Math.max(1, Math.min(4, p.level + d)) as Level } : p)) }));

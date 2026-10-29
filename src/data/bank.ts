@@ -31,6 +31,10 @@ export interface Word {
   topic?: string;
   /** CEFR level of the source list (A1–B2), kept for reference */
   cefr?: string;
+  /** soft-deleted: never dealt any more, but the id stays known so old progress isn't orphaned */
+  retired?: boolean;
+  /** the id that took this word's place (progress moves there on the next save load) */
+  replacedBy?: string;
 }
 
 export interface PackWord {
@@ -44,6 +48,8 @@ export interface PackWord {
   lists?: string[];
   topic?: string;
   cefr?: string;
+  retired?: boolean;
+  replacedBy?: string;
 }
 
 export interface Pack {
@@ -91,8 +97,14 @@ export function buildBank(packs: Pack[]): Word[] {
         have.topic ??= e.topic;
         have.cefr ??= e.cefr;
         have.icon ??= e.icon;
+        if (!e.retired) have.retired = undefined; // any pack that still offers the word keeps it alive
       } else {
-        byId.set(id, { id, w: e.w.trim(), pos: e.pos, zh: e.zh, lv: e.lv, icon: e.icon, heard: e.heard, topic: e.topic, cefr: e.cefr, lists: [...new Set(lists)] });
+        byId.set(id, {
+          id, w: e.w.trim(), pos: e.pos, zh: e.zh, lv: e.lv, icon: e.icon, heard: e.heard, topic: e.topic, cefr: e.cefr,
+          lists: [...new Set(lists)],
+          ...(e.retired ? { retired: true as const } : {}),
+          ...(e.retired && e.replacedBy ? { replacedBy: e.replacedBy } : {}),
+        });
       }
     }
   }
@@ -103,8 +115,12 @@ const files = import.meta.glob<Pack>('./packs/*.json', { eager: true, import: 'd
 /** Packs sorted by id so the order never depends on the bundler. */
 export const PACKS: Pack[] = Object.values(files).sort((a, b) => a.id.localeCompare(b.id));
 
-export const WORDS: Word[] = buildBank(PACKS);
-export const WORD_BY_ID = new Map(WORDS.map((w) => [w.id, w]));
+/** Every word ever shipped, retired ones included. */
+export const ALL_WORDS: Word[] = buildBank(PACKS);
+/** The words the game deals: retired ones are left out. */
+export const WORDS: Word[] = ALL_WORDS.filter((w) => !w.retired);
+/** Lookup by id covers retired words too, so an old save entry can still be shown. */
+export const WORD_BY_ID = new Map(ALL_WORDS.map((w) => [w.id, w]));
 
 export function wordsOfLevel(lv: number): Word[] {
   return WORDS.filter((w) => w.lv === lv);

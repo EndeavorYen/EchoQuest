@@ -1,6 +1,8 @@
 import { MAX_PLAYERS, newPlayer, type Player } from './model';
 import { newRun, type Run } from './run';
 import { legacyIdMap } from '../data/bank';
+import { LEDGER, BANK_REV } from '../data/ledger';
+import { reconcile } from './reconcile';
 import type { MonsterSpec } from '../gfx/monster';
 
 export interface Save {
@@ -20,6 +22,8 @@ export interface Save {
   caught: number[];
   /** Pokémon ids the little ones have grown into stickers (toddler mode), newest first */
   pals: number[];
+  /** word-bank revision this save has been brought up to (see data/ledger.ts); absent in older saves */
+  bankRev?: number;
   treks: number;
   sound: boolean;
   music: boolean;
@@ -41,6 +45,7 @@ export function defaultSave(): Save {
     aliases: {},
     caught: [],
     pals: [],
+    bankRev: BANK_REV,
     treks: 0,
     sound: true,
     music: true,
@@ -98,6 +103,7 @@ function normalise(data: Raw): Save {
     aliases: data.aliases && typeof data.aliases === 'object' ? data.aliases : {},
     caught: Array.isArray(data.caught) ? data.caught.filter((n) => Number.isInteger(n)) : [],
     pals: Array.isArray(data.pals) ? data.pals.filter((n) => Number.isInteger(n)) : [],
+    bankRev: Number.isInteger(data.bankRev) ? data.bankRev : 0,
   };
 }
 
@@ -115,10 +121,15 @@ function read(s: StorageLike, key: string): Raw | null {
 export function load(s: StorageLike | null = store()): Save {
   if (!s) return defaultSave();
   const v3 = read(s, KEY);
-  if (v3 && v3.v === 3) return normalise(v3);
+  if (v3 && v3.v === 3) {
+    const save = normalise(v3);
+    const fixed = reconcile(save, LEDGER, BANK_REV);
+    if (fixed !== save) persist(fixed, s);
+    return fixed;
+  }
   const v2 = read(s, KEY_V2);
   if (v2 && v2.v === 2) {
-    const save = normalise(migrateV2(v2));
+    const save = reconcile(normalise(migrateV2(v2)), LEDGER, BANK_REV);
     persist(save, s); // the old v2 entry stays as a backup
     return save;
   }
