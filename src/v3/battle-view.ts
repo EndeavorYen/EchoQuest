@@ -1,6 +1,7 @@
 import { artUrl, typeOf, type Mon } from '../mon/dex';
 import type { Word } from '../data/words';
 
+const BACK = '<svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>';
 const MIC = '<svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11z"/></svg>';
 const SPEAKER = '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>';
 const KEYBOARD = '<svg viewBox="0 0 24 24"><path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-9 3h2v2h-2zm-3 0h2v2H8zM5 8h2v2H5zm2 8H5v-2h2zm9 0H8v-2h8zm3 0h-2v-2h2zm0-3h-2v-2h2zm0-3h-2V8h2z"/></svg>';
@@ -13,50 +14,41 @@ export interface PartyChip {
   color: string;
   level: number;
   on: boolean;
+  /** cannot act right now (boss fight) */
+  locked?: boolean;
+  /** bounced off the boss shield and recovering */
+  down?: boolean;
 }
 
 const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-/** Pure DOM: builds the battle screen and exposes small methods the controller drives. */
-export class BattleView {
-  readonly root: HTMLElement;
-  private $ = <T extends HTMLElement>(sel: string): T => this.root.querySelector(sel) as T;
+export interface WordOpts {
+  mode: 'speak' | 'defend';
+  word: Word;
+  hint: string;
+  revenge?: boolean;
+  showConfirm?: boolean;
+  listening?: boolean;
+  typing?: boolean;
+  note?: string;
+  timer?: boolean;
+  /** label on the microphone button when idle */
+  micLabel?: string;
+}
 
+/** The white card with the word, the microphone and the helper buttons. Used by battles and practice. */
+export class WordPanel {
   onMic: () => void = () => {};
   onHear: () => void = () => {};
   onKeyboard: () => void = () => {};
   onConfirm: () => void = () => {};
-  onPartner: (i: number) => void = () => {};
   onSubmitTyped: (text: string) => void = () => {};
   onNext: () => void = () => {};
 
-  constructor(root: HTMLElement) {
-    this.root = root;
-    root.innerHTML = `
-      <div class="app" data-screen="battle">
-        <div class="bar">
-          <h1 id="title">野生的寶可夢出現了！</h1>
-          <span class="stars" id="stars"></span>
-        </div>
-        <div class="arena" id="arena">
-          <div class="plate foe"><div class="nm"><span id="foeName"></span><span class="chip" id="foeType"></span></div>
-            <div class="hp"><i id="foeHp"></i></div><div class="hpnum" id="foeHpNum"></div></div>
-          <div class="mon foe" id="foe"></div>
-          <div class="mon me" id="me"></div>
-          <div class="plate me"><div class="nm"><span id="meName"></span><span class="chip" id="meType"></span></div></div>
-          <div class="fx" id="fx"></div>
-        </div>
-        <div class="party" id="party"></div>
-        <div class="panel" id="panel">
-          <p class="hint" id="hint"></p>
-          <div id="body"></div>
-        </div>
-      </div>`;
-    this.$('#party').addEventListener('click', (e) => {
-      const b = (e.target as HTMLElement).closest('[data-i]') as HTMLElement | null;
-      if (b) this.onPartner(Number(b.dataset.i));
-    });
-    this.$('#panel').addEventListener('click', (e) => {
+  constructor(readonly el: HTMLElement) {
+    el.className = 'panel';
+    el.innerHTML = '<p class="hint" id="hint"></p><div id="body"></div>';
+    el.addEventListener('click', (e) => {
       const t = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
       if (!t) return;
       switch (t.dataset.act) {
@@ -68,10 +60,12 @@ export class BattleView {
         case 'send': this.submitTyped(); break;
       }
     });
-    this.$('#panel').addEventListener('keydown', (e) => {
+    el.addEventListener('keydown', (e) => {
       if ((e as KeyboardEvent).key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') this.submitTyped();
     });
   }
+
+  private $ = <T extends HTMLElement>(sel: string): T => this.el.querySelector(sel) as T;
 
   private submitTyped(): void {
     const input = this.$('#typed') as HTMLInputElement | null;
@@ -79,60 +73,12 @@ export class BattleView {
     if (v) this.onSubmitTyped(v);
   }
 
-  // ---- creatures ------------------------------------------------------------
-
-  private monImg(m: Mon): string {
-    return `<img src="${artUrl(m.id)}" alt="${esc(m.name)}" draggable="false" onerror="this.outerHTML='<div class=fallback></div>'">`;
-  }
-
-  setFoe(m: Mon): void {
-    const t = typeOf(m);
-    this.$('#foe').innerHTML = this.monImg(m);
-    this.$('#foeName').textContent = m.name;
-    const chip = this.$('#foeType');
-    chip.textContent = t.name;
-    chip.style.background = t.color;
-    this.$('#stars').textContent = '★'.repeat(m.rarity) + '☆'.repeat(5 - m.rarity);
-    this.$('#title').textContent = '野生的' + m.name;
-    this.$('#arena').style.setProperty('--type', t.color);
-    this.root.style.setProperty('--type', t.color);
-  }
-
-  setPartner(m: Mon): void {
-    const t = typeOf(m);
-    this.$('#me').innerHTML = this.monImg(m);
-    this.$('#meName').textContent = m.name;
-    const chip = this.$('#meType');
-    chip.textContent = t.name;
-    chip.style.background = t.color;
-  }
-
-  setParty(chips: PartyChip[]): void {
-    this.$('#party').innerHTML = chips
-      .map(
-        (c, i) => `<button class="pbtn ${c.on ? 'on' : ''}" data-i="${i}" style="--type:${c.color}" aria-label="夥伴 ${i + 1}">
-          <img src="${c.img}" alt="" onerror="this.style.visibility='hidden'">
-          <span class="lv">${[1, 2, 3, 4].map((n) => `<i class="${n <= c.level ? 'f' : ''}"></i>`).join('')}</span></button>`,
-      )
-      .join('');
-  }
-
-  setFoeHp(hp: number, max: number): void {
-    const f = Math.max(0, Math.min(1, hp / max));
-    const bar = this.$('#foeHp');
-    bar.style.width = `${f * 100}%`;
-    bar.className = f > 0.5 ? '' : f > 0.25 ? 'mid' : 'low';
-    this.$('#foeHpNum').textContent = `${Math.max(0, Math.ceil(hp))} / ${max}`;
-  }
-
-  // ---- panel ----------------------------------------------------------------
-
   private setMode(mode: PanelMode): void {
-    this.$('#panel').className = `panel ${mode === 'defend' ? 'defend' : ''}`;
-    this.root.dataset.mode = mode;
+    this.el.className = `panel ${mode === 'defend' ? 'defend' : ''}`;
+    this.el.dataset.mode = mode;
   }
 
-  showWord(opts: { mode: 'speak' | 'defend'; word: Word; hint: string; revenge?: boolean; showConfirm?: boolean; listening?: boolean; typing?: boolean; note?: string; timer?: boolean }): void {
+  showWord(opts: WordOpts): void {
     const { word, mode } = opts;
     this.setMode(mode);
     this.$('#hint').textContent = (opts.revenge ? '復仇！ ' : '') + opts.hint;
@@ -142,7 +88,7 @@ export class BattleView {
       : '';
     const micBtn = opts.typing
       ? ''
-      : `<button class="mic ${opts.listening ? 'live' : ''}" data-act="mic">${MIC}<span>${opts.listening ? '聽著…' : mode === 'defend' ? '念出防禦咒語' : '按下去，說說看'}</span></button>`;
+      : `<button class="mic ${opts.listening ? 'live' : ''}" data-act="mic">${MIC}<span>${opts.listening ? '聽著…' : opts.micLabel ?? (mode === 'defend' ? '念出防禦咒語' : '按下去，說說看')}</span></button>`;
     this.$('#body').innerHTML = `
       <div class="wordrow" data-act="hear">${pic}<div><div class="word" id="theWord">${esc(word.w)}</div><div class="zh">${esc(word.zh)}</div></div></div>
       ${opts.timer ? '<div class="timer"><i id="timerBar"></i></div>' : ''}
@@ -173,18 +119,137 @@ export class BattleView {
     this.$('#body').innerHTML = '<div style="height:96px"></div>';
   }
 
-  showVictory(foe: Mon, words: Word[]): void {
+  showHtml(hint: string, html: string): void {
     this.setMode('victory');
-    this.$('#hint').textContent = '';
-    this.$('#body').innerHTML = `<div class="victory">
+    this.$('#hint').textContent = hint;
+    this.$('#body').innerHTML = html;
+  }
+}
+
+
+/** Pure DOM: builds the battle screen and exposes small methods the controller drives. */
+export class BattleView {
+  readonly root: HTMLElement;
+  readonly panel: WordPanel;
+  private $ = <T extends HTMLElement>(sel: string): T => this.root.querySelector(sel) as T;
+
+  onMic: () => void = () => {};
+  onHear: () => void = () => {};
+  onKeyboard: () => void = () => {};
+  onConfirm: () => void = () => {};
+  onPartner: (i: number) => void = () => {};
+  onSubmitTyped: (text: string) => void = () => {};
+  onNext: () => void = () => {};
+  onLeave: () => void = () => {};
+
+  constructor(root: HTMLElement) {
+    this.root = root;
+    root.innerHTML = `
+      <div class="app" data-screen="battle">
+        <div class="bar">
+          <button class="icon-btn" data-act="leave" aria-label="離開">${BACK}</button>
+          <h1 id="title">野生的寶可夢出現了！</h1>
+          <span class="stars" id="stars"></span>
+        </div>
+        <div class="arena" id="arena">
+          <div class="plate foe"><div class="nm"><span id="foeName"></span><span class="chip" id="foeType"></span></div>
+            <div class="shields" id="shields" hidden></div>
+            <div class="hp"><i id="foeHp"></i></div><div class="hpnum" id="foeHpNum"></div></div>
+          <div class="mon foe" id="foe"></div>
+          <div class="mon me" id="me"></div>
+          <div class="plate me"><div class="nm"><span id="meName"></span><span class="chip" id="meType"></span></div></div>
+          <div class="fx" id="fx"></div>
+        </div>
+        <div class="party" id="party"></div>
+        <div id="panel"></div>
+      </div>`;
+    this.panel = new WordPanel(this.$('#panel'));
+    this.panel.onMic = () => this.onMic();
+    this.panel.onHear = () => this.onHear();
+    this.panel.onKeyboard = () => this.onKeyboard();
+    this.panel.onConfirm = () => this.onConfirm();
+    this.panel.onSubmitTyped = (t) => this.onSubmitTyped(t);
+    this.panel.onNext = () => this.onNext();
+    this.$('#party').addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('[data-i]') as HTMLElement | null;
+      if (b) this.onPartner(Number(b.dataset.i));
+    });
+    this.$('[data-act=leave]').addEventListener('click', () => this.onLeave());
+  }
+
+  // ---- creatures ------------------------------------------------------------
+
+  private monImg(m: Mon): string {
+    return `<img src="${artUrl(m.id)}" alt="${esc(m.name)}" draggable="false" onerror="this.outerHTML='<div class=fallback></div>'">`;
+  }
+
+  setFoe(m: Mon, boss = false): void {
+    const t = typeOf(m);
+    const foe = this.$('#foe');
+    foe.classList.remove('faint');
+    foe.innerHTML = this.monImg(m);
+    this.$('#foeName').textContent = m.name;
+    const chip = this.$('#foeType');
+    chip.textContent = t.name;
+    chip.style.background = t.color;
+    this.$('#stars').textContent = '★'.repeat(m.rarity) + '☆'.repeat(5 - m.rarity);
+    this.$('#title').textContent = (boss ? '首領 ' : '野生的') + m.name;
+    this.$('#arena').style.setProperty('--type', t.color);
+    this.root.style.setProperty('--type', t.color);
+    this.setShields(0, 0);
+  }
+
+  setPartner(m: Mon): void {
+    const t = typeOf(m);
+    this.$('#me').innerHTML = this.monImg(m);
+    this.$('#meName').textContent = m.name;
+    const chip = this.$('#meType');
+    chip.textContent = t.name;
+    chip.style.background = t.color;
+  }
+
+  setParty(chips: PartyChip[]): void {
+    this.$('#party').innerHTML = chips
+      .map(
+        (c, i) => `<button class="pbtn ${c.on ? 'on' : ''} ${c.locked ? 'locked' : ''} ${c.down ? 'down' : ''}" data-i="${i}" style="--type:${c.color}" aria-label="夥伴 ${i + 1}">
+          <img src="${c.img}" alt="" onerror="this.style.visibility='hidden'">
+          <span class="lv">${[1, 2, 3, 4].map((n) => `<i class="${n <= c.level ? 'f' : ''}"></i>`).join('')}</span></button>`,
+      )
+      .join('');
+  }
+
+  setFoeHp(hp: number, max: number): void {
+    const f = Math.max(0, Math.min(1, hp / max));
+    const bar = this.$('#foeHp');
+    bar.style.width = `${f * 100}%`;
+    bar.className = f > 0.5 ? '' : f > 0.25 ? 'mid' : 'low';
+    this.$('#foeHpNum').textContent = `${Math.max(0, Math.ceil(hp))} / ${max}`;
+  }
+
+  /** Boss shield: one pip per layer left. */
+  setShields(layers: number, max: number): void {
+    const el = this.$('#shields');
+    el.hidden = max <= 0;
+    el.innerHTML = Array.from({ length: max }, (_, i) => `<i class="${i < layers ? 'on' : ''}"></i>`).join('') + (layers > 0 ? '<span>護盾</span>' : '<span>護盾破了！</span>');
+  }
+
+  // ---- panel (forwarded) ------------------------------------------------------
+
+  showWord(opts: WordOpts): void { this.panel.showWord(opts); }
+  setNote(text: string): void { this.panel.setNote(text); }
+  setTimer(frac: number): void { this.panel.setTimer(frac); }
+  showWait(hint: string): void { this.panel.showWait(hint); }
+
+  showVictory(foe: Mon, words: Word[], o: { isNew?: boolean; nextLabel?: string } = {}): void {
+    this.panel.showHtml('', `<div class="victory">
       <div class="big">打倒了${esc(foe.name)}！</div>
+      ${o.isNew ? '<div class="newmon">✨ 新的圖鑑夥伴 ✨</div>' : ''}
       <div class="zh">學到的咒語</div>
       <div class="cards">${words.slice(0, 6).map((w) => `<span>${w.icon ?? ''} ${esc(w.w)}</span>`).join('') || '<span>—</span>'}</div>
-      <button class="btn" data-act="next">再遇見一隻</button></div>`;
+      <button class="btn" data-act="next">${esc(o.nextLabel ?? '再遇見一隻')}</button></div>`);
   }
 
   // ---- effects --------------------------------------------------------------
-
   private center(el: HTMLElement): { x: number; y: number } {
     const a = this.$('#arena').getBoundingClientRect();
     const r = el.getBoundingClientRect();

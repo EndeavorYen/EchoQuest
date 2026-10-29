@@ -16,6 +16,10 @@ export interface Save {
   stickers: MonsterSpec[];
   /** per word: transcripts a grown-up confirmed as "said it right" on this device */
   aliases: Record<string, string[]>;
+  /** Pokémon ids the party has defeated (caught) in battle */
+  caught: number[];
+  /** Pokémon ids the little ones have grown into stickers (toddler mode), newest first */
+  pals: number[];
   treks: number;
   sound: boolean;
   music: boolean;
@@ -35,6 +39,8 @@ export function defaultSave(): Save {
     relics: [],
     stickers: [],
     aliases: {},
+    caught: [],
+    pals: [],
     treks: 0,
     sound: true,
     music: true,
@@ -90,6 +96,8 @@ function normalise(data: Raw): Save {
     relics: data.relics ?? [],
     stickers: Array.isArray(data.stickers) ? data.stickers : [],
     aliases: data.aliases && typeof data.aliases === 'object' ? data.aliases : {},
+    caught: Array.isArray(data.caught) ? data.caught.filter((n) => Number.isInteger(n)) : [],
+    pals: Array.isArray(data.pals) ? data.pals.filter((n) => Number.isInteger(n)) : [],
   };
 }
 

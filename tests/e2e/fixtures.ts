@@ -40,7 +40,7 @@ export interface Zone { x: number; y: number; w: number; h: number; label?: stri
 export class Game {
   constructor(readonly page: Page) {}
 
-  async open(url = '/?debug'): Promise<void> {
+  async open(url = '/classic.html?debug'): Promise<void> {
     await this.page.goto(url);
     await this.page.waitForFunction(() => (window as any).__eq?.scene);
     await this.frames(3);

@@ -37,6 +37,11 @@ HTTPS). Where it's unavailable or the mic is blocked, a typing box takes over.
 - Add `?debug` to the URL to expose the app as `window.__eq` for automated tests.
 - Deploy: import the repo in Vercel (it's a plain Vite static site; `vercel.json` sets the build and allows camera/microphone). CI (`.github/workflows/ci.yml`) runs tests and a build on every PR.
 
+## Two front ends
+
+- `/` — the Pokémon-style app (`src/v3/`): DOM screens, colormon's colour matching (`src/mon/colorpick.ts`) and data (`src/data/mon/`, see its README for the image/IP note).
+- `/classic.html` — the earlier pixel-art canvas version (`src/main.ts`, `src/scenes/`). Kept for now; same save, same word bank and speech code.
+
 ## Word bank & saves
 
 - Words live in `src/data/packs/*.json` (one file per pack). Drop in another file and it is picked up — no code changes.

@@ -8,6 +8,8 @@ export interface Player {
   level: Level;
   /** avatar look index */
   face: number;
+  /** the Pokémon that fights for this player (id); starter by seat when unset */
+  mon?: number;
   progress: Progress;
   stats: { dealt: number; perfect: number; blocks: number; words: number };
 }

@@ -13,6 +13,8 @@ export interface TypeInfo {
   name: string;
   color: string;
   glyph: string;
+  /** signature colours the colour matching leans on */
+  affinity?: string[];
   fx: { style: string; colors: string[] };
   arena: { base: string[]; frame: string };
 }
@@ -75,8 +77,8 @@ export function shieldLayers(m: Mon): number {
 const RARITY_WEIGHT = config.rarityWeight as Record<string, number>;
 
 /** A random creature, common ones far more often than rare ones. `owned` creatures show up a bit less. */
-export function pickWild(rng: Rng, opts: { owned?: Set<number>; ownedWeight?: number; maxRarity?: number } = {}): Mon {
-  const pool = DEX.filter((m) => m.rarity <= (opts.maxRarity ?? 5));
+export function pickWild(rng: Rng, opts: { owned?: Set<number>; ownedWeight?: number; minRarity?: number; maxRarity?: number } = {}): Mon {
+  const pool = DEX.filter((m) => m.rarity >= (opts.minRarity ?? 1) && m.rarity <= (opts.maxRarity ?? 5));
   const w = pool.map((m) => (RARITY_WEIGHT[String(m.rarity)] ?? 0.1) * (opts.owned?.has(m.id) ? (opts.ownedWeight ?? 0.3) : 1));
   const total = w.reduce((a, b) => a + b, 0);
   let r = rng.next() * total;
@@ -88,7 +90,8 @@ export function pickWild(rng: Rng, opts: { owned?: Set<number>; ownedWeight?: nu
 }
 
 /** A friendly starter for a new player: common, and of varied types. */
+export const STARTER_IDS = [25, 1, 4, 7, 133, 39]; // a fixed, kid-friendly rotation of well-known commons
+
 export function starterFor(index: number): Mon {
-  const ids = [25, 1, 4, 7, 133, 39]; // a fixed, kid-friendly rotation of well-known commons
-  return MON_BY_ID.get(ids[index % ids.length]) ?? DEX[0];
+  return MON_BY_ID.get(STARTER_IDS[index % STARTER_IDS.length]) ?? DEX[0];
 }

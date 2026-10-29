@@ -1,36 +1,220 @@
 {
- "artUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{id}.png",
- "spriteUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{id}.png",
- "backSpriteUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/{id}.png",
- "rarityWeight": {
-  "1": 1,
-  "2": 0.6,
-  "3": 0.35,
-  "4": 0.14,
-  "5": 0.02
- },
- "shields": {
-  "3": 3,
-  "4": 4,
-  "5": 5
- },
- "battle": {
-  "enabled": true,
-  "minRarity": 4,
-  "delayMs": 900,
-  "foeSpeed": 250,
-  "foeSpeedStep": 30,
-  "pauseMs": 420,
-  "dashMul": 2.5,
-  "dodgeChance": 0.6,
-  "reactMs": 170,
-  "cooldownMs": 380,
-  "hitSlack": 7,
-  "hitsPerLayer": {
-   "default": 2,
-   "5": 3
+  "home": {
+    "url": "https://colormon-nu.vercel.app/",
+    "oldHosts": [
+      "endeavoryen.github.io"
+    ]
   },
-  "shakePx": 5,
-  "shotScale": 0.8
- }
+  "packs": [
+    "packs/gen1.json",
+    "packs/gen2.json",
+    "packs/gen3.json",
+    "packs/gen4.json",
+    "packs/gen5.json",
+    "packs/gen6.json",
+    "packs/gen7.json",
+    "packs/gen8.json",
+    "packs/gen9.json",
+    "packs/color-tweaks.json"
+  ],
+  "catchBase": {
+    "1": 0.75,
+    "2": 0.6,
+    "3": 0.45,
+    "4": 0.3,
+    "5": 0.2
+  },
+  "rarityWeight": {
+    "1": 1,
+    "2": 0.6,
+    "3": 0.35,
+    "4": 0.14,
+    "5": 0.02
+  },
+  "catchBonusPerMiss": 0.15,
+  "guaranteeAfter": 4,
+  "silhouetteUnseen": true,
+  "caughtWeight": 0.15,
+  "typeWeight": 0.4,
+  "colorOnlyChance": 0.3,
+  "typeWindow": 14,
+  "typeTemp": 7,
+  "maxTypes": 4,
+  "candidates": 30,
+  "minCandidates": 6,
+  "widenFactor": 3,
+  "randomness": 6,
+  "similarityWindow": 10,
+  "sameResultPerDay": false,
+  "artUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{id}.png",
+  "spriteUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{id}.png",
+  "backSpriteUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/{id}.png",
+  "ballUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png",
+  "ball": {
+    "diffThreshold": 28,
+    "gradientWeight": 0.6,
+    "maxShift": 3,
+    "minPixels": 4,
+    "maxFraction": 0.15,
+    "maxSize": 0.35,
+    "ignoreFraction": 0.3,
+    "confirmFrames": 3,
+    "minTravel": 0.08,
+    "stillMs": 500,
+    "minFlightMs": 300,
+    "maxFlightMs": 4000,
+    "cooldownMs": 800,
+    "warmupMs": 1200,
+    "phoneMotionDeg": 60,
+    "landTimeoutMs": 5000,
+    "showMarker": true,
+    "objectDetection": {
+      "enabled": true,
+      "categories": [
+        "sports ball"
+      ],
+      "scoreThreshold": 0.3,
+      "confirmWindowMs": 1500,
+      "minTravel": 0.06,
+      "detectEveryMs": 100,
+      "moduleUrl": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/vision_bundle.mjs",
+      "wasmUrl": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm",
+      "modelUrl": "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite"
+    },
+    "longTravel": 0.3,
+    "edgeMargin": 0.2,
+    "minDirCos": 0.2,
+    "chromaWeight": 0.8,
+    "useColor": true
+  },
+  "explore": {
+    "foundDeg": 15,
+    "holdMs": 700,
+    "minTargetDeg": 70,
+    "maxTargetDeg": 170,
+    "minPitch": -20,
+    "maxPitch": 35,
+    "slowBeatMs": 1300,
+    "fastBeatMs": 140
+  },
+  "night": {
+    "darkL": 22,
+    "colorFactor": 0.1,
+    "types": [
+      "ghost",
+      "dark"
+    ],
+    "ids": [
+      41,
+      42,
+      169,
+      163,
+      164,
+      43,
+      35,
+      36,
+      170,
+      171,
+      313,
+      314,
+      337,
+      198,
+      197,
+      200,
+      215,
+      228,
+      229,
+      261,
+      262,
+      302,
+      353,
+      354,
+      355,
+      356,
+      359,
+      92,
+      93,
+      94,
+      269
+    ],
+    "rarityScale": {
+      "4": 0.6,
+      "5": 0.3
+    }
+  },
+  "subject": {
+    "enabled": true,
+    "threshold": 22,
+    "minFraction": 0.015,
+    "maxFraction": 0.7,
+    "weight": 0.75
+  },
+  "color": {
+    "whiteBalance": {
+      "enabled": true,
+      "strength": 0.7,
+      "minL": 62,
+      "maxChroma": 42,
+      "hueTolerance": 35,
+      "minFraction": 0.04,
+      "uniformCoverage": 0.93,
+      "uniformFactor": 0.15,
+      "maxGain": 2.2,
+      "refLowL": 64,
+      "refHighL": 80
+    },
+    "vividWeight": 1.2,
+    "lightnessWeight": 0.5
+  },
+  "shields": {
+    "3": 3,
+    "4": 4,
+    "5": 5
+  },
+  "shieldHitsPerLayer": 3,
+  "shieldCatchMul": 0.3,
+  "shieldHitCooldownMs": 380,
+  "swipe": {
+    "touchRadius": 0.13,
+    "minTouch": 6,
+    "riseMin": 0.09,
+    "windowMs": 600,
+    "minHit": 35,
+    "hitRadius": 0.2
+  },
+  "shake": {
+    "threshold": 13,
+    "peak": 32,
+    "minSpanMs": 40,
+    "windowMs": 260,
+    "cooldownMs": 1500,
+    "armDelayMs": 700,
+    "gentleAbove": 48
+  },
+  "dex": {
+    "pageSize": 20
+  },
+  "battle": {
+    "enabled": true,
+    "minRarity": 4,
+    "delayMs": 900,
+    "foeSpeed": 250,
+    "foeSpeedStep": 30,
+    "pauseMs": 420,
+    "dashMul": 2.5,
+    "dodgeChance": 0.6,
+    "reactMs": 170,
+    "cooldownMs": 380,
+    "hitSlack": 7,
+    "hitsPerLayer": {
+      "default": 2,
+      "5": 3
+    },
+    "shakePx": 5,
+    "shotScale": 0.8
+  },
+  "rarityCap": {
+    "4": 0.1,
+    "5": 0.02
+  }
 }

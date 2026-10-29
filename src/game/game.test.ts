@@ -241,6 +241,25 @@ describe('run & save', () => {
     mem.set('echoquest.v3', '{not json');
     expect(load(s).players).toHaveLength(1);
   });
+
+  it('keeps caught creatures, toddler pals and a chosen partner; older saves get empty lists', () => {
+    const mem = new Map<string, string>();
+    const s = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v) };
+    const save = defaultSave();
+    save.caught = [6, 25];
+    save.pals = [4];
+    save.players[0].mon = 150;
+    persist(save, s);
+    const back = load(s);
+    expect(back.caught).toEqual([6, 25]);
+    expect(back.pals).toEqual([4]);
+    expect(back.players[0].mon).toBe(150);
+    const old = JSON.parse(mem.get('echoquest.v3')!);
+    delete old.caught; delete old.pals; old.pals = 'oops';
+    mem.set('echoquest.v3', JSON.stringify(old));
+    expect(load(s).caught).toEqual([]);
+    expect(load(s).pals).toEqual([]);
+  });
 });
 
 describe('word bank', () => {
