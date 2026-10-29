@@ -118,10 +118,11 @@ export class Battle {
     this.combo = 0;
   }
 
-  defend(blocked: boolean): DefenseResult {
+  /** `mult` scales the damage thrown back: 0 for a plain block or dodge, 1 for a reflect, 1.5 for a counter. */
+  defend(blocked: boolean, mult = 1): DefenseResult {
     if (blocked) {
       this.combo += 1;
-      const reflect = Math.max(1, Math.round(BASE_DAMAGE[this.defender.level] * 0.4));
+      const reflect = mult <= 0 ? 0 : Math.max(1, Math.round(BASE_DAMAGE[this.defender.level] * 0.4 * mult));
       this.monster.hp = Math.max(0, this.monster.hp - reflect);
       return { blocked: true, reflect, combo: this.combo, healed: 0, killed: this.monster.hp === 0 };
     }

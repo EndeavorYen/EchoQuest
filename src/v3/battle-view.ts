@@ -153,6 +153,7 @@ export class BattleView {
         <div class="arena" id="arena">
           <div class="plate foe"><div class="nm"><span id="foeName"></span><span class="chip" id="foeType"></span></div>
             <div class="shields" id="shields" hidden></div>
+            <div class="status" id="status" hidden></div>
             <div class="hp"><i id="foeHp"></i></div><div class="hpnum" id="foeHpNum"></div></div>
           <div class="mon foe" id="foe"></div>
           <div class="mon me" id="me"></div>
@@ -226,6 +227,16 @@ export class BattleView {
     this.$('#foeHpNum').textContent = `${Math.max(0, Math.ceil(hp))} / ${max}`;
   }
 
+  /** The condition on the wild creature (burn, sleep…), or none. */
+  setStatus(s: { zh: string; icon: string; color: string; left: number } | null): void {
+    const el = this.$('#status');
+    el.hidden = !s;
+    if (s) {
+      el.textContent = `${s.icon} ${s.zh} ${s.left}`;
+      el.style.setProperty('--c', s.color);
+    }
+  }
+
   /** Boss shield: one pip per layer left. */
   setShields(layers: number, max: number): void {
     const el = this.$('#shields');
@@ -290,10 +301,11 @@ export class BattleView {
   }
 
   /** `who` fires its type's move at the other creature; `hit` runs at the moment of impact. */
-  cast(who: 'me' | 'foe', style: string, colors: string[], power: 1 | 2, hit: () => void): void {
+  cast(who: 'me' | 'foe', style: string, colors: string[], power: 1 | 2, hit: () => void, aim: { dx: number; dy: number } = { dx: 0, dy: 0 }): void {
     const mine = who === 'me';
     const from = this.center(this.$(mine ? '#me' : '#foe'));
-    const to = this.center(this.$(mine ? '#foe' : '#me'));
+    const t = this.center(this.$(mine ? '#foe' : '#me'));
+    const to = { x: t.x + aim.dx, y: t.y + aim.dy };
     if (!mine) {
       const foe = this.$('#foe');
       foe.classList.add('lunge');
@@ -314,6 +326,15 @@ export class BattleView {
   }
   blockSpark(where: 'foe' | 'me', color: string): void {
     blockSpark(this.fxHost(), this.center(this.$(where === 'foe' ? '#foe' : '#me')), color);
+  }
+
+  /** The partner hops aside. */
+  dodge(): void {
+    const el = this.$('#me');
+    el.classList.remove('dodge');
+    void el.offsetWidth;
+    el.classList.add('dodge');
+    window.setTimeout(() => el.classList.remove('dodge'), 700);
   }
 
   /** The wild creature glows while it winds up. */

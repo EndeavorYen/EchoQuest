@@ -1,5 +1,8 @@
-import { Battle, monsterHp } from '../game/battle';
+import { Battle } from '../game/battle';
 import { Shield } from '../game/shield';
+import { DEFENSE, rollDefense, type DefenseKind } from '../game/defense';
+import { Afflictions, STATUS, rollStatus } from '../game/status';
+import { foeHp, typicalHit, TIRED_ROUND } from './pacing';
 import { dealCard, pickDefenseWord } from '../game/deck';
 import { Revenge, REVENGE_MULT } from '../game/revenge';
 import { record } from '../game/progress';
@@ -13,7 +16,7 @@ import type { Recognizer } from '../speech/recognizer';
 import { sfx, say, stopSay } from '../audio/sfx';
 import { Rng } from '../util/rng';
 import type { Word } from '../data/words';
-import { artUrl, shieldLayers, typeOf, type Mon } from '../mon/dex';
+import { artUrl, typeOf, type Mon } from '../mon/dex';
 import { partnerMon } from './partner';
 import { BattleView } from './battle-view';
 
@@ -54,6 +57,10 @@ export class BattleController {
   private rng: Rng;
   /** The boss's shield; null for an ordinary wild creature. */
   shield: Shield | null = null;
+  /** Conditions on the wild creature (burn, sleep, …). */
+  aff = new Afflictions();
+  /** Tests switch this off so a lucky status can't change the flow. */
+  statusEnabled = true;
   /** Called when the wild creature is beaten, with the words used. */
   onWin: (foe: Mon, words: Word[]) => { isNew: boolean; nextLabel: string } | void = () => {};
   onLeave: () => void = () => {};
@@ -88,9 +95,11 @@ export class BattleController {
     this.stopTimer();
     this.speaker.cancel();
     this.foe = foe ?? this.foe;
-    const maxHp = monsterHp(this.players, 0, bossFoe);
+    const maxHp = foeHp(this.players, this.foe.rarity, bossFoe);
     this.battle = new Battle({ name: this.foe.name, hp: maxHp, maxHp, boss: bossFoe }, this.players, firstPlayer);
-    this.shield = bossFoe ? new Shield(Math.max(2, shieldLayers(this.foe) || 3)) : null;
+    this.shield = bossFoe ? new Shield(this.foe.rarity >= 4 ? 3 : 2) : null;
+    this.aff = new Afflictions();
+    this.view.setStatus(null);
     this.learned = [];
     this.recent = [];
     this.revenge = new Revenge();
@@ -263,7 +272,7 @@ export class BattleController {
 
   private succeed(tier: Tier, defending: boolean): void {
     this.speaker.cancel();
-    if (defending) return this.resolveDefense(true);
+    if (defending) return this.resolveDefense(true, tier === 'perfect' ? 'perfect' : 'good');
     this.phase = 'strike';
     const sh = this.shield;
     const wasUp = !!sh?.up;
@@ -288,7 +297,7 @@ export class BattleController {
       return;
     }
 
-    const mult = (this.revengeActive ? REVENGE_MULT : 1) * (wasUp ? 0.5 : 1);
+    const mult = this.revengeActive ? REVENGE_MULT : 1;
     const res = this.battle.attack(this.word, tier, mult);
     if (wasUp && this.battle.monster.hp <= 0) { this.battle.monster.hp = 1; res.killed = false; }
     this.mark(this.word, true, tier, res.damage);
@@ -303,7 +312,8 @@ export class BattleController {
         sfx.play('heal');
       }
       this.view.setFoeHp(this.battle.monster.hp, this.battle.monster.maxHp);
-      window.setTimeout(() => (res.killed ? this.win() : this.afterAttack()), outcome === 'break' ? 1100 : 750);
+      if (!res.killed) this.tryStatus(tier === 'perfect' ? 'perfect' : 'good');
+      window.setTimeout(() => (res.killed ? this.win() : this.afterAttack()), outcome === 'break' ? 1100 : this.aff.current ? 1000 : 750);
     });
   }
 
@@ -318,15 +328,73 @@ export class BattleController {
     window.setTimeout(() => this.afterAttack(), 1400);
   }
 
-  /** After a spell, the wild creature strikes back (unless it is already down). */
+  /** A spell that landed may leave the creature burning, asleep, and so on. */
+  private tryStatus(tier: 'good' | 'perfect'): void {
+    if (!this.statusEnabled || this.aff.current) return;
+    const id = rollStatus(this.partnerMon(this.me).type, tier, this.rng, this.shield ? 0.5 : 1);
+    if (id && this.aff.apply(id)) {
+      const st = STATUS[id];
+      this.view.floatText('foe', `${st.icon} ${st.zh}！`, st.color, true, 56);
+      this.refreshStatus();
+    }
+  }
+
+  private refreshStatus(): void {
+    const c = this.aff.current;
+    this.view.setStatus(c ? { ...STATUS[c.id], left: c.left } : null);
+  }
+
+  /** After a spell, the wild creature strikes back — unless it is down, or a condition stops it. */
   private afterAttack(): void {
     if (this.dead) return;
-    const t = DEFENSE_TIME[this.me.level] ?? DEFENSE_TIME[1];
-    if (this.battle.monster.hp > 0) this.startDefend(t);
-    else {
-      this.battle.nextRound();
-      this.newRound();
+    if (this.battle.monster.hp <= 0) return this.finishRound();
+    const act = this.aff.beforeCounter(this.rng);
+    if (act === 'act') return this.startDefend(DEFENSE_TIME[this.me.level] ?? DEFENSE_TIME[1]);
+    const st = this.aff.info!;
+    if (act === 'selfhit') {
+      const dmg = Math.max(2, Math.round(typicalHit(this.players) * 0.4));
+      this.battle.monster.hp = Math.max(1, this.battle.monster.hp - dmg);
+      this.view.floatText('foe', `${st.icon} 打到自己！ -${dmg}`, st.color, true);
+      this.view.hurt('foe');
+      this.view.setFoeHp(this.battle.monster.hp, this.battle.monster.maxHp);
+    } else {
+      this.view.floatText('foe', `${st.icon} ${st.zh}，動不了！`, st.color, true);
     }
+    this.view.showWait(`${this.foe.name} ${st.zh}了，不能攻擊！`);
+    window.setTimeout(() => this.finishRound(), 1100);
+  }
+
+  /** End of a round: damage over time, then a fresh word. A fight that drags on ends gently. */
+  private finishRound(): void {
+    if (this.dead) return;
+    const m = this.battle.monster;
+    const { dot, cured } = this.aff.endRound(m.maxHp);
+    let delay = 0;
+    if (dot > 0 && m.hp > 0) {
+      const st = this.aff.info ?? cured;
+      m.hp = Math.max(0, m.hp - dot);
+      this.view.floatText('foe', `${st?.icon ?? ''} -${dot}`, st?.color ?? '#d9534f', true);
+      this.view.hurt('foe');
+      this.view.setFoeHp(m.hp, m.maxHp);
+      delay = 900;
+    }
+    if (cured) this.view.floatText('foe', `${cured.zh}好了`, '#2e9e5b', true, 30);
+    this.refreshStatus();
+    window.setTimeout(() => {
+      if (this.dead) return;
+      if (m.hp <= 0) return this.win();
+      this.battle.nextRound();
+      // after a few rounds the creature is worn out: one more hit will do
+      if (!this.shield && this.battle.round >= TIRED_ROUND) {
+        const one = typicalHit(this.players);
+        if (m.hp > one) {
+          m.hp = one;
+          this.view.setFoeHp(m.hp, m.maxHp);
+          this.view.floatText('foe', '累了…', '#5b6678', true);
+        }
+      }
+      this.newRound();
+    }, delay);
   }
 
   // ---- defend ---------------------------------------------------------------
@@ -380,44 +448,75 @@ export class BattleController {
     this.timerId = null;
   }
 
-  private resolveDefense(ok: boolean): void {
+  private resolveDefense(ok: boolean, tier: 'good' | 'perfect' = 'good'): void {
     this.stopTimer();
     if (this.phase === 'resolve') return;
     this.phase = 'resolve';
     this.view.setCharging(false);
     const w = this.defWord;
-    const res = this.battle.defend(ok);
-    if (w && ok) this.mark(w, true, 'good', res.reflect, true);
-    this.view.showWait(ok ? '防禦！' : '糟糕…');
-    const fx = typeOf(this.foe).fx;
+    const kind: DefenseKind | null = ok ? rollDefense(tier, this.rng) : null;
+    const res = this.battle.defend(ok, kind ? DEFENSE[kind].mult : 1);
+    if (w && ok) this.mark(w, true, tier, res.reflect, true);
+    this.view.showWait(kind ? DEFENSE[kind].zh : '糟糕…');
+    const foeFx = typeOf(this.foe).fx;
     const mine = typeOf(this.partnerMon(this.me));
-    if (ok) {
-      this.view.raiseShield(mine.color);
-      sfx.play('shield');
-    }
-    window.setTimeout(() => {
-      this.view.cast('foe', fx.style, fx.colors, 1, () => {
-        if (ok) {
-          sfx.play('block');
-          this.view.blockSpark('me', mine.color);
-          this.view.floatText('me', '擋住了！', '#2fbf71');
-          this.view.floatText('foe', `-${res.reflect}`, '#ff5a5a', true, 20);
-          this.view.hurt('foe');
-          this.view.dropShield();
-        } else {
-          sfx.play('hurt');
-          this.view.flash('#d9534f', 0.25);
-          this.view.hurt('me');
-          this.view.floatText('me', '好痛！', '#ff5a5a');
-        }
-        this.view.setFoeHp(this.battle.monster.hp, this.battle.monster.maxHp);
-        window.setTimeout(() => {
-          if (res.killed) return this.win();
-          this.battle.nextRound();
-          this.newRound();
-        }, 1000);
+    const done = (): void => {
+      this.view.setFoeHp(this.battle.monster.hp, this.battle.monster.maxHp);
+      window.setTimeout(() => {
+        if (res.killed) return this.win();
+        this.finishRound();
+      }, 1000);
+    };
+    const label = (): void => {
+      if (!kind) return;
+      const d = DEFENSE[kind];
+      this.view.floatText('me', d.zh, d.color);
+      if (res.reflect > 0) this.view.floatText('foe', `-${res.reflect}${d.mult > 1 ? ' ×1.5' : ''}`, '#ff5a5a', true, 20);
+    };
+
+    if (!kind) {
+      this.view.cast('foe', foeFx.style, foeFx.colors, 1, () => {
+        sfx.play('hurt');
+        this.view.flash('#d9534f', 0.25);
+        this.view.hurt('me');
+        this.view.floatText('me', '好痛！', '#ff5a5a');
+        done();
       });
-    }, ok ? 280 : 0);
+      return;
+    }
+    sfx.play('shield');
+    if (kind === 'counter') {
+      // no waiting for the hit: the partner answers with its own move
+      this.view.cast('me', mine.fx.style, mine.fx.colors, 2, () => {
+        sfx.play('hit', 4);
+        label();
+        this.view.hurt('foe');
+        done();
+      });
+      return;
+    }
+    if (kind === 'dodge') this.view.dodge(); else this.view.raiseShield(mine.color);
+    window.setTimeout(() => {
+      this.view.cast('foe', foeFx.style, foeFx.colors, 1, () => {
+        if (kind === 'dodge') {
+          label();
+          done();
+          return;
+        }
+        sfx.play('block');
+        this.view.blockSpark('me', mine.color);
+        this.view.dropShield();
+        label();
+        if (kind === 'reflect') {
+          // the creature's own move comes back at it
+          this.view.cast('me', foeFx.style, foeFx.colors, 1, () => {
+            sfx.play('hit', 2);
+            this.view.hurt('foe');
+            done();
+          });
+        } else done();
+      }, kind === 'dodge' ? { dx: -120, dy: -50 } : { dx: 0, dy: 0 });
+    }, 280);
   }
 
   /** Leave the screen: stop timers and the microphone. */

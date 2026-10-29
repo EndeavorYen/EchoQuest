@@ -116,7 +116,7 @@ async function playUntil(game: any, page: Page, done: () => Promise<boolean>, li
 const BOSS = { id: 150, name: '超夢', type: 'psychic', rarity: 5, colors: ['#B8A8C8'] };
 
 test.describe('co-op boss', () => {
-  test('a child strips a layer with each spell, takes half damage while it is up, and wins once it is down', async ({ game }) => {
+  test('a child strips a layer with each spell and wins once it is down', async ({ game }) => {
     const p = game.page;
     await open(p);
     await go(p, 'battle', { foe: BOSS, boss: true });
@@ -173,20 +173,56 @@ test.describe('co-op boss', () => {
 test.describe('defense', () => {
   const MOUSE = { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] };
 
-  test('even a level-1 player gets a shield round after casting, and blocking reflects damage', async ({ game }) => {
+  test('even a level-1 player gets a shield round after casting, and a good defense shows its outcome', async ({ game }) => {
     const p = game.page;
     await open(p);
     await go(p, 'battle', { foe: MOUSE });
     await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => { c.statusEnabled = false; });
     await sayWord(game, p);
     await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
     await expect(p.locator('.panel.defend')).toBeVisible();
     await expect(p.locator('.timer')).toBeVisible();
-    const hp = await ctl(p, (c) => c.battle.monster.hp);
     await sayWord(game, p);
-    await expect(p.locator('.pt.shieldfx')).toBeVisible({ timeout: 4000 });
-    await expect(p.locator('.float', { hasText: '擋住了' })).toBeVisible({ timeout: 6000 });
-    expect(await ctl(p, (c) => c.battle.monster.hp)).toBeLessThan(hp);
+    await expect(p.locator('.float', { hasText: /擋住|閃躲|反彈|反擊/ }).first()).toBeVisible({ timeout: 6000 });
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('speak');
+  });
+
+  test('each defense outcome plays out: block, dodge, reflect and counter', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => { c.statusEnabled = false; c.battle.monster.hp = c.battle.monster.maxHp = 500; });
+    for (const kind of ['block', 'dodge', 'reflect', 'counter']) {
+      await ctl(p, (c) => { c.dead = false; });
+      // force the roll: swap the controller's rng for one that always lands on the wanted outcome
+      const ok = await p.evaluate((k) => {
+        const c = (window as any).__v3;
+        const want: Record<string, number> = { block: 0.05, dodge: 0.2, reflect: 0.5, counter: 0.9 };
+        const real = c.rng.next.bind(c.rng);
+        c.rng.next = () => want[k];
+        c.startDefend(30);
+        c.rng.next = real;
+        return c.phase;
+      }, kind);
+      expect(ok).toBe('defend');
+      await p.evaluate((k) => { const c = (window as any).__v3; const want: Record<string, number> = { block: 0.05, dodge: 0.2, reflect: 0.5, counter: 0.9 }; c.rng.next = () => want[k]; c.resolveDefense(true, 'perfect'); }, kind);
+      const label = { block: '擋住', dodge: '閃躲', reflect: '反彈', counter: '反擊' }[kind]!;
+      await expect(p.locator('.float', { hasText: label }).first()).toBeVisible({ timeout: 6000 });
+      await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('speak');
+    }
+  });
+
+  test('a spell can leave a condition; a sleeping creature skips its counter-attack', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: MOUSE });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => { c.aff.apply('sleep'); c.refreshStatus(); });
+    await expect(p.locator('#status')).toContainText('睡眠');
+    await sayWord(game, p);
+    await expect(p.locator('.float', { hasText: '動不了' })).toBeVisible({ timeout: 8000 });
     await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('speak');
   });
 
@@ -195,6 +231,7 @@ test.describe('defense', () => {
     await open(p);
     await go(p, 'battle', { foe: MOUSE });
     await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => { c.statusEnabled = false; });
     await sayWord(game, p);
     await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
     const hp = await ctl(p, (c) => c.battle.monster.hp);
