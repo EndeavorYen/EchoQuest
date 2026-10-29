@@ -93,6 +93,99 @@ test.describe('scan and battle', () => {
     expect(await save(p, (s) => Object.keys(s.aliases).length)).toBe(1);
   });
 
+  test('a recogniser that hears nothing never traps an attack: after three tries "I said it" and "skip" appear', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    for (let i = 1; i <= 3; i++) {
+      await expect(p.locator('.stuck')).toHaveCount(0);
+      await p.click('[data-act=mic]'); // the fake engine has nothing queued: "no speech"
+      await expect.poll(() => ctl(p, (c) => c.attempts)).toBe(i);
+    }
+    await expect(p.locator('.stuck [data-act=ok]')).toBeVisible();
+    const before = await ctl(p, (c) => c.battle.monster.hp);
+    await p.click('.stuck [data-act=skip]');
+    await expect.poll(() => ctl(p, (c) => c.phase)).not.toBe('speak');
+    expect(await ctl(p, (c) => c.battle.monster.hp)).toBeGreaterThanOrEqual(before);
+    const log = await p.evaluate(() => JSON.parse(localStorage.getItem('echoquest.heard') ?? '[]'));
+    expect(log.filter((e: any) => e.r === 'none')).toHaveLength(3);
+    expect(log.at(-1)).toMatchObject({ r: 'skipped' });
+  });
+
+  test('stuck on an attack word: "I said it" counts as a hit and is logged', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    for (let i = 1; i <= 3; i++) {
+      await p.click('[data-act=mic]');
+      await expect.poll(() => ctl(p, (c) => c.attempts)).toBe(i);
+    }
+    const before = await ctl(p, (c) => c.battle.monster.hp);
+    await p.click('.stuck [data-act=ok]');
+    await expect.poll(() => ctl(p, (c) => c.battle.monster.hp)).toBeLessThan(before);
+    const log = await p.evaluate(() => JSON.parse(localStorage.getItem('echoquest.heard') ?? '[]'));
+    expect(log.at(-1)).toMatchObject({ r: 'confirmed' });
+  });
+
+  test('defending: two attempts the engine cannot make out still raise a plain block, and it is logged', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => { c.statusEnabled = false; });
+    await sayWord(game, p);
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
+    const hp = await ctl(p, (c) => c.battle.monster.hp);
+    const hearts = await ctl(p, (c) => c.hearts);
+    await p.click('[data-act=mic]');
+    await expect.poll(() => ctl(p, (c) => c.attempts)).toBe(1);
+    expect(await ctl(p, (c) => c.phase)).toBe('defend');
+    await p.click('[data-act=mic]');
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).not.toBe('defend');
+    // a plain block: nothing is bounced back at the creature, and nobody lost a heart
+    expect(await ctl(p, (c) => c.battle.monster.hp)).toBeGreaterThanOrEqual(hp);
+    expect(await ctl(p, (c) => c.hearts)).toBe(hearts);
+    const log = await p.evaluate(() => JSON.parse(localStorage.getItem('echoquest.heard') ?? '[]'));
+    expect(log.at(-1)).toMatchObject({ r: 'rescued', d: 1 });
+  });
+
+  test('copying the recognition log: stamped, new-only vs all, and nothing is deleted', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => {
+      const mk = (n: number) => ({ n, w: 'bee', c: ['B'], r: 'confirmed', lv: 1, t: 1_700_000_000 + n, s: 1 });
+      localStorage.setItem('echoquest.heard', JSON.stringify([mk(1), mk(2), mk(3)]));
+      localStorage.setItem('echoquest.heard.seq', '3');
+      (window as any).__copied = [];
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (s: string) => void (window as any).__copied.push(s) }, configurable: true });
+    });
+    await p.click('.menu [data-go=party]');
+    await expect(p.locator('#logNew')).toContainText('3');
+    await p.click('#logNew');
+    await expect(p.locator('#logmsg')).toContainText('第 1 次');
+    await expect(p.locator('#logNew')).toContainText('（0）');
+    await p.evaluate(() => {
+      const a = JSON.parse(localStorage.getItem('echoquest.heard')!);
+      a.push({ n: 4, w: 'she', c: ['see'], r: 'rescued', lv: 1, t: 1_700_000_100, s: 1, d: 1 });
+      localStorage.setItem('echoquest.heard', JSON.stringify(a));
+    });
+    await p.click('[data-screen=party] .bar [data-go]');
+    await p.click('.menu [data-go=party]');
+    await expect(p.locator('#logNew')).toContainText('（1）');
+    await p.click('#logAll');
+    await expect(p.locator('#logmsg')).toContainText('第 2 次');
+    const copied: string[] = await p.evaluate(() => (window as any).__copied);
+    expect(copied[0]).toMatch(/^# EchoQuest 辨識回報\nID: EQ-\d{8}-\d{4}-[A-Z2-9]{4}\n匯出: 第 1 次/);
+    expect(copied[0]).toContain('筆數: 3');
+    expect(copied[1]).toContain('範圍: 全部紀錄');
+    expect(copied[1]).toContain('筆數: 4');
+    expect(copied[0].match(/ID: (\S+)/)![1]).not.toBe(copied[1].match(/ID: (\S+)/)![1]);
+    // exporting never deletes anything
+    expect(await p.evaluate(() => JSON.parse(localStorage.getItem('echoquest.heard')!).length)).toBe(4);
+  });
+
   test('winning adds the creature to the dex and the trek moves on', async ({ game }) => {
     const p = game.page;
     await open(p);

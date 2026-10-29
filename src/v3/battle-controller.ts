@@ -21,6 +21,10 @@ import { partnerMon } from './partner';
 import { BattleView } from './battle-view';
 
 export const MAX_TRIES = 3;
+/** Defending: this many attempts the engine could not make out and the shield goes up anyway. */
+export const RESCUE_AFTER = 2;
+/** Attacking: this many unrecognised attempts and the "I said it" / "skip" buttons appear. */
+export const STUCK_AFTER = 3;
 /** Seconds to raise a shield once the wild creature winds up. Even the youngest players get one, with plenty of time. */
 const DEFENSE_TIME: Record<number, number> = { 1: 14, 2: 9, 3: 7, 4: 6 };
 
@@ -42,6 +46,8 @@ export class BattleController {
   foe!: Mon;
   word!: Word;
   tries = 0;
+  /** attempts that did not count as a hearing (wrong words and "heard nothing" alike) */
+  attempts = 0;
   lastHeard: string[] = [];
   defLeft = 0;
   defWord: Word | null = null;
@@ -83,6 +89,7 @@ export class BattleController {
     view.onHear = () => this.hear();
     view.onKeyboard = () => this.openKeyboard();
     view.onConfirm = () => this.confirm();
+    view.onSkip = () => this.skip();
     view.onPartner = (i) => this.switchTo(i);
     view.onSubmitTyped = (t) => this.answer({ kind: 'typed', text: t });
     view.onNext = () => this.onNextFoe();
@@ -139,6 +146,7 @@ export class BattleController {
       // the new defender gets a shield word at their own level, with a fresh set of tries
       this.defWord = pickDefenseWord(this.me, Date.now(), this.rng, this.recent);
       this.tries = 0;
+      this.attempts = 0;
       this.lastHeard = [];
       this.showDefend();
     } else this.deal();
@@ -157,6 +165,7 @@ export class BattleController {
     this.word = due ?? dealCard(p, Date.now(), this.rng, this.recent).word;
     this.recent = [...this.recent.slice(-6), this.word.id];
     this.tries = 0;
+    this.attempts = 0;
     this.lastHeard = [];
     this.typing = false;
     this.refreshParty();
@@ -169,7 +178,8 @@ export class BattleController {
       word: this.word,
       hint: this.bossHint() ?? (this.revengeActive ? '再挑戰一次，傷害變大！' : '念出咒語攻擊！'),
       revenge: this.revengeActive,
-      showConfirm: this.tries >= 1,
+      showConfirm: this.tries >= 1 || this.attempts >= 1,
+      stuck: this.attempts >= STUCK_AFTER,
       listening: this.speaker.listening,
       typing: this.typing,
       note,
@@ -231,17 +241,25 @@ export class BattleController {
     if (this.phase !== 'speak' && this.phase !== 'defend') return;
     const defending = this.phase === 'defend';
     const w = defending && this.defWord ? this.defWord : this.word;
+    const lv = this.me.level;
     if (r.kind === 'fail') {
+      if (r.reason === 'aborted') return;
+      // nothing came back: that still counts as an attempt, or the round could never end
+      logHeard({ w: w.w, c: [r.reason], r: 'none', lv, defend: defending });
+      this.attempts += 1;
+      if (defending && this.attempts >= RESCUE_AFTER) return this.rescue(w);
       this.rerender(failText(r.reason));
       return;
     }
     const cand = r.kind === 'heard' ? r.candidates : [r.text];
-    const j = judge(w.w, cand, this.me.level, knownHearings(this.save.aliases, w));
-    logHeard({ w: w.w, c: cand, r: j.tier, lv: this.me.level });
+    const j = judge(w.w, cand, lv, knownHearings(this.save.aliases, w));
+    logHeard({ w: w.w, c: cand, r: j.tier, lv, defend: defending });
     this.lastHeard = cand;
     this.typing = false;
     if (j.tier === 'miss') {
       this.tries += 1;
+      this.attempts += 1;
+      if (defending && this.attempts >= RESCUE_AFTER) return this.rescue(w);
       if (this.tries >= MAX_TRIES) {
         this.fail(defending);
       } else {
@@ -253,6 +271,23 @@ export class BattleController {
     this.succeed(j.tier, defending);
   }
 
+  /**
+   * Defending and the engine keeps not understanding: assume it was said, and give a plain
+   * block (no reflect or counter bonus). It is logged so the word can be fixed afterwards.
+   */
+  private rescue(w: Word): void {
+    this.speaker.cancel();
+    logHeard({ w: w.w, c: this.lastHeard, r: 'rescued', lv: this.me.level, defend: true });
+    this.resolveDefense(true, 'good', 'block');
+  }
+
+  /** Stuck on an attack word: let it go (a fizzle, like three wrong tries) and move on. */
+  private skip(): void {
+    if (this.phase !== 'speak') return;
+    logHeard({ w: this.word.w, c: this.lastHeard, r: 'skipped', lv: this.me.level });
+    this.fail(false);
+  }
+
   /** A grown-up says "they said it right". The engine's transcript is remembered for next time. */
   private confirm(): void {
     if (this.phase !== 'speak' && this.phase !== 'defend') return;
@@ -261,8 +296,8 @@ export class BattleController {
     if (this.lastHeard.length) {
       this.save = { ...this.save, aliases: learnHearing(this.save.aliases, w, this.lastHeard) };
       this.onSave(this.save);
-      logHeard({ w: w.w, c: this.lastHeard, r: 'confirmed', lv: this.me.level });
     }
+    logHeard({ w: w.w, c: this.lastHeard, r: 'confirmed', lv: this.me.level, defend: defending });
     this.succeed('good', defending);
   }
 
@@ -420,6 +455,7 @@ export class BattleController {
     this.phase = 'defend';
     this.defWord = pickDefenseWord(this.me, Date.now(), this.rng, this.recent);
     this.tries = 0;
+    this.attempts = 0;
     this.lastHeard = [];
     this.defLeft = seconds;
     this.defTotal = seconds;
@@ -439,7 +475,7 @@ export class BattleController {
       mode: 'defend',
       word: this.defWord,
       hint: `${this.foe.name} 要攻擊了！念出防禦咒語擋住牠！`,
-      showConfirm: this.tries >= 1,
+      showConfirm: this.tries >= 1 || this.attempts >= 1,
       listening: this.speaker.listening,
       typing: this.typing,
       note,
@@ -465,13 +501,13 @@ export class BattleController {
     this.timerId = null;
   }
 
-  private resolveDefense(ok: boolean, tier: 'good' | 'perfect' = 'good'): void {
+  private resolveDefense(ok: boolean, tier: 'good' | 'perfect' = 'good', force?: DefenseKind): void {
     this.stopTimer();
     if (this.phase === 'resolve') return;
     this.phase = 'resolve';
     this.view.setCharging(false);
     const w = this.defWord;
-    const kind: DefenseKind | null = ok ? rollDefense(tier, this.rng) : null;
+    const kind: DefenseKind | null = ok ? force ?? rollDefense(tier, this.rng) : null;
     const res = this.battle.defend(ok, kind ? DEFENSE[kind].mult : 1);
     if (w && ok) this.mark(w, true, tier, res.reflect, true);
     this.view.showWait(kind ? DEFENSE[kind].zh : '糟糕…');

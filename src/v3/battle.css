@@ -103,6 +103,8 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 .note { min-height: 1.3em; margin: 0; text-align: center; font-size: .9rem; font-weight: 700; color: #b9570c; }
 .timer { width: 100%; height: 6px; border-radius: 999px; background: #f3d6d4; overflow: hidden; }
 .timer > i { display: block; height: 100%; width: 100%; background: var(--bad); transition: width .1s linear; }
+.stuck { display: flex; gap: 10px; justify-content: center; width: 100%; }
+.stuck .btn { flex: 1; min-height: 48px; }
 .actions { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; }
 .mic {
   flex: 1 1 auto; max-width: 220px; height: 56px; border-radius: 16px; background: var(--sun); color: var(--sunInk);

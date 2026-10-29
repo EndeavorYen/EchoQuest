@@ -28,6 +28,8 @@ export interface WordOpts {
   hint: string;
   revenge?: boolean;
   showConfirm?: boolean;
+  /** the recogniser keeps failing: offer "I said it" and "skip" as big buttons */
+  stuck?: boolean;
   listening?: boolean;
   typing?: boolean;
   note?: string;
@@ -42,6 +44,7 @@ export class WordPanel {
   onHear: () => void = () => {};
   onKeyboard: () => void = () => {};
   onConfirm: () => void = () => {};
+  onSkip: () => void = () => {};
   onSubmitTyped: (text: string) => void = () => {};
   onNext: () => void = () => {};
   onLose: () => void = () => {};
@@ -57,6 +60,7 @@ export class WordPanel {
         case 'hear': this.onHear(); break;
         case 'kbd': this.onKeyboard(); break;
         case 'ok': this.onConfirm(); break;
+        case 'skip': this.onSkip(); break;
         case 'next': this.onNext(); break;
         case 'lose': this.onLose(); break;
         case 'send': this.submitTyped(); break;
@@ -97,10 +101,11 @@ export class WordPanel {
       ${opts.timer ? '<div class="timer"><i id="timerBar"></i></div>' : ''}
       <p class="note" id="note">${esc(opts.note ?? '')}</p>
       ${typing}
+      ${opts.stuck ? `<div class="stuck"><button class="btn good" data-act="ok">我念對了</button><button class="btn ghost" data-act="skip">跳過這個字</button></div>` : ''}
       <div class="actions">
         <button class="small-btn" data-act="kbd" aria-label="用鍵盤">${KEYBOARD}</button>
         ${micBtn}
-        ${opts.showConfirm ? `<button class="small-btn ok" data-act="ok" aria-label="他說對了" title="他說對了">${CHECK}</button>` : ''}
+        ${opts.showConfirm && !opts.stuck ? `<button class="small-btn ok" data-act="ok" aria-label="他說對了" title="他說對了">${CHECK}</button>` : ''}
         <button class="small-btn" data-act="hear" aria-label="聽一次">${SPEAKER}</button>
       </div>`;
     if (opts.typing) (this.$('#typed') as HTMLInputElement | null)?.focus();
@@ -140,6 +145,7 @@ export class BattleView {
   onHear: () => void = () => {};
   onKeyboard: () => void = () => {};
   onConfirm: () => void = () => {};
+  onSkip: () => void = () => {};
   onPartner: (i: number) => void = () => {};
   onSubmitTyped: (text: string) => void = () => {};
   onNext: () => void = () => {};
@@ -173,6 +179,7 @@ export class BattleView {
     this.panel.onHear = () => this.onHear();
     this.panel.onKeyboard = () => this.onKeyboard();
     this.panel.onConfirm = () => this.onConfirm();
+    this.panel.onSkip = () => this.onSkip();
     this.panel.onSubmitTyped = (t) => this.onSubmitTyped(t);
     this.panel.onNext = () => this.onNext();
     this.panel.onLose = () => this.onLose();
