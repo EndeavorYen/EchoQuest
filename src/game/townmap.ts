@@ -69,6 +69,8 @@ export interface TownMap {
   visited: number[];
   /** nodes whose types are shown (visited ones always are) */
   revealed: number[];
+  /** places the party has seen from a neighbouring place (they stay out of the fog); absent in maps saved before fog */
+  seen?: number[];
   gifts: number[];
   infoDone: number[];
   quizDone: number[];
@@ -80,12 +82,12 @@ export const TYPE_IDS = ['fire', 'water', 'grass', 'electric', 'bug', 'poison', 
 
 /** The map is a grid of COLS columns; a layer (a row of places) is SPACE grid rows apart. */
 export const COLS = 9;
-export const SPACE = 4;
+export const SPACE = 3;
 export const CELL = 100 / COLS;
 
 export const SIZE_NAME: Record<MapSize, string> = { S: '小地圖', M: '中地圖', L: '大地圖' };
 /** How many gym cities a map of this size has (the league comes on top of them). */
-const GYMS: Record<MapSize, [number, number]> = { S: [0, 1], M: [1, 2], L: [3, 4] };
+const GYMS: Record<MapSize, [number, number]> = { S: [0, 1], M: [1, 2], L: [2, 3] };
 const SIZE_ODDS: [MapSize, number][] = [['S', 0.35], ['M', 0.45], ['L', 0.2]];
 
 const TOWN_A = ['青草', '白雲', '彩虹', '星光', '月牙', '小橋', '楓葉', '海風', '花香', '金沙', '銀杏', '藍天', '晨曦', '櫻花', '陽光', '紅葉', '竹林', '珊瑚', '雪松', '黃昏', '糖果', '蜜柑', '微風', '麥田'];
@@ -179,10 +181,10 @@ function routeRoad(a: MapNode, b: MapNode, blocked: (c: number, r: number) => bo
 }
 
 function layout(rng: Rng, sz: MapSize, gyms: number, bag: TypeBag, used: Set<string>): TownMap | null {
-  // layers from the bottom: the start town; per segment one or two rows of two wild places and then a city (the league at the end)
+  // layers from the bottom: the start town; per segment a row of two wild places and then a city (the league at the end)
   const plan: { kind: 'start' | 'wild' | 'city' | 'league'; width: number }[] = [{ kind: 'start', width: 1 }];
   for (let s = 0; s <= gyms; s++) {
-    for (let k = rng.chance(0.3) ? 2 : 1; k > 0; k--) plan.push({ kind: 'wild', width: 2 });
+    plan.push({ kind: 'wild', width: 2 });
     plan.push({ kind: s === gyms ? 'league' : 'city', width: 1 });
   }
   const layers = plan.length;
@@ -301,7 +303,7 @@ function layout(rng: Rng, sz: MapSize, gyms: number, bag: TypeBag, used: Set<str
     const kind: RoadKind = ends.includes('lake') ? 'water' : ends.includes('cave') ? 'mountain' : ends.includes('forest') ? 'forest' : 'grass';
     const interior = path.length - 2;
     const r = rng.next();
-    const k = Math.min(interior, r < 0.5 ? 1 : r < 0.85 ? 2 : 3);
+    const k = Math.min(interior, r < 0.7 ? 1 : 2);
     const idx = new Set<number>();
     for (let i = 1; i <= k; i++) idx.add(Math.max(1, Math.min(path.length - 2, Math.round((i * (path.length - 1)) / (k + 1)))));
     const road = `${id + 1}號${kind === 'grass' ? '道路' : kind === 'water' ? '水路' : kind === 'forest' ? '森林小徑' : '山路'}`;
@@ -390,21 +392,56 @@ export function startEntering(m: TownMap, id: number): TownMap {
 }
 /** Walk onto a neighbour that has nothing to fight (a town, or a place already cleared). */
 export function moveTo(m: TownMap, id: number): TownMap {
-  return neighbors(m, m.at).includes(id) && !needsFight(m, id) ? { ...m, at: id, entering: null, visited: m.visited.includes(id) ? m.visited : [...m.visited, id] } : m;
+  return neighbors(m, m.at).includes(id) && !needsFight(m, id) ? markSeen({ ...m, at: id, entering: null, visited: m.visited.includes(id) ? m.visited : [...m.visited, id] }) : m;
 }
 /** The creature of the node being entered was beaten. */
 export function winEntering(m: TownMap): TownMap {
   const id = m.entering;
   if (id === null) return m;
-  return {
+  return markSeen({
     ...m, at: id, entering: null,
     cleared: m.cleared.includes(id) ? m.cleared : [...m.cleared, id],
     visited: m.visited.includes(id) ? m.visited : [...m.visited, id],
-  };
+  });
 }
 /** Lost, ran away or backed out: the party is where it was, and what it has beaten stays beaten. */
 export const retreat = (m: TownMap): TownMap => (m.entering === null ? m : { ...m, entering: null });
 export const rememberFoe = (m: TownMap, id: number, mon: number): TownMap => ({ ...m, foes: { ...m.foes, [id]: mon } });
+
+// ---- fog ----------------------------------------------------------------------
+
+/** Remember the places next to where the party stands: once seen, they stay out of the fog. */
+function markSeen(m: TownMap): TownMap {
+  const seen = new Set([...(m.seen ?? []), ...neighbors(m, m.at)]);
+  return seen.size === (m.seen ?? []).length ? m : { ...m, seen: [...seen] };
+}
+
+/** The places that are not under clouds: where the party has been, what it has seen next door, what the town news lifted, and the league. */
+export function visibleNodes(m: TownMap): Set<number> {
+  const v = new Set<number>([m.at, ...m.visited, ...m.revealed, ...(m.seen ?? []), ...neighbors(m, m.at)]);
+  const league = m.nodes.find((n) => n.kind === 'league');
+  if (league) v.add(league.id);
+  return v;
+}
+
+/** The grid cells with no cloud over them: the visible places and the stretches of road between two visible places. */
+export function clearCells(m: TownMap): Set<string> {
+  const v = visibleNodes(m);
+  const out = new Set<string>();
+  for (const id of v) {
+    const n = m.nodes[id];
+    const halo = n.kind === 'wild' ? 0 : 1;
+    for (const [c, r] of footprint(n)) for (let dc = -halo; dc <= halo; dc++) for (let dr = -halo; dr <= halo; dr++) out.add(key(c + dc, r + dr));
+  }
+  for (const road of m.roads) {
+    const chain = [road.a, ...road.nodes, road.b];
+    const at = chain.map((id, i) => (i === 0 ? 0 : i === chain.length - 1 ? road.path.length - 1 : road.path.findIndex(([c, r]) => c === m.nodes[id].col && r === m.nodes[id].row)));
+    for (let i = 0; i < chain.length - 1; i++) {
+      if (v.has(chain[i]) && v.has(chain[i + 1])) for (let k = at[i]; k <= at[i + 1]; k++) out.add(key(road.path[k][0], road.path[k][1]));
+    }
+  }
+  return out;
+}
 
 // ---- towns ---------------------------------------------------------------------
 
@@ -461,9 +498,9 @@ export function checkTownMap(m: TownMap): string[] {
   if (!m.nodes.every((n) => (n.kind === 'town' ? n.types.length === 0 : n.types.length >= 1 && n.types.every((t) => TYPE_IDS.includes(t))))) bad.push('every place with a creature has types, towns have none');
   // every node can be reached from the start
   if (hopsFrom(m, m.at).size !== m.nodes.length) bad.push('some places cannot be reached');
-  // every road has 1-3 stops, all in a line between its ends
+  // every road has 1-2 stops, all in a line between its ends
   for (const r of m.roads) {
-    if (r.nodes.length < 1 || r.nodes.length > 3) bad.push(`road ${r.name} needs 1-3 stops`);
+    if (r.nodes.length < 1 || r.nodes.length > 2) bad.push(`road ${r.name} needs 1-2 stops`);
     const chain = [r.a, ...r.nodes, r.b];
     for (let i = 0; i < chain.length - 1; i++) if (!neighbors(m, chain[i]).includes(chain[i + 1])) bad.push(`road ${r.name} is broken`);
     for (const id of r.nodes) if (m.nodes[id].road !== r.id || neighbors(m, id).length !== 2) bad.push(`stop on road ${r.name} is misplaced`);

@@ -350,6 +350,87 @@ test.describe('town map', () => {
     expect(await save(p, (s) => s.townmap.entering)).toBeNull();
   });
 
+  test('clouds cover what has not been seen; the league and the neighbours are in view; the town news lifts them', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    const total = await p.locator('.tnode').count();
+    const hidden = () => p.locator('.tnode[data-fog="1"]').count();
+    expect(await hidden()).toBeGreaterThan(total / 2);
+    await expect(p.locator('.tnode[data-kind=league][data-fog="0"]')).toHaveCount(1);
+    await expect(p.locator('.tnode[data-state=out]').first()).toBeVisible();
+    const puffs = await p.locator('.puff').count();
+    const lit = () => p.locator('.puff.gone').count();
+    expect(await lit()).toBeGreaterThan(0);
+    expect(await lit()).toBeLessThan(puffs / 2);
+    const before = { hidden: await hidden(), lit: await lit() };
+    await p.click('#svc-info');
+    expect(await hidden()).toBeLessThan(before.hidden);
+    expect(await lit()).toBeGreaterThan(before.lit);
+  });
+
+  test('walking lifts the clouds around the new place', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    const lit = () => p.locator('.puff.gone').count();
+    const before = await lit();
+    await walkToFight(p);
+    await startFight(p);
+    await ctl(p, (c) => { c.battle.monster.hp = 1; });
+    await sayWord(game, p);
+    await expect(p.locator('.victory')).toBeVisible({ timeout: 8000 });
+    await p.click('[data-act=next]');
+    await expect(p.locator('[data-screen=trek]')).toBeVisible();
+    await expect.poll(lit).toBeGreaterThan(before);
+  });
+
+  test('the map opens on the party, zoomed in, and is never shrunk to fit', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    const view = () => p.evaluate(() => {
+      const box = document.querySelector('#mapscroll') as HTMLElement;
+      const tm = document.querySelector('#tm') as HTMLElement;
+      const me = document.querySelector('#partner') as HTMLElement;
+      const b = box.getBoundingClientRect(), m = me.getBoundingClientRect();
+      return { fit: box.clientWidth - 20, w: tm.offsetWidth, inside: m.x > b.x && m.x < b.right && m.y > b.y && m.y < b.bottom, mid: (m.x - b.x) / b.width };
+    });
+    const v = await view();
+    expect(v.w).toBeGreaterThan(v.fit * 1.4); // zoomed in
+    expect(v.inside).toBe(true); // the party is in view
+    expect(Math.abs(v.mid - 0.5)).toBeLessThan(0.15); // and in the middle
+    // zoom out as far as it goes: the map fills the width, never less
+    for (let i = 0; i < 6; i++) await p.click('#zout');
+    expect((await view()).w).toBe(v.fit);
+    // zoom in as far as it goes
+    for (let i = 0; i < 10; i++) await p.click('#zin');
+    const big = await view();
+    expect(big.w).toBeGreaterThan(v.fit * 2.2);
+    expect(big.w).toBeLessThanOrEqual(Math.round(v.fit * 2.5));
+    // ctrl + wheel zooms too
+    await p.evaluate(() => (document.querySelector('#mapscroll') as HTMLElement).dispatchEvent(new WheelEvent('wheel', { deltaY: 300, ctrlKey: true, clientX: 200, clientY: 300, bubbles: true, cancelable: true })));
+    expect((await view()).w).toBeLessThan(big.w);
+  });
+
+  test('a finger drags the map without tapping what it started on; the target button comes back to the party', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    const scroll = () => p.evaluate(() => { const b = document.querySelector('#mapscroll') as HTMLElement; return { x: b.scrollLeft, y: b.scrollTop }; });
+    const before = await scroll();
+    const node = await p.locator('.tnode[data-state=out]').first().boundingBox();
+    await p.mouse.move(node!.x + node!.width / 2, node!.y + node!.height / 2);
+    await p.mouse.down();
+    await p.mouse.move(node!.x + node!.width / 2 + 100, node!.y + node!.height / 2 + 100, { steps: 6 });
+    await p.mouse.up();
+    const after = await scroll();
+    expect(before.x - after.x + (before.y - after.y)).toBeGreaterThan(15); // the map moved with the finger (a small map has little room to move)
+    await expect(p.locator('#panel')).not.toContainText('前往'); // the drag was not a tap
+    await p.click('#zme');
+    await expect.poll(async () => Math.abs((await scroll()).y - before.y) + Math.abs((await scroll()).x - before.x)).toBeLessThan(8);
+  });
+
   test('picking a place shows what it is; "go" steps there and shows who lives there', async ({ game }) => {
     const p = game.page;
     await open(p);

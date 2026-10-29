@@ -1,5 +1,5 @@
 import {
-  atTown, CELL, canGift, canInfo, canQuiz, catOf, generateTownMap, isBig, isRevealed, kindLabel, moveTo, needsFight, neighbors, progressOf, rememberFoe,
+  atTown, CELL, clearCells, COLS, visibleNodes, canGift, canInfo, canQuiz, catOf, generateTownMap, isBig, isRevealed, kindLabel, moveTo, needsFight, neighbors, progressOf, rememberFoe,
   retreat, rollRarity, roadIcon, SIZE_NAME, startEntering, takeGift, useInfo, type MapNode, type RoadKind, type TownMap,
 } from '../../game/townmap';
 import { nextRelic } from '../../game/run';
@@ -8,6 +8,10 @@ import type { Habitat } from '../../mon/habitat';
 import { partnerMon } from '../partner';
 import { sfx } from '../../audio/sfx';
 import { bar, esc, type ScanParams, type ScreenFactory } from '../ctx';
+
+/** the zoom the player last used on the map: 1 = the map fills the width, and it stays that way between visits */
+let lastZoom = 1.6;
+const MIN_ZOOM = 1, MAX_ZOOM = 2.5;
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => window.setTimeout(r, ms));
 
@@ -52,6 +56,11 @@ export const trek: ScreenFactory = (root, ctx) => {
         <polyline class="road" data-road="${r.id}" points="${pts(r.path)}" fill="none" stroke="${ROAD_COLOR[r.kind]}" stroke-width="${r.kind === 'water' ? 2.2 : 1.9}" stroke-linejoin="round" ${dash}/>`;
     }).join('')}
   </svg>`;
+  const rowsN = Math.round(H / CELL);
+  const fog = `<svg class="fog" viewBox="0 0 100 ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <defs><radialGradient id="cloud"><stop offset="0" stop-color="#f4f7fa" stop-opacity=".98"/><stop offset=".62" stop-color="#eef2f7" stop-opacity=".94"/><stop offset="1" stop-color="#e6ecf3" stop-opacity="0"/></radialGradient></defs>
+    ${Array.from({ length: rowsN }, (_, r) => Array.from({ length: COLS }, (_, c) => `<circle class="puff" data-k="${c},${r}" cx="${cx(c)}" cy="${cx(r)}" r="${CELL * 0.9}" fill="url(#cloud)"/>`).join('')).join('')}
+  </svg>`;
   const labelAt = (r: TownMap['roads'][number]): { x: number; y: number } => {
     const [c, row] = r.path[Math.floor(r.path.length / 2)];
     return { x: cx(c) + 3.5, y: cx(row) };
@@ -59,12 +68,14 @@ export const trek: ScreenFactory = (root, ctx) => {
 
   root.innerHTML = `<div class="app" data-screen="trek">${bar('冒險')}
     <div class="mapnote"><b>${esc(m0.title)}　<small>${SIZE_NAME[m0.size]}</small></b><span class="muted" id="here"></span></div>
-    <div class="screen scroll" id="mapscroll"><div class="townmap" id="tm" style="aspect-ratio:100/${H}">
+    <div class="mapwrap"><div class="mapbox" id="mapscroll"><div class="townmap" id="tm" style="aspect-ratio:100/${H}">
       ${svg}
+      ${fog}
       ${m0.roads.map((r) => `<span class="rlabel" data-road="${r.id}" style="${pos(labelAt(r))}" hidden>${esc(r.name)}</span>`).join('')}
       ${m0.nodes.map((n) => `<button class="tnode ${isBig(n) ? 'big' : 'small'}${n.w > 1 ? ' wide' : ''}" data-id="${n.id}" data-kind="${n.kind}" style="${pos(n)}" aria-label="${esc(n.name)}"><i>${n.icon}</i>${isBig(n) ? `<span class="tname">${esc(n.name)}</span>` : ''}<span class="ttypes"></span><em class="gift" hidden>🎁</em></button>`).join('')}
       <div class="partner" id="partner"><img src="${artUrl(mon.id)}" alt="" onerror="this.style.visibility='hidden'"></div>
     </div></div>
+      <div class="zoombar"><button id="zin" aria-label="放大">＋</button><button id="zout" aria-label="縮小">－</button><button id="zme" aria-label="回到我的位置">🎯</button></div></div>
     <div class="tpanel" id="panel"></div></div>`;
 
   const tm = root.querySelector<HTMLElement>('#tm')!;
@@ -80,12 +91,77 @@ export const trek: ScreenFactory = (root, ctx) => {
     window.setTimeout(() => t.remove(), 1800);
   }
 
-  function placePartner(smooth: boolean): void {
+  function placePartner(): void {
     const a = N(M().at);
     partner.style.left = `${a.x}%`;
     partner.style.top = `${(a.y / H) * 100}%`;
-    box.scrollTo({ top: Math.max(0, (a.y / H) * tm.clientHeight - box.clientHeight * 0.6), behavior: smooth ? 'smooth' : 'auto' });
   }
+
+  // ---- zoom, pan and focus: the map is as wide as `zoom` screens and is never shrunk to fit ------------------
+  const MARGIN_X = 10, MARGIN_Y = 6;
+  let zoom = lastZoom;
+  const baseWidth = (): number => Math.max(200, box.clientWidth - MARGIN_X * 2);
+  const applyWidth = (): void => { tm.style.width = `${Math.round(baseWidth() * zoom)}px`; };
+  /** zoom to `z`, keeping the map point under (ax, ay) — a point of the scroll box — where it is */
+  function zoomTo(z: number, ax = box.clientWidth / 2, ay = box.clientHeight / 2): void {
+    const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+    if (Math.abs(next - zoom) < 0.001) return;
+    const ratio = next / zoom;
+    const px = box.scrollLeft + ax, py = box.scrollTop + ay;
+    zoom = lastZoom = next;
+    applyWidth();
+    box.scrollLeft = MARGIN_X + (px - MARGIN_X) * ratio - ax;
+    box.scrollTop = MARGIN_Y + (py - MARGIN_Y) * ratio - ay;
+  }
+  /** put a place in the middle of the view (a little below the middle, the partner stands above it) */
+  function focusOn(id: number, smooth: boolean): void {
+    const n = N(id);
+    box.scrollTo({
+      left: Math.max(0, MARGIN_X + (n.x / 100) * tm.offsetWidth - box.clientWidth / 2),
+      top: Math.max(0, MARGIN_Y + (n.y / H) * tm.offsetHeight - box.clientHeight * 0.55),
+      behavior: smooth ? 'smooth' : 'auto',
+    });
+  }
+
+  // one finger drags the map, two fingers pinch it, ctrl + wheel zooms; a drag does not count as a tap
+  const fingers = new Map<number, { x: number; y: number }>();
+  let moved = 0, pinch0 = 0, pinchZoom = 1;
+  const spread = (): number => { const [a, b] = [...fingers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+  box.addEventListener('pointerdown', (e) => {
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (fingers.size === 1) moved = 0;
+    if (fingers.size === 2) { pinch0 = spread(); pinchZoom = zoom; }
+  });
+  box.addEventListener('pointermove', (e) => {
+    const prev = fingers.get(e.pointerId);
+    if (!prev) return;
+    const now = { x: e.clientX, y: e.clientY };
+    fingers.set(e.pointerId, now);
+    if (fingers.size === 1) {
+      moved += Math.abs(now.x - prev.x) + Math.abs(now.y - prev.y);
+      if (moved > 8) { box.scrollLeft -= now.x - prev.x; box.scrollTop -= now.y - prev.y; }
+    } else if (fingers.size === 2 && pinch0 > 0) {
+      moved = 99;
+      const [a, b] = [...fingers.values()];
+      const rect = box.getBoundingClientRect();
+      zoomTo(pinchZoom * (spread() / pinch0), (a.x + b.x) / 2 - rect.left, (a.y + b.y) / 2 - rect.top);
+    }
+  });
+  const lift = (e: PointerEvent): void => { fingers.delete(e.pointerId); pinch0 = 0; };
+  box.addEventListener('pointerup', lift);
+  box.addEventListener('pointercancel', lift);
+  box.addEventListener('click', (e) => { if (moved > 8) { e.stopPropagation(); e.preventDefault(); moved = 0; } }, true);
+  box.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    const rect = box.getBoundingClientRect();
+    zoomTo(zoom * Math.exp(-e.deltaY * 0.01), e.clientX - rect.left, e.clientY - rect.top);
+  }, { passive: false });
+  root.querySelector('#zin')!.addEventListener('click', () => zoomTo(zoom * 1.25));
+  root.querySelector('#zout')!.addEventListener('click', () => zoomTo(zoom / 1.25));
+  root.querySelector('#zme')!.addEventListener('click', () => focusOn(M().at, true));
+  const onResize = (): void => { applyWidth(); focusOn(M().at, false); };
+  window.addEventListener('resize', onResize);
 
   const typeDots = (n: MapNode): string => n.types.map((t) => `<b style="background:${TYPES[t]?.color ?? '#999'}" title="${esc(TYPES[t]?.name ?? t)}"></b>`).join('');
   const typeNames = (n: MapNode): string => n.types.map((t) => TYPES[t]?.name ?? t).join('、');
@@ -107,15 +183,21 @@ export const trek: ScreenFactory = (root, ctx) => {
       if (!isBig(n)) el.style.setProperty('--ring', shown ? (TYPES[n.types[0]]?.color ?? '#9fb3c8') : '#9fb3c8');
       (el.querySelector('.gift') as HTMLElement).hidden = !(n.gift && !m.gifts.includes(id) && m.visited.includes(id) && id !== m.at);
     });
+    // the clouds: every cell without a cloud over it is lit, and what stands in a cloud cannot be seen or tapped
+    const clear = clearCells(m);
+    const vis = visibleNodes(m);
+    root.querySelectorAll<SVGElement>('.puff').forEach((el) => el.classList.toggle('gone', clear.has(el.dataset.k!)));
+    root.querySelectorAll<HTMLElement>('.tnode').forEach((el) => { el.dataset.fog = vis.has(Number(el.dataset.id)) ? '0' : '1'; });
     root.querySelectorAll<HTMLElement>('.rlabel').forEach((el) => {
       const r = m0.roads[Number(el.dataset.road)];
-      el.hidden = ![r.a, r.b, ...r.nodes].some((id) => m.visited.includes(id));
+      const [c, row] = r.path[Math.floor(r.path.length / 2)];
+      el.hidden = !clear.has(`${c},${row}`);
     });
     root.querySelectorAll<SVGElement>('.road').forEach((el) => {
       const r = m0.roads[Number(el.dataset.road)];
       el.classList.toggle('walked', r.nodes.every((id) => m.cleared.includes(id)));
     });
-    placePartner(true);
+    placePartner();
     renderPanel();
   }
 
@@ -127,7 +209,7 @@ export const trek: ScreenFactory = (root, ctx) => {
       const fight = needsFight(m, picked);
       const who = n.kind === 'town' ? '安全的城鎮，可以休息一下' :
         !fight ? '這裡的寶可夢已經打敗了' :
-        isRevealed(m, picked) ? `住著「${esc(typeNames(n))}」系的寶可夢` : '住著誰？到了才知道（城鎮可以打聽情報）';
+        isRevealed(m, picked) ? `住著「${esc(typeNames(n))}」系的寶可夢` : '住著誰？到了才知道（城鎮可以撥開烏雲）';
       const extra = n.kind === 'city' ? '　·　道館首領在這裡！' : n.kind === 'league' ? '　·　冠軍在這裡！' : '';
       const title = n.kind === 'wild' ? `${roadIcon[m0.roads[n.road].kind]} ${esc(n.name)}` : `${n.icon} ${esc(n.name)} <small>${kindLabel[n.kind]}</small>`;
       panel.innerHTML = `<div class="ttitle">${title}</div><div class="tsub">${who}${extra}</div>
@@ -138,7 +220,7 @@ export const trek: ScreenFactory = (root, ctx) => {
     if (atTown(m)) {
       const svc = [
         canGift(m) ? '<button class="btn" id="svc-gift">🎁 拿小禮物</button>' : '',
-        canInfo(m) ? '<button class="btn" id="svc-info">🔭 聽聽情報</button>' : '',
+        canInfo(m) ? '<button class="btn" id="svc-info">☁️ 撥開烏雲</button>' : '',
         canQuiz(m) ? '<button class="btn" id="svc-quiz">💬 村民考考你</button>' : '',
       ].join('');
       panel.innerHTML = `<div class="ttitle">${here.icon} ${esc(here.name)} <small>${kindLabel[here.kind]}</small></div>
@@ -147,7 +229,7 @@ export const trek: ScreenFactory = (root, ctx) => {
       panel.querySelector('#svc-info')?.addEventListener('click', () => {
         sfx.play('good');
         ctx.update((s) => ({ ...s, townmap: useInfo(s.townmap!) }));
-        toast('附近的寶可夢屬性都顯示出來了！');
+        toast('烏雲散開了，附近的寶可夢屬性都看得到！');
         render();
       });
       panel.querySelector('#svc-quiz')?.addEventListener('click', () => ctx.go('practice', { quiz: true }));
@@ -195,6 +277,7 @@ export const trek: ScreenFactory = (root, ctx) => {
     ctx.update((s) => ({ ...s, townmap: moveTo(s.townmap!, id) }));
     sfx.play('step');
     render();
+    focusOn(M().at, true);
     await sleep(450);
     busy = false;
     if (!dead && atTown(M()) && (canGift(M()) || canInfo(M()))) toast('到城鎮了！');
@@ -215,7 +298,9 @@ export const trek: ScreenFactory = (root, ctx) => {
 
   root.querySelectorAll<HTMLElement>('.tnode').forEach((el) => el.addEventListener('click', () => pick(Number(el.dataset.id))));
 
-  placePartner(false);
+  applyWidth();
+  placePartner();
   render();
-  return { destroy: () => { dead = true; } };
+  focusOn(M().at, false); // open on the party, zoomed in
+  return { destroy: () => { dead = true; window.removeEventListener('resize', onResize); } };
 };

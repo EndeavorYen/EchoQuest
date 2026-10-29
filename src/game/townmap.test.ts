@@ -3,7 +3,7 @@ import { Rng } from '../util/rng';
 import { DEX, TYPES } from '../mon/dex';
 import {
   checkTownMap, fewestFights, generateTownMap, isTownMap, neighbors, startEntering, moveTo, winEntering, retreat, useInfo, takeGift, canGift,
-  needsFight, rollRarity, RARITY_TABLE, TYPE_IDS, isRevealed, type MapSize, type TownMap,
+  needsFight, rollRarity, RARITY_TABLE, TYPE_IDS, isRevealed, visibleNodes, clearCells, type MapSize, type TownMap,
 } from './townmap';
 
 const seeds = Array.from({ length: 120 }, (_, i) => i * 7919 + 13);
@@ -36,13 +36,13 @@ describe('generated maps', () => {
       expect(avg('M', f)).toBeLessThan(avg('L', f));
     }
     for (const m of rows.S) {
-      expect(m.nodes.filter((n) => n.kind !== 'wild').length).toBeLessThanOrEqual(12);
-      expect(fewestFights(m)).toBeGreaterThanOrEqual(3);
-      expect(fewestFights(m)).toBeLessThanOrEqual(16);
+      expect(m.nodes.filter((n) => n.kind !== 'wild').length).toBeLessThanOrEqual(8);
+      expect(fewestFights(m)).toBeGreaterThanOrEqual(2);
+      expect(fewestFights(m)).toBeLessThanOrEqual(10);
     }
     for (const m of rows.L) {
-      expect(m.nodes.filter((n) => n.kind !== 'wild').length).toBeGreaterThanOrEqual(13);
-      expect(fewestFights(m)).toBeLessThanOrEqual(40);
+      expect(m.nodes.filter((n) => n.kind !== 'wild').length).toBeGreaterThanOrEqual(10);
+      expect(fewestFights(m)).toBeLessThanOrEqual(24);
     }
   });
   it('have forks: more than one way through, and towns to rest in', () => {
@@ -161,5 +161,44 @@ describe('walking', () => {
     m = takeGift(m);
     expect(canGift(m)).toBe(false);
     expect(takeGift(m).gifts).toEqual(m.gifts);
+  });
+});
+
+describe('fog', () => {
+  const m0 = (): TownMap => generateTownMap(42, 'L');
+  it('at the start only the start, its neighbours and the league are in view', () => {
+    const m = m0();
+    const v = visibleNodes(m);
+    expect(v.has(0)).toBe(true);
+    expect(neighbors(m, 0).every((n) => v.has(n))).toBe(true);
+    expect(v.has(m.nodes.find((n) => n.kind === 'league')!.id)).toBe(true);
+    expect(v.size).toBeLessThan(m.nodes.length / 3);
+  });
+  it('walking lifts the clouds and what was seen stays seen', () => {
+    let m = m0();
+    const before = clearCells(m).size;
+    const next = neighbors(m, 0).find((n) => needsFight(m, n))!;
+    m = winEntering(startEntering(m, next));
+    expect(clearCells(m).size).toBeGreaterThan(before);
+    // the other neighbour of the start, seen from there, is still out of the clouds after walking on
+    expect(neighbors(m, next).every((n) => visibleNodes(m).has(n))).toBe(true);
+    const after = neighbors(m, next).find((n) => needsFight(m, n));
+    if (after !== undefined) {
+      const m2 = winEntering(startEntering(m, after));
+      expect(visibleNodes(m2).has(next)).toBe(true);
+      expect(neighbors(m, next).every((n) => visibleNodes(m2).has(n))).toBe(true);
+    }
+  });
+  it('the town news lifts the clouds over the area around it', () => {
+    const m = m0();
+    const n = useInfo(m);
+    expect(visibleNodes(n).size).toBeGreaterThan(visibleNodes(m).size + 5);
+    expect(clearCells(n).size).toBeGreaterThan(clearCells(m).size);
+  });
+  it('a map saved before fog still works', () => {
+    const { seen: _s, ...old } = m0();
+    void _s;
+    expect(isTownMap(old)).toBe(true);
+    expect(visibleNodes(old as TownMap).size).toBeGreaterThan(2);
   });
 });
