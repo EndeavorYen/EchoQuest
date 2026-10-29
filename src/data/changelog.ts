@@ -11,6 +11,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '2.2',
+    date: '2026-10-29',
+    title: '地圖點一下就出發',
+    items: [
+      '可以去的新地方會閃光、頭上有小箭頭，一眼就看得到',
+      '點了就直接出發，不用再按「前往」',
+      '走過的地方不管多遠，點一下就自動走回去',
+    ],
+  },
+  {
     version: '2.1',
     date: '2026-10-29',
     title: '城鎮地圖、新音效與圖鑑翻頁',

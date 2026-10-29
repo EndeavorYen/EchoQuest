@@ -394,6 +394,63 @@ export function startEntering(m: TownMap, id: number): TownMap {
 export function moveTo(m: TownMap, id: number): TownMap {
   return neighbors(m, m.at).includes(id) && !needsFight(m, id) ? markSeen({ ...m, at: id, entering: null, visited: m.visited.includes(id) ? m.visited : [...m.visited, id] }) : m;
 }
+/** Shortest way between two places the party has stood in, going only through such places. Excludes `from`, includes `to`. */
+export function walkPath(m: TownMap, from: number, to: number): number[] | null {
+  if (from === to) return [];
+  const ok = new Set([...m.visited, from]);
+  if (!ok.has(to)) return null;
+  const prev = new Map<number, number>([[from, from]]);
+  const queue = [from];
+  for (let i = 0; i < queue.length; i++) {
+    const cur = queue[i];
+    for (const nx of neighbors(m, cur)) {
+      if (!ok.has(nx) || prev.has(nx)) continue;
+      prev.set(nx, cur);
+      if (nx === to) {
+        const path = [to];
+        for (let c = to; prev.get(c) !== from; c = prev.get(c)!) path.unshift(prev.get(c)!);
+        return path;
+      }
+      queue.push(nx);
+    }
+  }
+  return null;
+}
+
+/** New places the party can head for: next door to somewhere it has already stood. */
+export function frontier(m: TownMap): number[] {
+  const seen = new Set(m.visited);
+  const out = new Set<number>();
+  for (const v of m.visited) for (const nx of neighbors(m, v)) if (!seen.has(nx)) out.add(nx);
+  return [...out].sort((a, b) => a - b);
+}
+
+export interface Trip {
+  /** the places to walk through, in order (all already visited, bar a town at the very end) */
+  steps: number[];
+  /** after the steps, step into a place that has a creature to beat */
+  fight: boolean;
+}
+
+/**
+ * Where a tap on `id` leads. A place the party has stood in can be walked to from anywhere, however far.
+ * A new place can only be entered from a place next to it, so the party first walks there.
+ */
+export function planTrip(m: TownMap, id: number): Trip | null {
+  if (m.entering !== null || id === m.at || !m.nodes[id]) return null;
+  if (m.visited.includes(id)) {
+    const steps = walkPath(m, m.at, id);
+    return steps ? { steps, fight: false } : null;
+  }
+  let best: number[] | null = null;
+  for (const d of neighbors(m, id)) {
+    if (!m.visited.includes(d)) continue;
+    const p = walkPath(m, m.at, d);
+    if (p && (!best || p.length < best.length)) best = p;
+  }
+  if (!best) return null;
+  return needsFight(m, id) ? { steps: best, fight: true } : { steps: [...best, id], fight: false };
+}
 /** The creature of the node being entered was beaten. */
 export function winEntering(m: TownMap): TownMap {
   const id = m.entering;
@@ -419,6 +476,8 @@ function markSeen(m: TownMap): TownMap {
 /** The places that are not under clouds: where the party has been, what it has seen next door, what the town news lifted, and the league. */
 export function visibleNodes(m: TownMap): Set<number> {
   const v = new Set<number>([m.at, ...m.visited, ...m.revealed, ...(m.seen ?? []), ...neighbors(m, m.at)]);
+  // everything next door to anywhere the party has stood stays in view, so a way not yet taken is never lost under the clouds
+  for (const id of m.visited) for (const nx of neighbors(m, id)) v.add(nx);
   const league = m.nodes.find((n) => n.kind === 'league');
   if (league) v.add(league.id);
   return v;

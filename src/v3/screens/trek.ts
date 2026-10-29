@@ -1,6 +1,6 @@
 import {
-  atTown, CELL, clearCells, COLS, visibleNodes, canGift, canInfo, canQuiz, catOf, generateTownMap, isBig, isRevealed, kindLabel, moveTo, needsFight, neighbors, progressOf, rememberFoe,
-  retreat, rollRarity, roadIcon, SIZE_NAME, startEntering, takeGift, useInfo, type MapNode, type RoadKind, type TownMap,
+  atTown, CELL, clearCells, COLS, frontier, planTrip, visibleNodes, canGift, canInfo, canQuiz, catOf, generateTownMap, isBig, isRevealed, kindLabel, moveTo, progressOf, rememberFoe,
+  retreat, rollRarity, SIZE_NAME, startEntering, takeGift, useInfo, type MapNode, type RoadKind, type TownMap,
 } from '../../game/townmap';
 import { nextRelic } from '../../game/run';
 import { artUrl, DEX, pickEncounter, TYPES } from '../../mon/dex';
@@ -37,7 +37,6 @@ export const trek: ScreenFactory = (root, ctx) => {
   let dead = false;
   let scene: Scene | null = null;
   let busy = false;
-  let picked: number | null = null;
   const M = (): TownMap => ctx.save.townmap!;
   const m0 = M();
   const mon = partnerMon(ctx.save.players[Math.min(ctx.save.active, ctx.save.players.length - 1)], ctx.save.active);
@@ -168,7 +167,6 @@ export const trek: ScreenFactory = (root, ctx) => {
   window.addEventListener('resize', onResize);
 
   const typeDots = (n: MapNode): string => n.types.map((t) => `<b style="background:${TYPES[t]?.color ?? '#999'}" title="${esc(TYPES[t]?.name ?? t)}"></b>`).join('');
-  const typeNames = (n: MapNode): string => n.types.map((t) => TYPES[t]?.name ?? t).join('、');
 
   /** the music follows the ground the party stands on: towns, open country, caves and mountains */
   function music(): void {
@@ -184,14 +182,13 @@ export const trek: ScreenFactory = (root, ctx) => {
     music();
     const m = M();
     const here = N(m.at);
-    const near = new Set(neighbors(m, m.at));
+    const next = new Set(frontier(m));
     root.querySelector('#here')!.innerHTML = `${here.icon ? (here.kind === 'cave' ? icon('cave') : glyph(here.icon)) : icon('pin')} ${esc(here.name)}`;
     root.querySelectorAll<HTMLElement>('.tnode').forEach((el) => {
       const id = Number(el.dataset.id);
       const n = N(id);
-      el.dataset.state = id === m.at ? 'here' : near.has(id) ? 'out' : m.visited.includes(id) ? 'seen' : 'far';
+      el.dataset.state = id === m.at ? 'here' : next.has(id) ? 'next' : m.visited.includes(id) ? 'seen' : 'far';
       el.dataset.done = m.cleared.includes(id) ? '1' : '0';
-      el.dataset.pick = picked === id ? '1' : '0';
       const shown = isRevealed(m, id) && n.types.length > 0;
       el.querySelector('.ttypes')!.innerHTML = shown ? typeDots(n) : '';
       el.dataset.known = shown ? '1' : '0';
@@ -219,19 +216,6 @@ export const trek: ScreenFactory = (root, ctx) => {
   function renderPanel(): void {
     const m = M();
     const here = N(m.at);
-    if (picked !== null) {
-      const n = N(picked);
-      const fight = needsFight(m, picked);
-      const who = n.kind === 'town' ? '安全的城鎮，可以休息一下' :
-        !fight ? '這裡的寶可夢已經打敗了' :
-        isRevealed(m, picked) ? `住著「${esc(typeNames(n))}」系的寶可夢` : '住著誰？到了才知道（城鎮可以撥開烏雲）';
-      const extra = n.kind === 'city' ? '　·　道館首領在這裡！' : n.kind === 'league' ? '　·　冠軍在這裡！' : '';
-      const title = n.kind === 'wild' ? `${glyph(roadIcon[m0.roads[n.road].kind])} ${esc(n.name)}` : `${n.kind === 'cave' ? icon('cave') : glyph(n.icon)} ${esc(n.name)} <small>${kindLabel[n.kind]}</small>`;
-      panel.innerHTML = `<div class="ttitle">${title}</div><div class="tsub">${who}${extra}</div>
-        <div class="trow"><button class="btn" id="go">${fight ? '前往！' : '走過去'}</button></div>`;
-      panel.querySelector('#go')!.addEventListener('click', () => void goTo(picked!));
-      return;
-    }
     if (atTown(m)) {
       const svc = [
         canGift(m) ? `<button class="btn" id="svc-gift">${icon('gift')} 拿小禮物</button>` : '',
@@ -239,7 +223,7 @@ export const trek: ScreenFactory = (root, ctx) => {
         canQuiz(m) ? `<button class="btn" id="svc-quiz">${icon('chat')} 村民考考你</button>` : '',
       ].join('');
       panel.innerHTML = `<div class="ttitle">${here.kind === 'cave' ? icon('cave') : glyph(here.icon)} ${esc(here.name)} <small>${kindLabel[here.kind]}</small></div>
-        <div class="tsub">${svc ? '這裡可以做的事：' : '都做完了！點亮著的地方繼續走'}</div>${svc ? `<div class="trow wrap">${svc}</div>` : ''}`;
+        <div class="tsub">${svc ? '這裡可以做的事：' : '都做完了！點一下閃光的地方就出發'}</div>${svc ? `<div class="trow wrap">${svc}</div>` : ''}`;
       panel.querySelector('#svc-gift')?.addEventListener('click', openGift);
       panel.querySelector('#svc-info')?.addEventListener('click', () => {
         sfx.play('good');
@@ -250,16 +234,7 @@ export const trek: ScreenFactory = (root, ctx) => {
       panel.querySelector('#svc-quiz')?.addEventListener('click', () => ctx.go('practice', { quiz: true }));
       return;
     }
-    panel.innerHTML = `<div class="ttitle">${here.kind === 'wild' ? icon('pin') : here.kind === 'cave' ? icon('cave') : glyph(here.icon)} ${esc(here.name)}</div><div class="tsub">點亮著的地方，再按「前往」</div>`;
-  }
-
-  function pick(id: number): void {
-    const m = M();
-    if (busy || id === m.at) return;
-    if (!neighbors(m, m.at).includes(id)) { toast('太遠了，先走到相鄰的地方'); return; }
-    sfx.play('select');
-    picked = id;
-    render();
+    panel.innerHTML = `<div class="ttitle">${here.kind === 'wild' ? icon('pin') : here.kind === 'cave' ? icon('cave') : glyph(here.icon)} ${esc(here.name)}</div><div class="tsub">點一下閃光的地方就出發；走過的地方也能直接回去</div>`;
   }
 
   /** the creature of a node is rolled once and then remembered, so backing out doesn't re-roll it */
@@ -274,28 +249,40 @@ export const trek: ScreenFactory = (root, ctx) => {
     return pickMon.id;
   }
 
+  /**
+   * A tap is the whole decision: the party walks there (through places it has already been)
+   * and, if a creature lives in the new place, the meeting starts. Backing out of that is free.
+   */
   async function goTo(id: number): Promise<void> {
     if (busy || dead) return;
+    const trip = planTrip(M(), id);
+    if (!trip) {
+      if (id !== M().at) toast('要先走到它旁邊的地方，才去得了這裡');
+      return;
+    }
     busy = true;
-    picked = null;
-    const m = M();
-    if (needsFight(m, id)) {
+    sfx.play('select');
+    for (const step of trip.steps) {
+      ctx.update((s) => ({ ...s, townmap: moveTo(s.townmap!, step) }));
+      sfx.play('step', step);
+      render();
+      focusOn(step, true);
+      await sleep(trip.steps.length > 3 ? 230 : 330);
+      if (dead) return;
+    }
+    if (trip.fight) {
       ctx.update((s) => ({ ...s, townmap: startEntering(s.townmap!, id) }));
       const a = N(id);
       partner.style.left = `${a.x}%`;
       partner.style.top = `${(a.y / H) * 100}%`;
+      focusOn(id, true);
       sfx.play('warn');
       await sleep(600);
       if (!dead) ctx.go('scan', sceneOf(M(), a, foeFor(id)));
       return;
     }
-    ctx.update((s) => ({ ...s, townmap: moveTo(s.townmap!, id) }));
-    sfx.play('step');
-    render();
-    focusOn(M().at, true);
-    await sleep(450);
     busy = false;
-    if (!dead && atTown(M()) && (canGift(M()) || canInfo(M()))) toast('到城鎮了！');
+    if (atTown(M()) && (canGift(M()) || canInfo(M()))) toast('到城鎮了！');
   }
 
   function openGift(): void {
@@ -311,7 +298,7 @@ export const trek: ScreenFactory = (root, ctx) => {
     root.querySelector('.app')!.appendChild(el);
   }
 
-  root.querySelectorAll<HTMLElement>('.tnode').forEach((el) => el.addEventListener('click', () => pick(Number(el.dataset.id))));
+  root.querySelectorAll<HTMLElement>('.tnode').forEach((el) => el.addEventListener('click', () => void goTo(Number(el.dataset.id))));
 
   applyWidth();
   placePartner();

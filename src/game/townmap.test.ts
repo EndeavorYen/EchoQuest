@@ -3,7 +3,7 @@ import { Rng } from '../util/rng';
 import { DEX, TYPES } from '../mon/dex';
 import {
   checkTownMap, fewestFights, generateTownMap, isTownMap, neighbors, startEntering, moveTo, winEntering, retreat, useInfo, takeGift, canGift,
-  needsFight, rollRarity, RARITY_TABLE, TYPE_IDS, isRevealed, visibleNodes, clearCells, type MapSize, type TownMap,
+  needsFight, walkPath, frontier, planTrip, rollRarity, RARITY_TABLE, TYPE_IDS, isRevealed, visibleNodes, clearCells, type MapSize, type TownMap,
 } from './townmap';
 
 const seeds = Array.from({ length: 120 }, (_, i) => i * 7919 + 13);
@@ -200,5 +200,88 @@ describe('fog', () => {
     void _s;
     expect(isTownMap(old)).toBe(true);
     expect(visibleNodes(old as TownMap).size).toBeGreaterThan(2);
+  });
+});
+
+describe('tap to travel', () => {
+  /** walk (and win) a long way from the start so there is something far behind */
+  function wander(seed: number, hops: number): TownMap {
+    let m = generateTownMap(seed);
+    for (let i = 0; i < hops; i++) {
+      const next = frontier(m).find((n) => neighbors(m, m.at).includes(n)) ?? neighbors(m, m.at).find((n) => !m.visited.includes(n));
+      if (next === undefined) break;
+      m = needsFight(m, next) ? winEntering(startEntering(m, next)) : moveTo(m, next);
+    }
+    return m;
+  }
+  const adjacent = (m: TownMap, a: number, b: number): boolean => neighbors(m, a).includes(b);
+
+  it('a place already stood in can be walked to from far away, through places already stood in', () => {
+    for (const seed of seeds.slice(0, 25)) {
+      const m = wander(seed, 12);
+      for (const far of m.visited) {
+        if (far === m.at) continue;
+        const trip = planTrip(m, far)!;
+        expect(trip, `seed ${seed} -> ${far}`).not.toBeNull();
+        expect(trip.fight).toBe(false);
+        expect(trip.steps[trip.steps.length - 1]).toBe(far);
+        let prev = m.at;
+        for (const st of trip.steps) {
+          expect(adjacent(m, prev, st)).toBe(true);
+          expect(m.visited).toContain(st);
+          prev = st;
+        }
+      }
+    }
+  });
+  it('walking the steps one by one reaches the place', () => {
+    const m = wander(7919, 10);
+    const far = m.visited.find((v) => v !== m.at && walkPath(m, m.at, v)!.length > 2);
+    if (far === undefined) return;
+    let cur = m;
+    for (const st of planTrip(m, far)!.steps) cur = moveTo(cur, st);
+    expect(cur.at).toBe(far);
+  });
+  it('a new place can be entered only from a place next to it: the party walks there first', () => {
+    for (const seed of seeds.slice(0, 25)) {
+      const m = wander(seed, 8);
+      for (const n of frontier(m)) {
+        const trip = planTrip(m, n)!;
+        expect(trip, `seed ${seed} -> ${n}`).not.toBeNull();
+        const stand = trip.steps.length ? trip.steps[trip.fight ? trip.steps.length - 1 : trip.steps.length - 2] ?? m.at : m.at;
+        if (trip.fight) expect(adjacent(m, stand, n)).toBe(true);
+        expect(trip.fight).toBe(needsFight(m, n));
+      }
+    }
+  });
+  it('a place that is not next to anywhere visited cannot be reached', () => {
+    const m = generateTownMap(13);
+    const near = new Set([...m.visited, ...frontier(m)]);
+    const faraway = m.nodes.find((n) => !near.has(n.id));
+    expect(faraway).toBeTruthy();
+    expect(planTrip(m, faraway!.id)).toBeNull();
+    expect(planTrip(m, m.at)).toBeNull();
+  });
+  it('frontier lists exactly the unvisited places next to visited ones', () => {
+    const m = wander(13, 6);
+    for (const n of m.nodes) {
+      const want = !m.visited.includes(n.id) && neighbors(m, n.id).some((x) => m.visited.includes(x));
+      expect(frontier(m).includes(n.id)).toBe(want);
+    }
+  });
+  it('nothing is planned while a fight is under way', () => {
+    const m = generateTownMap(13);
+    const f = frontier(m).find((n) => needsFight(m, n))!;
+    expect(planTrip(startEntering(m, f), 0)).toBeNull();
+  });
+
+  it('a way not yet taken stays in view after the party has moved on', () => {
+    const m = generateTownMap(13);
+    const start = frontier(m);
+    expect(start.length).toBeGreaterThanOrEqual(2);
+    const first = start.find((n) => needsFight(m, n)) ?? start[0];
+    const moved = needsFight(m, first) ? winEntering(startEntering(m, first)) : moveTo(m, first);
+    for (const n of start) expect(visibleNodes(moved).has(n), `node ${n}`).toBe(true);
+    for (const n of frontier(moved)) expect(visibleNodes(moved).has(n)).toBe(true);
   });
 });

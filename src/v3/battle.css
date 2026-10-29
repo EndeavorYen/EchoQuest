@@ -317,9 +317,13 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 .tnode[data-done="1"] i { background: #b9e3a0; }
 .tnode.big[data-done="1"] i::after { content: '✓'; position: absolute; right: -2px; bottom: 14px; font-size: .8rem; font-style: normal; font-weight: 900; color: #2c8a3a; }
 .tnode[data-state=far] { opacity: .75; }
-.tnode[data-state=out] i, .tnode[data-pick="1"] i { box-shadow: 0 0 0 5px rgba(74, 144, 226, .3); animation: tpulse 1.4s ease-in-out infinite; }
-.tnode.small[data-state=out] i { border-color: #4a90e2; }
-.tnode[data-pick="1"] i { background: #4a90e2; }
+.tnode[data-state=next] i { box-shadow: 0 0 0 4px #fff, 0 0 0 8px #ffc53d; animation: tpulse 1.1s ease-in-out infinite; }
+.tnode.small[data-state=next] i { border-color: #1f2a44; background: #fff6cf; }
+.tnode[data-state=next]::after { content: ''; position: absolute; left: 50%; top: -3.6cqw; border: 1.9cqw solid transparent; border-top: 2.7cqw solid #1f2a44; border-bottom: 0; transform: translateX(-50%); animation: tbob 1s ease-in-out infinite; pointer-events: none; }
+.tnode.big[data-state=next]::after { top: -4.8cqw; }
+@keyframes tbob { 50% { transform: translate(-50%, 1.3cqw); } }
+.tnode[data-state=seen] { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .tnode[data-state=next] i, .tnode[data-state=next]::after { animation: none; } }
 .tnode[data-state=here] i { box-shadow: 0 0 0 5px rgba(255, 197, 61, .4); }
 .tname { margin-top: 2px; font-size: .68rem; font-weight: 800; background: rgba(255, 255, 255, .85); border-radius: 8px; padding: 0 6px; white-space: nowrap; }
 .ttypes { position: absolute; top: 100%; display: flex; gap: 2px; margin-top: 1px; }
@@ -336,7 +340,7 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 .trow { display: flex; gap: 8px; }
 .trow.wrap { flex-wrap: wrap; }
 .trow .btn { flex: 1 1 40%; }
-@keyframes tpulse { 50% { box-shadow: 0 0 0 9px rgba(74, 144, 226, .1); } }
+@keyframes tpulse { 50% { box-shadow: 0 0 0 4px #fff, 0 0 0 13px rgba(255, 197, 61, .45); } }
 .modal { position: absolute; inset: 0; background: rgba(20, 30, 50, .5); display: grid; place-items: center; z-index: 20; padding: 24px; }
 
 /* dex: paging, caught filter and the evolution family */
