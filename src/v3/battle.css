@@ -222,3 +222,27 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 .toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 8px 16px; border-radius: 999px; font-weight: 800; z-index: 20; }
 .relic { font-size: 4rem; text-align: center; }
 .panel #body { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+
+/* move effects (see effects.ts) */
+.pt { position: absolute; width: var(--s, 20px); height: var(--s, 20px); margin: calc(var(--s, 20px) / -2) 0 0 calc(var(--s, 20px) / -2); pointer-events: none; will-change: transform, opacity; }
+.pt.ring { --s: 20px; border-radius: 50%; border: 4px solid var(--c); }
+.pt.sh-orb { border-radius: 50%; background: radial-gradient(circle, #fff 0 30%, var(--c) 72%); box-shadow: 0 0 14px 5px var(--c); }
+.pt.sh-fire { border-radius: 50% 50% 50% 8%; transform-origin: 50% 70%; background: radial-gradient(circle at 40% 60%, #fff3b0 0 24%, var(--c) 62%); box-shadow: 0 0 12px 4px var(--c); }
+.pt.sh-drop { border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%; background: radial-gradient(circle at 35% 30%, #fff 0 18%, var(--c) 60%); box-shadow: 0 0 8px var(--c); }
+.pt.sh-leaf { border-radius: 0 100% 0 100%; background: linear-gradient(135deg, #fff6 0, var(--c) 55%); border: 1px solid #0003; }
+.pt.sh-spark { border-radius: 50%; background: var(--c); box-shadow: 0 0 8px 2px var(--c); }
+.pt.sh-dot { border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
+.pt.sh-bubble { border-radius: 50%; background: radial-gradient(circle at 32% 30%, #fff9 0 18%, color-mix(in srgb, var(--c) 40%, transparent) 60%); border: 2px solid var(--c); }
+.pt.sh-sparkle { background: var(--c); clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); filter: drop-shadow(0 0 5px var(--c)); }
+.pt.sh-star { background: var(--c); clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); filter: drop-shadow(0 0 4px #fff); }
+.pt.sh-shard { background: linear-gradient(135deg, #fff, var(--c)); clip-path: polygon(50% 0, 85% 60%, 50% 100%, 15% 60%); }
+.pt.sh-wind { border-radius: 50%; border: 5px solid transparent; border-top-color: var(--c); border-right-color: var(--c); filter: drop-shadow(0 0 5px var(--c)); }
+.pt.sh-rock { background: linear-gradient(135deg, color-mix(in srgb, var(--c) 60%, #fff), var(--c)); clip-path: polygon(15% 10%, 70% 0, 100% 40%, 82% 92%, 30% 100%, 0 55%); }
+.pt.sh-wisp { border-radius: 50% 50% 40% 40% / 60% 60% 40% 40%; background: radial-gradient(circle at 50% 40%, #fff 0 14%, var(--c) 60%); box-shadow: 0 0 16px 6px var(--c); opacity: .9; }
+.pt.sh-slash { width: 150px; height: 8px; margin: 0; border-radius: 6px; background: linear-gradient(90deg, transparent, #fff, transparent); box-shadow: 0 0 12px 3px var(--c); }
+.pt.shieldfx { --s: 150px; border-radius: 50%; border: 5px solid var(--c); background: radial-gradient(circle, transparent 52%, color-mix(in srgb, var(--c) 35%, transparent) 100%); box-shadow: 0 0 18px 4px color-mix(in srgb, var(--c) 60%, transparent), inset 0 0 20px color-mix(in srgb, var(--c) 40%, transparent); margin: 0; }
+.boltsvg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; filter: drop-shadow(0 0 6px #fff); }
+.washfx { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+.mon.charging img { animation: charge .5s ease-in-out infinite; }
+@keyframes charge { 50% { transform: scale(1.06) translateY(-4px); filter: drop-shadow(0 0 14px var(--type)) brightness(1.15); } }
+.pbtn .adult { position: absolute; top: -6px; right: -6px; background: #4a90e2; color: #fff; border-radius: 999px; font: 800 .62rem var(--body); padding: 1px 6px; }

@@ -10,6 +10,8 @@ export interface Player {
   face: number;
   /** the Pokémon that fights for this player (id); starter by seat when unset */
   mon?: number;
+  /** a grown-up: boss shields bounce their spells while any layer is up */
+  adult?: boolean;
   progress: Progress;
   stats: { dealt: number; perfect: number; blocks: number; words: number };
 }

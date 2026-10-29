@@ -2,7 +2,7 @@ import { advance, isFinished, nextRelic } from '../../game/run';
 import { sfx } from '../../audio/sfx';
 import { BattleView } from '../battle-view';
 import { BattleController } from '../battle-controller';
-import { pickWild } from '../../mon/dex';
+import { pickWild, TYPES } from '../../mon/dex';
 import type { BattleParams, ScreenFactory } from '../ctx';
 
 /** One fight: a wild creature (or a co-op boss) against the party's partners. */
@@ -35,6 +35,6 @@ export const battle: ScreenFactory = (root, ctx, params: BattleParams) => {
   };
   ctl.onLeave = () => ctx.go(params.trek ? 'trek' : 'home');
   ctl.start(params.foe, boss, Math.min(ctx.save.active, ctx.save.players.length - 1));
-  if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { __v3: ctl });
+  if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { __v3: Object.assign(ctl, { view }), __types: TYPES });
   return { destroy: () => ctl.dispose() };
 };

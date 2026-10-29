@@ -1,5 +1,6 @@
 import { artUrl, typeOf, type Mon } from '../mon/dex';
 import type { Word } from '../data/words';
+import { blockSpark, dropShield, playMove, raiseShield, type FxHost } from './effects';
 
 const BACK = '<svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg>';
 const MIC = '<svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11z"/></svg>';
@@ -14,10 +15,8 @@ export interface PartyChip {
   color: string;
   level: number;
   on: boolean;
-  /** cannot act right now (boss fight) */
-  locked?: boolean;
-  /** bounced off the boss shield and recovering */
-  down?: boolean;
+  /** a grown-up (shown with a badge) */
+  adult?: boolean;
 }
 
 const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -211,7 +210,8 @@ export class BattleView {
   setParty(chips: PartyChip[]): void {
     this.$('#party').innerHTML = chips
       .map(
-        (c, i) => `<button class="pbtn ${c.on ? 'on' : ''} ${c.locked ? 'locked' : ''} ${c.down ? 'down' : ''}" data-i="${i}" style="--type:${c.color}" aria-label="夥伴 ${i + 1}">
+        (c, i) => `<button class="pbtn ${c.on ? 'on' : ''}" data-i="${i}" style="--type:${c.color}" aria-label="夥伴 ${i + 1}${c.adult ? '（大人）' : ''}">
+          ${c.adult ? '<span class="adult">大人</span>' : ''}
           <img src="${c.img}" alt="" onerror="this.style.visibility='hidden'">
           <span class="lv">${[1, 2, 3, 4].map((n) => `<i class="${n <= c.level ? 'f' : ''}"></i>`).join('')}</span></button>`,
       )
@@ -264,56 +264,65 @@ export class BattleView {
     return e;
   }
 
-  /** The partner fires a type-coloured move at the wild creature. */
-  shoot(colors: string[], style: string, done: () => void): void {
-    const from = this.center(this.$('#me'));
-    const to = this.center(this.$('#foe'));
-    const c = colors[0] ?? '#ffc53d';
-    const n = style === 'flame' || style === 'leaf' || style === 'swarm' || style === 'tornado' ? 3 : 1;
-    let left = n;
-    for (let i = 0; i < n; i++) {
-      const orb = this.spawn('orb', from.x, from.y, colors[i % colors.length] ?? c);
-      const dy = (i - (n - 1) / 2) * 34;
-      const dur = style === 'bolt' || style === 'jet' ? 220 : 420;
-      const anim = orb.animate(
-        [{ transform: 'translate(0,0) scale(.6)' }, { transform: `translate(${(to.x - from.x) * 0.5}px, ${(to.y - from.y) * 0.5 + dy - 24}px) scale(1.1)`, offset: 0.5 }, { transform: `translate(${to.x - from.x}px, ${to.y - from.y}px) scale(.9)` }],
-        { duration: dur, delay: i * 60, easing: 'ease-in', fill: 'forwards' },
-      );
-      anim.onfinish = () => {
-        orb.remove();
-        if (--left === 0) {
-          this.burst(to.x, to.y, c);
-          done();
-        }
-      };
-    }
+  private host?: FxHost;
+
+  private fxHost(): FxHost {
+    return (this.host ??= {
+      layer: this.$('#fx'),
+      shake: (px, ms = 260) => {
+        void this.$('#arena').animate([{ transform: 'translate(0,0)' }, { transform: `translate(${-px}px,${px / 2}px)` }, { transform: `translate(${px}px,${-px / 2}px)` }, { transform: 'translate(0,0)' }], { duration: ms });
+      },
+      flash: (color, alpha = 0.3, ms = 300) => {
+        const w = document.createElement('div');
+        w.className = 'washfx';
+        w.style.background = color;
+        this.$('#fx').appendChild(w);
+        void w.animate([{ opacity: alpha }, { opacity: 0 }], { duration: ms, easing: 'ease-out' }).finished.then(() => w.remove());
+      },
+      tint: (who, css, ms) => {
+        const img = this.$(who === 'foe' ? '#foe' : '#me').querySelector('img') as HTMLElement | null;
+        if (!img) return;
+        img.style.transition = 'filter .15s';
+        img.style.filter = css;
+        window.setTimeout(() => { img.style.filter = ''; }, ms);
+      },
+    });
   }
 
-  burst(x: number, y: number, color: string): void {
-    const r = this.spawn('ring', x, y, color);
-    r.animate([{ transform: 'scale(.4)', opacity: 1 }, { transform: 'scale(5)', opacity: 0 }], { duration: 450, easing: 'ease-out' }).onfinish = () => r.remove();
-    for (let i = 0; i < 8; i++) {
-      const p = this.spawn('orb', x, y, color);
-      p.style.width = p.style.height = '10px';
-      p.style.margin = '-5px';
-      const a = (i / 8) * Math.PI * 2;
-      p.animate([{ transform: 'translate(0,0)', opacity: 1 }, { transform: `translate(${Math.cos(a) * 50}px, ${Math.sin(a) * 50}px)`, opacity: 0 }], { duration: 500, easing: 'ease-out' }).onfinish = () => p.remove();
+  /** `who` fires its type's move at the other creature; `hit` runs at the moment of impact. */
+  cast(who: 'me' | 'foe', style: string, colors: string[], power: 1 | 2, hit: () => void): void {
+    const mine = who === 'me';
+    const from = this.center(this.$(mine ? '#me' : '#foe'));
+    const to = this.center(this.$(mine ? '#foe' : '#me'));
+    if (!mine) {
+      const foe = this.$('#foe');
+      foe.classList.add('lunge');
+      window.setTimeout(() => foe.classList.remove('lunge'), 520);
     }
+    playMove(this.fxHost(), style, colors, from, to, power, hit);
   }
 
-  /** The wild creature rushes at the partner. */
-  foeAttack(colors: string[], done: () => void): void {
-    const foe = this.$('#foe');
-    foe.classList.add('lunge');
-    window.setTimeout(() => foe.classList.remove('lunge'), 520);
-    const from = this.center(foe);
-    const to = this.center(this.$('#me'));
-    const orb = this.spawn('orb', from.x, from.y, colors[0] ?? '#d9534f');
-    const anim = orb.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${to.x - from.x}px, ${to.y - from.y}px)` }], { duration: 380, easing: 'ease-in', fill: 'forwards' });
-    anim.onfinish = () => {
-      orb.remove();
-      done();
-    };
+  /** A bubble around the partner while the block is up. */
+  private shieldEl: HTMLElement | null = null;
+  raiseShield(color: string): void {
+    this.dropShield();
+    this.shieldEl = raiseShield(this.fxHost(), this.center(this.$('#me')), color);
+  }
+  dropShield(): void {
+    if (this.shieldEl) dropShield(this.shieldEl);
+    this.shieldEl = null;
+  }
+  blockSpark(where: 'foe' | 'me', color: string): void {
+    blockSpark(this.fxHost(), this.center(this.$(where === 'foe' ? '#foe' : '#me')), color);
+  }
+
+  /** The wild creature glows while it winds up. */
+  setCharging(on: boolean): void {
+    this.$('#foe').classList.toggle('charging', on);
+  }
+
+  flash(color: string, alpha = 0.3): void {
+    this.fxHost().flash(color, alpha);
   }
 
   floatText(where: 'foe' | 'me', text: string, color: string, small = false, dy = 0): void {

@@ -23,7 +23,8 @@ export const party: ScreenFactory = (root, ctx) => {
             <div class="stepper"><button data-lv="${i}" data-d="-1" ${p.level <= 1 ? 'disabled' : ''} aria-label="簡單一點">−</button>
               <b>Lv.${p.level} ${esc(info.name)}</b>
               <button data-lv="${i}" data-d="1" ${p.level >= 4 ? 'disabled' : ''} aria-label="難一點">＋</button></div>
-            <div class="muted">學會 ${st.learned} / ${st.total} 個單字</div></div>
+            <div class="muted">學會 ${st.learned} / ${st.total} 個單字</div>
+            <label class="row muted"><input type="checkbox" data-adult="${i}" ${p.adult ? 'checked' : ''}> 我是大人（首領的護盾會彈開大人的咒語）</label></div>
           ${players.length > 1 ? `<button class="icon-btn" data-del="${i}" aria-label="移除">✕</button>` : ''}</div>`;
       })
       .join('');
@@ -39,6 +40,10 @@ export const party: ScreenFactory = (root, ctx) => {
       ctx.update((s) => ({ ...s, players: s.players.map((p, k) => (k === i ? { ...p, level: Math.max(1, Math.min(4, p.level + d)) as Level } : p)) }));
       sfx.play('select');
       draw();
+    }));
+    root.querySelectorAll<HTMLInputElement>('[data-adult]').forEach((b) => b.addEventListener('change', () => {
+      const i = Number(b.dataset.adult);
+      ctx.update((s) => ({ ...s, players: s.players.map((p, k) => (k === i ? { ...p, adult: b.checked } : p)) }));
     }));
     root.querySelectorAll<HTMLElement>('[data-del]').forEach((b) => b.addEventListener('click', () => {
       const i = Number(b.dataset.del);

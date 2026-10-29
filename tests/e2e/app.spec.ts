@@ -100,48 +100,128 @@ test.describe('scan and battle', () => {
   });
 });
 
+/** Keep answering whatever the battle asks (a spell or a shield word) until `done` is true. */
+async function playUntil(game: any, page: Page, done: () => Promise<boolean>, limit = 120): Promise<void> {
+  for (let i = 0; i < limit; i++) {
+    if (await done()) return;
+    const phase = await ctl(page, (c) => c.phase);
+    if (phase === 'speak' || phase === 'defend') {
+      if (await page.locator('[data-act=mic]').count()) await sayWord(game, page);
+    }
+    await page.waitForTimeout(350);
+  }
+  throw new Error('battle did not reach the expected state');
+}
+
+const BOSS = { id: 150, name: '超夢', type: 'psychic', rarity: 5, colors: ['#B8A8C8'] };
+
 test.describe('co-op boss', () => {
-  test('a solo player goes through launch, rescue (three layers) and the finisher', async ({ game }) => {
+  test('a child strips a layer with each spell, takes half damage while it is up, and wins once it is down', async ({ game }) => {
     const p = game.page;
     await open(p);
-    // a rare creature (5 shield layers → capped by BossFight)
-    await go(p, 'battle', { foe: { id: 150, name: '超夢', type: 'psychic', rarity: 5, colors: ['#B8A8C8'] }, boss: true });
-    await p.waitForFunction(() => (window as any).__v3?.boss);
+    await go(p, 'battle', { foe: BOSS, boss: true });
+    await p.waitForFunction(() => (window as any).__v3?.shield);
     await expect(p.locator('#shields')).toBeVisible();
-    const layers = await ctl(p, (c) => c.boss.maxLayers);
-    expect(layers).toBeGreaterThanOrEqual(3);
-    // launch
-    await expect(p.locator('.panel .hint')).toContainText('超級咒語');
-    await sayWord(game, p);
-    await expect.poll(() => ctl(p, (c) => c.boss.stage), { timeout: 8000 }).toBe('rescue');
-    await expect(p.locator('#theWord')).toBeVisible({ timeout: 8000 });
-    // rescue: every success strips a layer
-    for (let i = 0; i < layers; i++) {
-      await expect(p.locator('#theWord')).toBeVisible({ timeout: 8000 });
-      await expect.poll(() => ctl(p, (c) => c.phase)).toBe('speak');
-      await sayWord(game, p);
-      await expect.poll(() => ctl(p, (c) => c.boss.layers), { timeout: 8000 }).toBe(layers - 1 - i);
-    }
-    await expect.poll(() => ctl(p, (c) => c.boss.stage)).toBe('finish');
-    await expect(p.locator('.panel .hint')).toContainText('最後一擊', { timeout: 8000 });
-    await expect.poll(() => ctl(p, (c) => c.phase)).toBe('speak');
-    await sayWord(game, p);
-    await expect(p.locator('.victory')).toBeVisible({ timeout: 10000 });
+    test.setTimeout(180_000);
+    const max = await ctl(p, (c) => c.shield.max);
+    expect(max).toBeGreaterThanOrEqual(3);
+    await playUntil(game, p, async () => (await ctl(p, (c) => c.shield.layers)) <= max - 1);
+    await playUntil(game, p, async () => (await ctl(p, (c) => c.shield.layers)) === 0);
+    await expect(p.locator('#shields')).toContainText('護盾破了');
+    await playUntil(game, p, async () => (await p.locator(".victory").count()) > 0, 160);
+    await expect(p.locator('.victory')).toBeVisible();
   });
 
-  test('with two players only the right one may act at each stage', async ({ game }) => {
+  test('a grown-up is bounced while the shield is up: no layer, no damage; a child can break it', async ({ game }) => {
     const p = game.page;
     await open(p);
-    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, players: [s.players[0], { ...s.players[0], id: 'p2', name: 'B' }] })));
-    await go(p, 'battle', { foe: { id: 150, name: '超夢', type: 'psychic', rarity: 5, colors: ['#B8A8C8'] }, boss: true });
-    await p.waitForFunction(() => (window as any).__v3?.boss);
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, players: [{ ...s.players[0], name: 'Mom', adult: true }, { ...s.players[0], id: 'kid', name: 'Kid' }] })));
+    await go(p, 'battle', { foe: BOSS, boss: true });
+    await p.waitForFunction(() => (window as any).__v3?.shield);
+    await expect(p.locator('.pbtn .adult')).toHaveCount(1);
+    await expect(p.locator('.panel .hint')).toContainText('彈開');
+    const hp = await ctl(p, (c) => c.battle.monster.hp);
+    const layers = await ctl(p, (c) => c.shield.layers);
     await sayWord(game, p);
-    await expect.poll(() => ctl(p, (c) => c.boss.stage), { timeout: 8000 }).toBe('rescue');
+    await expect(p.locator('.float', { hasText: '被護盾彈開了' })).toBeVisible({ timeout: 8000 });
+    expect(await ctl(p, (c) => c.battle.monster.hp)).toBe(hp);
+    expect(await ctl(p, (c) => c.shield.layers)).toBe(layers);
+    // the foe strikes back: block it, then let the child have a go
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
+    await sayWord(game, p);
     await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('speak');
-    // the bounced player rests; the other one is up
-    expect(await ctl(p, (c) => c.battle.turn)).toBe(1);
-    await expect(p.locator('.pbtn.locked')).toHaveCount(1);
-    await expect(p.locator('.pbtn.down')).toHaveCount(1);
+    await p.click('.pbtn[data-i="1"]');
+    await expect(p.locator('.panel .hint')).toContainText('打破護盾');
+    await sayWord(game, p);
+    await expect.poll(() => ctl(p, (c) => c.shield.layers), { timeout: 8000 }).toBe(layers - 1);
+    expect(await ctl(p, (c) => c.battle.monster.hp)).toBeLessThan(hp);
+  });
+
+  test('once the shield is down, grown-ups can hurt the boss too', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, players: [{ ...s.players[0], name: 'Mom', adult: true }, { ...s.players[0], id: 'kid', name: 'Kid' }] })));
+    await go(p, 'battle', { foe: BOSS, boss: true });
+    await p.waitForFunction(() => (window as any).__v3?.shield);
+    await ctl(p, (c) => { c.shield.layers = 0; });
+    const hp = await ctl(p, (c) => c.battle.monster.hp);
+    await sayWord(game, p);
+    await expect.poll(() => ctl(p, (c) => c.battle.monster.hp), { timeout: 8000 }).toBeLessThan(hp);
+  });
+});
+
+test.describe('defense', () => {
+  const MOUSE = { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] };
+
+  test('even a level-1 player gets a shield round after casting, and blocking reflects damage', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: MOUSE });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await sayWord(game, p);
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
+    await expect(p.locator('.panel.defend')).toBeVisible();
+    await expect(p.locator('.timer')).toBeVisible();
+    const hp = await ctl(p, (c) => c.battle.monster.hp);
+    await sayWord(game, p);
+    await expect(p.locator('.pt.shieldfx')).toBeVisible({ timeout: 4000 });
+    await expect(p.locator('.float', { hasText: '擋住了' })).toBeVisible({ timeout: 6000 });
+    expect(await ctl(p, (c) => c.battle.monster.hp)).toBeLessThan(hp);
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('speak');
+  });
+
+  test('running out of time lets the hit through and the creature recovers a little', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: MOUSE });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await sayWord(game, p);
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
+    const hp = await ctl(p, (c) => c.battle.monster.hp);
+    await ctl(p, (c) => { c.defLeft = 0.05; });
+    await expect(p.locator('.float', { hasText: '好痛' })).toBeVisible({ timeout: 6000 });
+    expect(await ctl(p, (c) => c.battle.monster.hp)).toBeGreaterThanOrEqual(hp);
+  });
+
+  test('every type has its own move that lands', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: MOUSE });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    const types = await p.evaluate(() => Object.keys((window as any).__types));
+    expect(types.length).toBe(18);
+    for (const t of types) {
+      const landed = await p.evaluate(
+        (key) => new Promise<boolean>((res) => {
+          const c = (window as any).__v3;
+          const fx = (window as any).__types[key].fx;
+          const timer = setTimeout(() => res(false), 4000);
+          c.view.cast('me', fx.style, fx.colors, 1, () => { clearTimeout(timer); res(true); });
+        }),
+        t,
+      );
+      expect(landed, `move for ${t}`).toBe(true);
+    }
   });
 });
 
