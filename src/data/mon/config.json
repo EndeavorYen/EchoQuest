@@ -1,0 +1,36 @@
+{
+ "artUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/{id}.png",
+ "spriteUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/{id}.png",
+ "backSpriteUrl": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/{id}.png",
+ "rarityWeight": {
+  "1": 1,
+  "2": 0.6,
+  "3": 0.35,
+  "4": 0.14,
+  "5": 0.02
+ },
+ "shields": {
+  "3": 3,
+  "4": 4,
+  "5": 5
+ },
+ "battle": {
+  "enabled": true,
+  "minRarity": 4,
+  "delayMs": 900,
+  "foeSpeed": 250,
+  "foeSpeedStep": 30,
+  "pauseMs": 420,
+  "dashMul": 2.5,
+  "dodgeChance": 0.6,
+  "reactMs": 170,
+  "cooldownMs": 380,
+  "hitSlack": 7,
+  "hitsPerLayer": {
+   "default": 2,
+   "5": 3
+  },
+  "shakePx": 5,
+  "shotScale": 0.8
+ }
+}

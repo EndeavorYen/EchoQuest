@@ -1,0 +1,751 @@
+{
+  "fire": {
+    "name": "火",
+    "color": "#E85A22",
+    "glyph": "M12 2c1 4 6 6 6 12a6 6 0 0 1-12 0c0-3 2-5 3-6 0 2 1 3 2 3 0-3-1-6 1-9z",
+    "affinity": [
+      "#E8402A",
+      "#F27A22",
+      "#F8B030"
+    ],
+    "fx": {
+      "style": "flame",
+      "colors": [
+        "#ff5a1f",
+        "#ffd54a"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#3b2022",
+        "#331b1d"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "crack",
+          "#ff7a2a",
+          14
+        ],
+        [
+          "ember",
+          "#ffb347",
+          40
+        ],
+        [
+          "rock",
+          "#5a3030",
+          10
+        ]
+      ],
+      "frame": "#c2410c"
+    }
+  },
+  "water": {
+    "name": "水",
+    "color": "#2D7FD6",
+    "glyph": "M12 2c4 6 7 9.5 7 13a7 7 0 0 1-14 0c0-3.5 3-7 7-13z",
+    "affinity": [
+      "#2F7FD8",
+      "#5AA8F0",
+      "#1C4FA0",
+      "#7FD0E8"
+    ],
+    "fx": {
+      "style": "jet",
+      "colors": [
+        "#3b8cff",
+        "#d4ecff"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#4aa3e8",
+        "#3f98de"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "ripple",
+          "#9fd4ff",
+          50
+        ],
+        [
+          "ripple",
+          "#ffffff",
+          14
+        ],
+        [
+          "pad",
+          "#3fa34d",
+          7
+        ]
+      ],
+      "frame": "#1f5fa0"
+    }
+  },
+  "grass": {
+    "name": "草",
+    "color": "#2F9E47",
+    "glyph": "M5 20C5 10 11 4 20 4c0 9-5 16-15 16z",
+    "affinity": [
+      "#3E9A3A",
+      "#7CC84A",
+      "#2C6E30"
+    ],
+    "fx": {
+      "style": "leaf",
+      "colors": [
+        "#3fae4a",
+        "#b4f07a"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#78c850",
+        "#6fbf48"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "tuft",
+          "#4f9a3a",
+          70
+        ],
+        [
+          "flower",
+          "#ffffff",
+          8
+        ],
+        [
+          "flower",
+          "#ffd54a",
+          8
+        ]
+      ],
+      "frame": "#2f6b2a"
+    }
+  },
+  "electric": {
+    "name": "電",
+    "color": "#D9A600",
+    "glyph": "M13 2L4 14h7l-1 8 9-12h-7l1-8z",
+    "affinity": [
+      "#F8D030",
+      "#F0E060",
+      "#E8B020"
+    ],
+    "fx": {
+      "style": "bolt",
+      "colors": [
+        "#ffe14a",
+        "#ffffff"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#2b3350",
+        "#262d48"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "bolt",
+          "#ffe14a",
+          16
+        ],
+        [
+          "dot",
+          "#5b6ca8",
+          40
+        ],
+        [
+          "rivet",
+          "#4a5688",
+          24
+        ]
+      ],
+      "frame": "#ffe14a"
+    }
+  },
+  "bug": {
+    "name": "蟲",
+    "color": "#8AA516",
+    "glyph": "M12 5c3.3 0 5.5 3.4 5.5 7.5S15.3 20 12 20s-5.5-3.4-5.5-7.5S8.7 5 12 5z",
+    "affinity": [
+      "#9AB82A",
+      "#6E8E2A",
+      "#B89A50",
+      "#5A7A3A"
+    ],
+    "fx": {
+      "style": "swarm",
+      "colors": [
+        "#8fc12a",
+        "#f2e84a"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#6b5a3a",
+        "#62532f"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "leaf",
+          "#8fc12a",
+          40
+        ],
+        [
+          "leaf",
+          "#c8a030",
+          24
+        ],
+        [
+          "mushroom",
+          "#e04a3a",
+          6
+        ]
+      ],
+      "frame": "#3a2e1a"
+    }
+  },
+  "poison": {
+    "name": "毒",
+    "color": "#9A4FB8",
+    "glyph": "M12 3a6 6 0 0 1 6 6c0 2.5-1.5 4-3 5v3H9v-3c-1.5-1-3-2.5-3-5a6 6 0 0 1 6-6zM9 19h6v2H9z",
+    "affinity": [
+      "#8A4AB0",
+      "#5A2E70",
+      "#B080C8"
+    ],
+    "fx": {
+      "style": "bubble",
+      "colors": [
+        "#a14cd1",
+        "#e6b3ff"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#5a3a6e",
+        "#533566"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "bubble",
+          "#c58be8",
+          26
+        ],
+        [
+          "ripple",
+          "#7a4e92",
+          30
+        ]
+      ],
+      "frame": "#2e1a3a"
+    }
+  },
+  "psychic": {
+    "name": "超能力",
+    "color": "#DE4F87",
+    "glyph": "M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7z",
+    "affinity": [
+      "#E85A9A",
+      "#F0A0C8",
+      "#9A60C8"
+    ],
+    "fx": {
+      "style": "wave",
+      "colors": [
+        "#ff5fae",
+        "#ffd6ec"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#3a2858",
+        "#34234f"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "star",
+          "#ffd6ec",
+          34
+        ],
+        [
+          "star",
+          "#ff5fae",
+          14
+        ],
+        [
+          "dot",
+          "#6a4aa0",
+          30
+        ]
+      ],
+      "frame": "#ff5fae"
+    }
+  },
+  "fairy": {
+    "name": "妖精",
+    "color": "#E070A8",
+    "glyph": "M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6-8 11-8 11z",
+    "affinity": [
+      "#F4A6C8",
+      "#FFD0E0",
+      "#E070A8"
+    ],
+    "fx": {
+      "style": "charm",
+      "colors": [
+        "#ff8fcf",
+        "#ffe6f5"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#f3c9e0",
+        "#eebfd9"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "flower",
+          "#ffffff",
+          20
+        ],
+        [
+          "flower",
+          "#ff8fcf",
+          16
+        ],
+        [
+          "star",
+          "#ffffff",
+          20
+        ]
+      ],
+      "frame": "#d46aa8"
+    }
+  },
+  "ice": {
+    "name": "冰",
+    "color": "#33AFC4",
+    "glyph": "M12 2l8.7 5v10L12 22l-8.7-5V7z",
+    "affinity": [
+      "#A8E0F0",
+      "#E8F6FA",
+      "#70C0D8"
+    ],
+    "fx": {
+      "style": "ice",
+      "colors": [
+        "#6fdcf2",
+        "#f0fcff"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#bfe8f5",
+        "#b2e0f0"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "crystal",
+          "#7fd0ea",
+          16
+        ],
+        [
+          "crack",
+          "#e8fbff",
+          22
+        ],
+        [
+          "dot",
+          "#ffffff",
+          30
+        ]
+      ],
+      "frame": "#5aa8c4"
+    }
+  },
+  "flying": {
+    "name": "飛行",
+    "color": "#6E8FE0",
+    "glyph": "M3 14c4-1 7-4 9-9 1 6 4 9 9 9-4 3-9 4-13 3-2 0-4-1-5-3z",
+    "affinity": [
+      "#8FB8F0",
+      "#C8DCF8",
+      "#F4F6F8",
+      "#B08860"
+    ],
+    "fx": {
+      "style": "tornado",
+      "colors": [
+        "#a9c4ff",
+        "#ffffff"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#8fc8f6",
+        "#86c0f0"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "cloud",
+          "#ffffff",
+          14
+        ],
+        [
+          "dot",
+          "#ffffff",
+          20
+        ]
+      ],
+      "frame": "#4a7fc0"
+    }
+  },
+  "normal": {
+    "name": "一般",
+    "color": "#8A9099",
+    "glyph": "M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16z",
+    "affinity": [
+      "#E8DCC8",
+      "#C8B49A",
+      "#F2F0EA",
+      "#A89A88"
+    ],
+    "fx": {
+      "style": "star",
+      "colors": [
+        "#e6dccb",
+        "#ffffff"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#c8c0a8",
+        "#bfb79e"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "dot",
+          "#a8a088",
+          50
+        ],
+        [
+          "rock",
+          "#9a927a",
+          8
+        ],
+        [
+          "tuft",
+          "#8aa860",
+          20
+        ]
+      ],
+      "frame": "#6b6450"
+    }
+  },
+  "ground": {
+    "name": "地面",
+    "color": "#B07A3C",
+    "glyph": "M2 20l7-12 4 6 3-4 6 10z",
+    "affinity": [
+      "#B07A3C",
+      "#8B5A2B",
+      "#D8B070",
+      "#6E4A28"
+    ],
+    "fx": {
+      "style": "boulder",
+      "colors": [
+        "#a8793a",
+        "#e6c88a"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#d8b878",
+        "#cfae6e"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "crack",
+          "#a8844a",
+          20
+        ],
+        [
+          "dot",
+          "#b99858",
+          50
+        ],
+        [
+          "rock",
+          "#a8844a",
+          8
+        ]
+      ],
+      "frame": "#8a6a30"
+    }
+  },
+  "rock": {
+    "name": "岩石",
+    "color": "#8E8672",
+    "glyph": "M7 6l6-2 6 5-1 9-8 2-6-6z",
+    "affinity": [
+      "#8E8672",
+      "#B0A890",
+      "#6E6658",
+      "#A07850"
+    ],
+    "fx": {
+      "style": "boulder",
+      "colors": [
+        "#8f8260",
+        "#d6c994"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#8a8478",
+        "#7f796e"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "rock",
+          "#a8a294",
+          18
+        ],
+        [
+          "crack",
+          "#5a554c",
+          20
+        ],
+        [
+          "dot",
+          "#6e6a60",
+          40
+        ]
+      ],
+      "frame": "#4a463e"
+    }
+  },
+  "ghost": {
+    "name": "幽靈",
+    "color": "#5A4E8C",
+    "glyph": "M12 3a7 7 0 0 1 7 7v11l-2.3-2-2.4 2-2.3-2-2.3 2-2.4-2L5 21V10a7 7 0 0 1 7-7z",
+    "affinity": [
+      "#2A2440",
+      "#4E3A70",
+      "#151018",
+      "#6A5A90"
+    ],
+    "fx": {
+      "style": "wisp",
+      "colors": [
+        "#6a4c93",
+        "#cdb6ff"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#3d3358",
+        "#362d4f"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "tomb",
+          "#8f86b0",
+          8
+        ],
+        [
+          "ripple",
+          "#6a5ea0",
+          20
+        ],
+        [
+          "dot",
+          "#7a6ec0",
+          20
+        ]
+      ],
+      "frame": "#8a7ac8"
+    }
+  },
+  "dark": {
+    "name": "惡",
+    "color": "#3E3A48",
+    "glyph": "M15 3a9 9 0 1 0 6 15A8 8 0 0 1 15 3z",
+    "affinity": [
+      "#151515",
+      "#2A2A30",
+      "#3E3A48",
+      "#4A3428"
+    ],
+    "fx": {
+      "style": "crescent",
+      "colors": [
+        "#34343f",
+        "#9a9aae"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#26242e",
+        "#211f29"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "star",
+          "#8a86a0",
+          30
+        ],
+        [
+          "dot",
+          "#3a3848",
+          40
+        ],
+        [
+          "crack",
+          "#55506a",
+          10
+        ]
+      ],
+      "frame": "#6a6580"
+    }
+  },
+  "dragon": {
+    "name": "龍",
+    "color": "#5A55D6",
+    "glyph": "M12 2l7 10-7 10-7-10z",
+    "affinity": [
+      "#3A50B8",
+      "#5A3AA0",
+      "#2A6E8E"
+    ],
+    "fx": {
+      "style": "twin",
+      "colors": [
+        "#4a5bd6",
+        "#9fb0ff"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#343a78",
+        "#2f3570"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "rune",
+          "#ffd54a",
+          16
+        ],
+        [
+          "crack",
+          "#5a62b0",
+          18
+        ],
+        [
+          "dot",
+          "#4a52a0",
+          30
+        ]
+      ],
+      "frame": "#ffd54a"
+    }
+  },
+  "fighting": {
+    "name": "格鬥",
+    "color": "#C24A2C",
+    "glyph": "M6 9a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5zM8 4h8v2H8z",
+    "affinity": [
+      "#A06A48",
+      "#C8946A",
+      "#7A5038"
+    ],
+    "fx": {
+      "style": "fist",
+      "colors": [
+        "#d9531e",
+        "#ffd9b0"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#c8935a",
+        "#bf8a52"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "plank",
+          "#8a5e32",
+          28
+        ],
+        [
+          "dot",
+          "#a67444",
+          20
+        ]
+      ],
+      "frame": "#5a3a1a"
+    }
+  },
+  "steel": {
+    "name": "鋼",
+    "color": "#7E93A8",
+    "glyph": "M9 3h6v6h6v6h-6v6H9v-6H3V9h6z",
+    "affinity": [
+      "#9AA6B4",
+      "#C8D0D8",
+      "#6E7884"
+    ],
+    "fx": {
+      "style": "ricochet",
+      "colors": [
+        "#b9c3d6",
+        "#ffffff"
+      ]
+    },
+    "arena": {
+      "base": [
+        "#9aa6b8",
+        "#8e9aae"
+      ],
+      "tile": 6,
+      "decor": [
+        [
+          "rivet",
+          "#5a6678",
+          40
+        ],
+        [
+          "crack",
+          "#6a778a",
+          10
+        ],
+        [
+          "dot",
+          "#b8c4d4",
+          30
+        ]
+      ],
+      "frame": "#4a566a"
+    }
+  }
+}
