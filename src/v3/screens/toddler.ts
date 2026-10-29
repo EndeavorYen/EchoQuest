@@ -1,4 +1,5 @@
 import { artUrl, typeOf, MON_BY_ID, type Mon } from '../../mon/dex';
+import { svg } from '../icons';
 import evolutions from '../../data/mon/evolutions.json';
 import { sfx, say } from '../../audio/sfx';
 import { TODDLER_TAPS } from '../../game/toddler';
@@ -27,7 +28,7 @@ export const toddler: ScreenFactory = (root, ctx, params?: { foe?: Mon; book?: b
   if (params?.book) return book();
   root.innerHTML = `<div class="app" data-screen="toddler">${bar('幼兒模式')}
     <div class="screen" style="justify-content:center;text-align:center">
-      <div class="card"><div style="font-size:3rem">🧸</div><p><b>拍一張照片找朋友</b><br>點一點，牠就會長大變成貼紙！</p></div></div>
+      <div class="card"><div class="bigico">${svg('teddy')}</div><p><b>拍一張照片找朋友</b><br>點一點，牠就會長大變成貼紙！</p></div></div>
     <button class="btn" id="photo">拍照找朋友</button>
     <button class="btn ghost" id="stickers">貼紙本（${ctx.save.pals.length}）</button></div>`;
   root.querySelector('#photo')!.addEventListener('click', () => ctx.go('scan', { kind: 'toddler' }));

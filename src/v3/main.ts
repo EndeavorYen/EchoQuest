@@ -1,4 +1,5 @@
 import './battle.css';
+import './theme.css';
 import { load, persist, type Save } from '../game/save';
 import { Recognizer } from '../speech/recognizer';
 import { sfx } from '../audio/sfx';

@@ -1,4 +1,5 @@
 import { artUrl, typeOf, type Mon } from '../mon/dex';
+import { glyph, svg } from './icons';
 import type { Word } from '../data/words';
 import { blockSpark, dropShield, playMove, raiseShield, type FxHost } from './effects';
 
@@ -235,7 +236,7 @@ export class BattleView {
   /** The party's hearts: lose them all and the fight is lost. */
   setHearts(n: number, max: number): void {
     const el = this.$('#hearts');
-    el.innerHTML = Array.from({ length: max }, (_, i) => `<i class="${i < n ? 'on' : ''}">${i < n ? '❤️' : '🤍'}</i>`).join('');
+    el.innerHTML = Array.from({ length: max }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
     el.dataset.left = String(n);
   }
 
@@ -251,7 +252,7 @@ export class BattleView {
     const el = this.$('#status');
     el.hidden = !s;
     if (s) {
-      el.textContent = `${s.icon} ${s.zh} ${s.left}`;
+      el.innerHTML = `${glyph(s.icon)} ${s.zh} ${s.left}`;
       el.style.setProperty('--c', s.color);
     }
   }
@@ -296,7 +297,7 @@ export class BattleView {
   showVictory(foe: Mon, words: Word[], o: { isNew?: boolean; nextLabel?: string } = {}): void {
     this.panel.showHtml('', `<div class="victory">
       <div class="big">打倒了${esc(foe.name)}！</div>
-      ${o.isNew ? '<div class="newmon">✨ 新的圖鑑夥伴 ✨</div>' : ''}
+      ${o.isNew ? `<div class="newmon">${svg('sparkle')} 新的圖鑑夥伴 ${svg('sparkle')}</div>` : ''}
       <div class="zh">學到的咒語</div>
       <div class="cards">${words.slice(0, 6).map((w) => `<span>${w.icon ?? ''} ${esc(w.w)}</span>`).join('') || '<span>—</span>'}</div>
       <button class="btn" data-act="next">${esc(o.nextLabel ?? '再遇見一隻')}</button></div>`);

@@ -1,0 +1,99 @@
+/*
+ * EchoQuest look: a toy-box handheld. Chunky ink outlines, hard offset shadows that "press"
+ * when tapped, and one colour per job (adventure orange, dex blue, practice green, party purple).
+ * Loaded after battle.css, which holds the layout; this file holds the skin.
+ */
+:root {
+  --ink: #1f2a44; --bg: #bfe4f4; --card: #fffef8; --line: #1f2a44; --muted: #4d5a78;
+  --sun: #ffcf3a; --sunInk: #1f2a44; --good: #2fa866; --bad: #e5484d;
+  --hard: 0 4px 0 var(--ink);
+}
+body {
+  background-color: var(--bg);
+  background-image: radial-gradient(rgba(255,255,255,.55) 2px, transparent 2.5px);
+  background-size: 22px 22px;
+}
+.bar h1 { font-weight: 900; letter-spacing: .5px; }
+.icon-btn, .small-btn, .zoombar button {
+  border: 3px solid var(--ink); border-radius: 14px; background: #fff; box-shadow: var(--hard); color: var(--ink);
+}
+.zoombar button { border-radius: 50%; }
+.icon-btn:active, .small-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.btn, .mic {
+  border: 3px solid var(--ink); border-radius: 18px; background: var(--sun); color: var(--ink);
+  box-shadow: 0 5px 0 var(--ink); transition: transform .08s, box-shadow .08s;
+}
+.btn:active, .mic:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+.btn.ghost { background: #fff; border: 3px solid var(--ink); color: var(--ink); }
+.mic.live { background: var(--bad); color: #fff; }
+.panel { background: var(--card); border: 3px solid var(--ink); border-radius: 22px; box-shadow: 0 5px 0 var(--ink); }
+.panel.defend { background: #ffe9e6; border-color: var(--ink); box-shadow: 0 5px 0 var(--bad); }
+.pic { background: #fff3c4; border: 2px solid var(--ink); }
+.word { color: var(--ink); }
+.arena { border: 3px solid var(--ink); border-radius: 22px; box-shadow: 0 5px 0 var(--ink); }
+.plate { border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 3px 0 var(--ink); }
+.chip { border: 2px solid var(--ink); text-shadow: 0 1px 0 rgba(0,0,0,.35); }
+.stars { color: #f2a900; text-shadow: 0 1px 0 var(--ink); }
+.pbtn { border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); }
+.pbtn.on { background: #fff3c4; }
+.seg button { border: 2px solid var(--ink); background: #fff; box-shadow: 0 2px 0 var(--ink); }
+.seg button.on { background: var(--sun); }
+.card, .modal .card { border: 3px solid var(--ink); border-radius: 22px; box-shadow: 0 5px 0 var(--ink); background: var(--card); }
+.hearts i { font-size: 0; width: 22px; height: 20px; display: inline-block; background: no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 22'%3E%3Cpath d='M12 20.5S2 14.2 2 7.6C2 4.4 4.4 2.2 7.2 2.2c2 0 3.7 1.1 4.8 2.9 1.1-1.8 2.8-2.9 4.8-2.9 2.8 0 5.2 2.2 5.2 5.4 0 6.6-10 12.9-10 12.9z' fill='%23fff' stroke='%231f2a44' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.hearts i.on { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 22'%3E%3Cpath d='M12 20.5S2 14.2 2 7.6C2 4.4 4.4 2.2 7.2 2.2c2 0 3.7 1.1 4.8 2.9 1.1-1.8 2.8-2.9 4.8-2.9 2.8 0 5.2 2.2 5.2 5.4 0 6.6-10 12.9-10 12.9z' fill='%23e5484d' stroke='%231f2a44' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M6 6.4c.6-1 1.6-1.4 2.6-1.2' stroke='%23fff' stroke-width='1.6' stroke-linecap='round' fill='none'/%3E%3C/svg%3E"); }
+/* home */
+.home .hero { border: 3px solid var(--ink); box-shadow: 0 5px 0 var(--ink); }
+.home h1 { font-size: 2.2rem; color: var(--ink); text-shadow: 0 3px 0 #fff; }
+.menu .btn { background: #fff; border: 3px solid var(--ink); box-shadow: 0 5px 0 var(--ink); display: grid; grid-template-columns: 34px 1fr; column-gap: 10px; align-items: center; justify-items: start; padding: 12px 12px; text-align: left; white-space: nowrap; }
+.menu .btn small { display: block; color: var(--ink); opacity: .7; }
+.menu .btn::before { content: ''; grid-row: 1 / 3; width: 34px; height: 34px; background: center/contain no-repeat; }
+.menu .btn small { grid-column: 2; }
+.menu .btn.primary { background: #ff8a5c; color: var(--ink); display: flex; flex-direction: row; justify-content: center; gap: 12px; }
+.menu [data-go=dex] { background: #8ccbff; }
+.menu [data-go=practice] { background: #9be7a8; }
+.menu [data-go=party] { background: #d4b8ff; }
+.menu [data-go=trek]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 8l8-3 8 3 8-3v19l-8 3-8-3-8 3z' fill='%23fff' stroke='%231f2a44' stroke-width='2.4' stroke-linejoin='round'/%3E%3Cpath d='M12 5v19M20 8v19' stroke='%231f2a44' stroke-width='2'/%3E%3C/svg%3E"); }
+.menu [data-go=dex]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='5' y='3.5' width='22' height='25' rx='3' fill='%23fff' stroke='%231f2a44' stroke-width='2.4'/%3E%3Ccircle cx='16' cy='14' r='5' fill='%23ff8a5c' stroke='%231f2a44' stroke-width='2'/%3E%3Cpath d='M10 23h12' stroke='%231f2a44' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.menu [data-go=practice]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='11' y='3.5' width='10' height='15' rx='5' fill='%23fff' stroke='%231f2a44' stroke-width='2.4'/%3E%3Cpath d='M6.5 15a9.5 9.5 0 0019 0M16 24.5v4' stroke='%231f2a44' stroke-width='2.4' stroke-linecap='round' fill='none'/%3E%3C/svg%3E"); }
+.menu [data-go=party]::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='11' cy='11' r='4.5' fill='%23fff' stroke='%231f2a44' stroke-width='2.4'/%3E%3Ccircle cx='22' cy='13' r='3.8' fill='%23fff' stroke='%231f2a44' stroke-width='2.4'/%3E%3Cpath d='M3.5 26c0-5 3.5-8 7.5-8s7.5 3 7.5 8zM18 26c.3-3.6 2.4-6 5.5-6 3 0 5 2.2 5 6z' fill='%23fff' stroke='%231f2a44' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.menu [data-act=newtrip]::before { display: none; }
+.infobtn { border: 3px solid var(--ink); background: #fff; box-shadow: var(--hard); }
+/* dex */
+.dexcell { border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 3px 0 var(--ink); background: #fff; color: var(--ink); }
+.dexcell:not(.unknown) { background: color-mix(in srgb, #ffcf3a 28%, #fff); }
+.dexcell.unknown { background: #e3ecf3; border-style: dashed; box-shadow: none; opacity: .85; }
+.onlycaught { color: var(--ink); }
+.pager { color: var(--ink); }
+.pager .icon-btn:disabled { opacity: .4; box-shadow: none; }
+.sheet > div { border: 3px solid var(--ink); border-bottom: 0; background: var(--card); }
+.evo-chip { border: 3px solid var(--ink); background: #fff; }
+.evo-chip.cur { box-shadow: 0 0 0 3px var(--c); }
+/* town map */
+.tpanel { border: 3px solid var(--ink); box-shadow: 0 5px 0 var(--ink); }
+.tnode.big i { border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); }
+.tnode.small i { border: 3px solid var(--ink); }
+
+/* drawn icons */
+.ico { width: 1.15em; height: 1.15em; vertical-align: -.2em; flex: none; }
+.bigico .ico { width: 60px; height: 60px; }
+.bigico { display: grid; place-items: center; margin-bottom: 4px; }
+.relic .ico { width: 76px; height: 76px; }
+.btn .ico { width: 1.35em; height: 1.35em; margin-right: 6px; vertical-align: -.3em; }
+.zoombar button .ico { width: 22px; height: 22px; vertical-align: middle; }
+.ttitle .ico { width: 1.3em; height: 1.3em; vertical-align: -.3em; }
+#here .ico { width: 1.2em; height: 1.2em; vertical-align: -.25em; }
+.tnode.big i .ico { width: 74%; height: 74%; }
+.tnode.small i .ico { display: none; }
+.tnode .gift .ico { width: 18px; height: 18px; }
+.status .ico, .newmon .ico { width: 1.1em; height: 1.1em; vertical-align: -.2em; }
+.newmon { display: inline-flex; align-items: center; gap: 6px; }
+.icon-btn .ico { width: 20px; height: 20px; }
+
+/* the rest of the pieces, brought in line */
+.reveal { border: 3px solid var(--ink); border-radius: 22px; box-shadow: 0 5px 0 var(--ink); }
+.flee-btn { border: 3px solid var(--ink); border-radius: 14px; background: #fff; box-shadow: 0 3px 0 var(--ink); color: var(--ink); }
+.rel-list article { border: 2px solid var(--ink); }
+.rel-list article.new { border-color: var(--good); box-shadow: 0 3px 0 var(--good); }
+.cards span { background: #fff3c4; border: 2px solid var(--ink); }
+.status { border: 2px solid var(--ink); }
+.stop { border-color: var(--ink); }

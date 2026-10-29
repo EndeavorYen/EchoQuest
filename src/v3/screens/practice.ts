@@ -1,4 +1,5 @@
 import { pickPractice } from '../../game/deck';
+import { glyph } from '../icons';
 import { record } from '../../game/progress';
 import type { Level } from '../../game/model';
 import { LEVELS, type Word } from '../../data/words';
@@ -74,7 +75,7 @@ export const practice: ScreenFactory = (root, ctx, params: { quiz?: boolean } | 
     }));
     sfx.play(relic ? 'chest' : 'good');
     (root.querySelector('#panel') as HTMLElement).innerHTML = `<div class="card" style="text-align:center" data-quiz-done>
-      ${relic ? `<div class="relic">${relic.icon}</div><div class="big">答對 ${right} 個，送你${esc(relic.zh)}！</div>` : `<div class="big">謝謝你陪我練習！</div><div class="muted">答對 ${right} 個</div>`}
+      ${relic ? `<div class="relic">${glyph(relic.icon)}</div><div class="big">答對 ${right} 個，送你${esc(relic.zh)}！</div>` : `<div class="big">謝謝你陪我練習！</div><div class="muted">答對 ${right} 個</div>`}
       <button class="btn" data-go="trek">回到地圖</button></div>`;
   }
 

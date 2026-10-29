@@ -1,4 +1,5 @@
 import { MAX_PLAYERS, newPlayer, PLAYER_NAMES, type Level } from '../../game/model';
+import { svg } from '../icons';
 import { levelStat } from '../../game/progress';
 import { LEVELS, PACKS, WORDS } from '../../data/words';
 import { MON_BY_ID, STARTER_IDS, artUrl, typeOf } from '../../mon/dex';
@@ -31,7 +32,7 @@ export const party: ScreenFactory = (root, ctx) => {
               <button data-lv="${i}" data-d="1" ${p.level >= 4 ? 'disabled' : ''} aria-label="難一點">＋</button></div>
             <div class="muted">學會 ${st.learned} / ${st.total} 個單字</div>
             <label class="row muted"><input type="checkbox" data-adult="${i}" ${p.adult ? 'checked' : ''}> 我是大人（首領的護盾會彈開大人的咒語）</label></div>
-          ${players.length > 1 ? `<button class="icon-btn" data-del="${i}" aria-label="移除">✕</button>` : ''}</div>`;
+          ${players.length > 1 ? `<button class="icon-btn" data-del="${i}" aria-label="移除">${svg('close')}</button>` : ''}</div>`;
       })
       .join('');
     root.innerHTML = `<div class="app" data-screen="party">${bar('隊伍設定')}

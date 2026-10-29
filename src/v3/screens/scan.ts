@@ -1,4 +1,5 @@
 import { startCamera, CameraFailure, type CameraHandle } from '../../gfx/camera';
+import { glyph, svg } from '../icons';
 import { analyzeColors, pickMon, type Swatch } from '../../mon/colorpick';
 import { artUrl, pickWild, typeOf, TYPES, type Mon } from '../../mon/dex';
 import { sfx, say } from '../../audio/sfx';
@@ -15,7 +16,7 @@ export const scan: ScreenFactory = (root, ctx, params: ScanParams) => {
   const rarity = params.boss ? { minRarity: params.place?.minRarity ?? 3 } : params.rare ? { minRarity: 3, maxRarity: 4 } : params.kind === 'toddler' ? { maxRarity: 2 } : { maxRarity: params.place?.maxRarity ?? 3 };
   const place = params.place ? PLACES[params.place.key] : null;
   const placeName = params.place?.label ?? place?.zh ?? '';
-  const where = place ? `${params.place?.icon ?? place.icon} ${placeName}` : '';
+  const where = place ? `${placeName}` : '';
   const title = params.boss ? '道館的首領！' : params.rare ? '山洞深處…' : place ? `${placeName}的寶可夢` : '拍照找寶可夢';
   const owned = new Set(ctx.save.caught);
 
@@ -28,14 +29,14 @@ export const scan: ScreenFactory = (root, ctx, params: ScanParams) => {
     root.innerHTML = `<div class="app" data-screen="scan">${bar(title, back)}
       <div class="screen" style="justify-content:center;text-align:center;gap:14px">
         <div class="card">
-          ${hasPlace ? `<div style="font-size:3rem">${place!.icon}</div>
+          ${hasPlace ? `<div class="bigico">${params.place?.icon ? glyph(params.place.icon) : glyph(place!.icon)}</div>
             <p><b>這裡是${esc(placeName)}</b><br>${params.boss ? `館主擅長「${esc(types)}」系` : `常有「${esc(types)}」系的寶可夢出沒`}</p>
             <p class="muted">要看看是誰，還是拍張照讓顏色決定？</p>`
-          : `<div style="font-size:3rem">📷</div>
+          : `<div class="bigico">${svg('camera')}</div>
             <p><b>拍一拍身邊的東西</b><br>顏色會決定遇到哪一隻寶可夢！</p>`}
           ${msg ? `<p class="note">${esc(msg)}</p>` : ''}</div></div>
       ${hasPlace ? `<button class="btn" id="summon">看看是誰出現了（依地形）</button>
-        <button class="btn ghost" id="cam">📷 拍照看顏色</button>`
+        <button class="btn ghost" id="cam">${svg('camera')} 拍照看顏色</button>`
       : `<button class="btn" id="cam">打開相機</button>
         <button class="btn ghost" id="summon">不用相機，直接召喚</button>`}</div>`;
     root.querySelector('#cam')!.addEventListener('click', openCamera);

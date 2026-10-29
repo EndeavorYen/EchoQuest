@@ -7,6 +7,7 @@ import { artUrl, DEX, pickEncounter, TYPES } from '../../mon/dex';
 import type { Habitat } from '../../mon/habitat';
 import { partnerMon } from '../partner';
 import { sfx } from '../../audio/sfx';
+import { glyph, svg as icon } from '../icons';
 import { mapTrack, type Scene } from '../../audio/songs';
 import { bar, esc, type ScanParams, type ScreenFactory } from '../ctx';
 
@@ -75,10 +76,10 @@ export const trek: ScreenFactory = (root, ctx) => {
       ${svg}
       ${fog}
       ${m0.roads.map((r) => `<span class="rlabel" data-road="${r.id}" style="${pos(labelAt(r))}" hidden>${esc(r.name)}</span>`).join('')}
-      ${m0.nodes.map((n) => `<button class="tnode ${isBig(n) ? 'big' : 'small'}${n.w > 1 ? ' wide' : ''}" data-id="${n.id}" data-kind="${n.kind}" style="${pos(n)}" aria-label="${esc(n.name)}"><i>${n.icon}</i>${isBig(n) ? `<span class="tname">${esc(n.name)}</span>` : ''}<span class="ttypes"></span><em class="gift" hidden>🎁</em></button>`).join('')}
+      ${m0.nodes.map((n) => `<button class="tnode ${isBig(n) ? 'big' : 'small'}${n.w > 1 ? ' wide' : ''}" data-id="${n.id}" data-kind="${n.kind}" style="${pos(n)}" aria-label="${esc(n.name)}"><i>${n.kind === 'cave' ? icon('cave') : glyph(n.icon)}</i>${isBig(n) ? `<span class="tname">${esc(n.name)}</span>` : ''}<span class="ttypes"></span><em class="gift" hidden>${icon('gift')}</em></button>`).join('')}
       <div class="partner" id="partner"><img src="${artUrl(mon.id)}" alt="" onerror="this.style.visibility='hidden'"></div>
     </div></div>
-      <div class="zoombar"><button id="zin" aria-label="放大">＋</button><button id="zout" aria-label="縮小">－</button><button id="zme" aria-label="回到我的位置">🎯</button></div></div>
+      <div class="zoombar"><button id="zin" aria-label="放大">＋</button><button id="zout" aria-label="縮小">－</button><button id="zme" aria-label="回到我的位置">${icon('target')}</button></div></div>
     <div class="tpanel" id="panel"></div></div>`;
 
   const tm = root.querySelector<HTMLElement>('#tm')!;
@@ -184,7 +185,7 @@ export const trek: ScreenFactory = (root, ctx) => {
     const m = M();
     const here = N(m.at);
     const near = new Set(neighbors(m, m.at));
-    root.querySelector('#here')!.textContent = `${here.icon || '📍'} ${here.name}`;
+    root.querySelector('#here')!.innerHTML = `${here.icon ? (here.kind === 'cave' ? icon('cave') : glyph(here.icon)) : icon('pin')} ${esc(here.name)}`;
     root.querySelectorAll<HTMLElement>('.tnode').forEach((el) => {
       const id = Number(el.dataset.id);
       const n = N(id);
@@ -225,7 +226,7 @@ export const trek: ScreenFactory = (root, ctx) => {
         !fight ? '這裡的寶可夢已經打敗了' :
         isRevealed(m, picked) ? `住著「${esc(typeNames(n))}」系的寶可夢` : '住著誰？到了才知道（城鎮可以撥開烏雲）';
       const extra = n.kind === 'city' ? '　·　道館首領在這裡！' : n.kind === 'league' ? '　·　冠軍在這裡！' : '';
-      const title = n.kind === 'wild' ? `${roadIcon[m0.roads[n.road].kind]} ${esc(n.name)}` : `${n.icon} ${esc(n.name)} <small>${kindLabel[n.kind]}</small>`;
+      const title = n.kind === 'wild' ? `${glyph(roadIcon[m0.roads[n.road].kind])} ${esc(n.name)}` : `${n.kind === 'cave' ? icon('cave') : glyph(n.icon)} ${esc(n.name)} <small>${kindLabel[n.kind]}</small>`;
       panel.innerHTML = `<div class="ttitle">${title}</div><div class="tsub">${who}${extra}</div>
         <div class="trow"><button class="btn" id="go">${fight ? '前往！' : '走過去'}</button></div>`;
       panel.querySelector('#go')!.addEventListener('click', () => void goTo(picked!));
@@ -233,11 +234,11 @@ export const trek: ScreenFactory = (root, ctx) => {
     }
     if (atTown(m)) {
       const svc = [
-        canGift(m) ? '<button class="btn" id="svc-gift">🎁 拿小禮物</button>' : '',
-        canInfo(m) ? '<button class="btn" id="svc-info">☁️ 撥開烏雲</button>' : '',
-        canQuiz(m) ? '<button class="btn" id="svc-quiz">💬 村民考考你</button>' : '',
+        canGift(m) ? `<button class="btn" id="svc-gift">${icon('gift')} 拿小禮物</button>` : '',
+        canInfo(m) ? `<button class="btn" id="svc-info">${icon('cloud')} 撥開烏雲</button>` : '',
+        canQuiz(m) ? `<button class="btn" id="svc-quiz">${icon('chat')} 村民考考你</button>` : '',
       ].join('');
-      panel.innerHTML = `<div class="ttitle">${here.icon} ${esc(here.name)} <small>${kindLabel[here.kind]}</small></div>
+      panel.innerHTML = `<div class="ttitle">${here.kind === 'cave' ? icon('cave') : glyph(here.icon)} ${esc(here.name)} <small>${kindLabel[here.kind]}</small></div>
         <div class="tsub">${svc ? '這裡可以做的事：' : '都做完了！點亮著的地方繼續走'}</div>${svc ? `<div class="trow wrap">${svc}</div>` : ''}`;
       panel.querySelector('#svc-gift')?.addEventListener('click', openGift);
       panel.querySelector('#svc-info')?.addEventListener('click', () => {
@@ -249,7 +250,7 @@ export const trek: ScreenFactory = (root, ctx) => {
       panel.querySelector('#svc-quiz')?.addEventListener('click', () => ctx.go('practice', { quiz: true }));
       return;
     }
-    panel.innerHTML = `<div class="ttitle">${here.kind === 'wild' ? '📍' : here.icon} ${esc(here.name)}</div><div class="tsub">點亮著的地方，再按「前往」</div>`;
+    panel.innerHTML = `<div class="ttitle">${here.kind === 'wild' ? icon('pin') : here.kind === 'cave' ? icon('cave') : glyph(here.icon)} ${esc(here.name)}</div><div class="tsub">點亮著的地方，再按「前往」</div>`;
   }
 
   function pick(id: number): void {
@@ -305,7 +306,7 @@ export const trek: ScreenFactory = (root, ctx) => {
     render();
     const el = document.createElement('div');
     el.className = 'modal';
-    el.innerHTML = `<div class="card" style="text-align:center"><div class="relic">${relic.icon}</div><div class="big">${esc(relic.zh)}</div><div class="muted">${esc(relic.name)}</div><button class="btn" data-close>收下！</button></div>`;
+    el.innerHTML = `<div class="card" style="text-align:center"><div class="relic">${glyph(relic.icon)}</div><div class="big">${esc(relic.zh)}</div><div class="muted">${esc(relic.name)}</div><button class="btn" data-close>收下！</button></div>`;
     el.querySelector('[data-close]')!.addEventListener('click', () => el.remove());
     root.querySelector('.app')!.appendChild(el);
   }

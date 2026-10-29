@@ -350,7 +350,7 @@ export class BattleController {
     const id = rollStatus(this.partnerMon(this.me).type, tier, this.rng, this.shield ? 0.5 : 1);
     if (id && this.aff.apply(id)) {
       const st = STATUS[id];
-      this.view.floatText('foe', `${st.icon} ${st.zh}！`, st.color, true, 56);
+      this.view.floatText('foe', `${st.zh}！`, st.color, true, 56);
       sfx.play('status', STATUS_ORDER.indexOf(id));
       this.refreshStatus();
     }
@@ -371,11 +371,11 @@ export class BattleController {
     if (act === 'selfhit') {
       const dmg = Math.max(2, Math.round(typicalHit(this.players) * 0.4));
       this.battle.monster.hp = Math.max(1, this.battle.monster.hp - dmg);
-      this.view.floatText('foe', `${st.icon} 打到自己！ -${dmg}`, st.color, true);
+      this.view.floatText('foe', `${st.zh}，打到自己！ -${dmg}`, st.color, true);
       this.view.hurt('foe');
       this.view.setFoeHp(this.battle.monster.hp, this.battle.monster.maxHp);
     } else {
-      this.view.floatText('foe', `${st.icon} ${st.zh}，動不了！`, st.color, true);
+      this.view.floatText('foe', `${st.zh}，動不了！`, st.color, true);
     }
     this.view.showWait(`${this.foe.name} ${st.zh}了，不能攻擊！`);
     window.setTimeout(() => this.finishRound(), 1100);
@@ -390,7 +390,7 @@ export class BattleController {
     if (dot > 0 && m.hp > 0) {
       const st = this.aff.info ?? cured;
       m.hp = Math.max(0, m.hp - dot);
-      this.view.floatText('foe', `${st?.icon ?? ''} -${dot}`, st?.color ?? '#d9534f', true);
+      this.view.floatText('foe', `${st?.zh ?? ''} -${dot}`, st?.color ?? '#d9534f', true);
       this.view.hurt('foe');
       this.view.setFoeHp(m.hp, m.maxHp);
       delay = 900;

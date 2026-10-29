@@ -681,6 +681,10 @@ test.describe('town map', () => {
     const p = game.page;
     await open(p);
     await p.click('[data-go=trek]');
+    // a small map may have no gym city at all: draw new maps until one does
+    for (let i = 0; i < 40 && !(await save(p, (s) => s.townmap.nodes.some((x: any) => x.kind === 'city'))); i++) {
+      await p.evaluate(() => { const a = (window as any).__app; a.update((s: any) => ({ ...s, townmap: null })); a.go('trek'); });
+    }
     const city = await save(p, (s) => { const c = s.townmap.nodes.find((x: any) => x.kind === 'city'); return { id: c.id, type: c.types[0] }; });
     await approach(p, city.id);
     await p.click('[data-screen=reveal] #go:not([disabled])');
