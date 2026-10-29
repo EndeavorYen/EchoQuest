@@ -3,7 +3,7 @@
  * npm run words:prompt -- --revise "what to change" [--topic food] [--lv 2] [--ids a:n,b:v]
  *                                                            prompt that revises existing words
  * npm run words:prompt -- --schema                           writes docs/word-bank-reply.schema.json
- * The text goes to stdout, ready to paste into Gemini (or send through its API).
+ * The text goes to stdout, ready to hand to the agent.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { ALL_WORDS, POS_LIST, TOPICS, LEVELS } from '../src/data/bank';

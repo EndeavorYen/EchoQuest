@@ -76,7 +76,7 @@
 ```
 npm run words:batches                          # 把 CEFR-J 切成每批 100 字：words-work/batches/cefrj-001.json …
 npm run words:prompt -- words-work/batches/cefrj-001.json > p.txt   # 產生提示詞（規則＋這一批的字）
-#   → 貼給 Gemini（或用 API，responseSchema 用 docs/word-bank-reply.schema.json），把回傳存成 reply.json
+#   → 交給 agent 處理，回傳格式見 docs/word-bank-reply.schema.json，存成 reply.json
 npm run words:merge -- reply.json --batch words-work/batches/cefrj-001.json
 #   → 通過的併入 pack；不通過的寫進 words-work/rejects/，把原因貼回去請它重做
 npm run words:commit -- --note "cefrj batch 1"
