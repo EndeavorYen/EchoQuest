@@ -10,9 +10,11 @@
  *    pack whose licence allows it — record that in its `license` field.
  */
 import levelData from './levels.json';
+import topicData from './topics.json';
 
 export type Lv = 1 | 2 | 3 | 4;
-export type Pos = 'n' | 'v' | 'adj' | 'adv' | 'prep' | 'conj' | 'pron' | 'det' | 'interj' | 'phr';
+export type Pos = 'n' | 'v' | 'adj' | 'adv' | 'prep' | 'conj' | 'pron' | 'det' | 'num' | 'interj' | 'phr';
+export const POS_LIST: readonly Pos[] = ['n', 'v', 'adj', 'adv', 'prep', 'conj', 'pron', 'det', 'num', 'interj', 'phr'];
 
 export interface Word {
   id: string;
@@ -25,6 +27,10 @@ export interface Word {
   heard?: string[];
   /** every word list this word belongs to */
   lists: string[];
+  /** subject area (an id from topics.json), for browsing and practice */
+  topic?: string;
+  /** CEFR level of the source list (A1–B2), kept for reference */
+  cefr?: string;
 }
 
 export interface PackWord {
@@ -36,6 +42,8 @@ export interface PackWord {
   heard?: string[];
   /** extra lists on top of the pack's own */
   lists?: string[];
+  topic?: string;
+  cefr?: string;
 }
 
 export interface Pack {
@@ -80,8 +88,11 @@ export function buildBank(packs: Pack[]): Word[] {
       if (have) {
         for (const l of lists) if (!have.lists.includes(l)) have.lists.push(l);
         if (e.heard) have.heard = [...new Set([...(have.heard ?? []), ...e.heard])];
+        have.topic ??= e.topic;
+        have.cefr ??= e.cefr;
+        have.icon ??= e.icon;
       } else {
-        byId.set(id, { id, w: e.w.trim(), pos: e.pos, zh: e.zh, lv: e.lv, icon: e.icon, heard: e.heard, lists: [...new Set(lists)] });
+        byId.set(id, { id, w: e.w.trim(), pos: e.pos, zh: e.zh, lv: e.lv, icon: e.icon, heard: e.heard, topic: e.topic, cefr: e.cefr, lists: [...new Set(lists)] });
       }
     }
   }
@@ -107,3 +118,13 @@ export function wordsInList(listId: string): Word[] {
 export function legacyIdMap(): Map<string, string> {
   return new Map(WORDS.map((w) => [`${w.lv}-${w.w}`, w.id]));
 }
+
+export interface Topic {
+  id: string;
+  zh: string;
+  icon: string;
+  about: string;
+}
+
+export const TOPICS: readonly Topic[] = topicData.topics;
+export const TOPIC_BY_ID = new Map(TOPICS.map((t) => [t.id, t]));
