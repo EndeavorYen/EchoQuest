@@ -100,22 +100,22 @@ export const SONGS = {
   ),
 
   // ---- battle ---------------------------------------------------------------
-  /** an ordinary wild creature (the original tune, now with a light beat) */
-  battle: {
-    bpm: 148,
-    lead: [
-      69, 72, 76, 72, 69, 72, 76, 72, 67, 71, 74, 71, 67, 71, 74, 71,
-      65, 69, 72, 69, 65, 69, 72, 69, 64, 68, 71, 68, 64, 68, 71, 76,
-    ],
-    bass: [
-      45, 45, null, 45, 45, null, 45, 45, 43, 43, null, 43, 43, null, 43, 43,
-      41, 41, null, 41, 41, null, 41, 41, 40, 40, null, 40, 40, null, 40, 52,
-    ],
-    drums: parseDrums(Array(4).fill('k . h . s . h h').join(' ')),
-  } as Song,
+  /** an ordinary wild creature: quick and bouncy (the earlier tune was too slow and plodding) */
+  battle: song(
+    172,
+    [
+      'G5 B5 D6 . B5 G5 D5 .', 'F#5 A5 D6 . A5 F#5 D5 .', 'E5 G5 B5 . G5 E5 B4 .', 'C6 B5 A5 G5 E5 . G5 .',
+      'G5 B5 D6 G6 . D6 B5 .', 'A5 D6 F#6 . D6 A5 F#5 .', 'E6 . D6 C6 B5 . A5 .', 'A5 C#6 D6 . F#6 D6 A5 .',
+    ].join(' '),
+    [
+      'G2 . G3 . G2 . G3 G2', 'D3 . D2 . D3 . D2 D3', 'E2 . E3 . E2 . E3 E2', 'C3 . C2 . C3 . C2 C3',
+      'G2 . G3 . G2 . G3 G2', 'D3 . D2 . D3 . D2 D3', 'C3 . C2 . C3 . C2 C3', 'D3 . D2 . D3 . D2 D3',
+    ].join(' '),
+    Array(8).fill('k . h h s . h h').join(' '),
+  ),
   /** a gym leader: tenser, minor, a driving bass */
   gym: song(
-    156,
+    184,
     [
       'D5 D5 F5 D5 A5 - G5 F5', 'D5 D5 F5 D5 Bb5 - A5 G5', 'E5 E5 G5 E5 C6 - Bb5 A5', 'C#5 C#5 E5 C#5 A5 - G5 E5',
       'F5 F5 A5 F5 D6 - C6 A5', 'D6 D6 C6 Bb5 A5 - G5 F5', 'E5 G5 C6 G5 E6 - D6 C6', 'C#6 B5 A5 G5 E5 - A4 -',
@@ -128,7 +128,7 @@ export const SONGS = {
   ),
   /** the champion: the fastest and most urgent */
   final: song(
-    176,
+    204,
     [
       'E5 G5 B5 G5 E5 G5 B5 E6', 'C5 E5 G5 E5 C5 E5 G5 C6', 'D5 F#5 A5 F#5 D5 F#5 A5 D6', 'B4 D#5 F#5 D#5 B4 D#5 F#5 B5',
       'B5 - E6 - G6 - E6 B5', 'G5 - C6 - E6 - C6 G5', 'A5 - D6 - F#6 - D6 A5', 'D#6 F#6 B6 - A6 F#6 D#6 B5',

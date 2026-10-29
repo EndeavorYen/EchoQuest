@@ -274,6 +274,23 @@ test.describe('defense', () => {
   });
 });
 
+test.describe('word card', () => {
+  test('a word with a picture shows it in a box; a word without one gets no box and no long Chinese squeezed in', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    const show = (word: object) => p.evaluate((w) => (window as any).__v3.view.showWord({ mode: 'speak', word: w, hint: 'x' }), word);
+    await show({ id: 'a', w: 'dog', zh: '狗', icon: '🐶' });
+    await expect(p.locator('.wordrow .pic')).toHaveText('🐶');
+    await show({ id: 'b', w: 'although', zh: '雖然、儘管如此' });
+    await expect(p.locator('.wordrow .pic')).toHaveCount(0);
+    await expect(p.locator('.wordrow')).toHaveClass(/nopic/);
+    await expect(p.locator('.wordrow .zh')).toHaveText('雖然、儘管如此'); // the meaning stays under the word
+    await expect(p.locator('#theWord')).toHaveText('although');
+  });
+});
+
 test.describe('what is new', () => {
   test('the info button opens the update notes; the red dot goes once they were read', async ({ game }) => {
     const p = game.page;

@@ -95,8 +95,8 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 .panel .hint { margin: 0; font-size: .86rem; font-weight: 700; color: var(--muted); text-align: center; }
 .panel.defend .hint { color: var(--bad); }
 .wordrow { display: flex; align-items: center; gap: 12px; }
+.wordrow.nopic { text-align: center; }
 .pic { width: 58px; height: 58px; border-radius: 16px; background: #f1f5fa; display: grid; place-items: center; font-size: 2.2rem; flex: none; }
-.pic.zh { font: 900 1.2rem var(--body); text-align: center; line-height: 1.1; }
 .word { font: 800 2.8rem/1 var(--display); letter-spacing: .5px; }
 .zh { color: var(--muted); font-weight: 700; margin-top: -2px; }
 .say { display: flex; align-items: center; gap: 4px; }

@@ -84,7 +84,8 @@ export class WordPanel {
     const { word, mode } = opts;
     this.setMode(mode);
     this.$('#hint').textContent = (opts.revenge ? '復仇！ ' : '') + opts.hint;
-    const pic = word.icon ? `<div class="pic" data-act="hear">${word.icon}</div>` : `<div class="pic zh" data-act="hear">${esc(word.zh)}</div>`;
+    // a word with a picture gets the picture box; one without gets no box at all (the meaning is printed under the word)
+    const pic = word.icon ? `<div class="pic" data-act="hear">${word.icon}</div>` : '';
     const typing = opts.typing
       ? `<div class="typebox"><input id="typed" inputmode="latin" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="輸入單字"><button class="small-btn ok" data-act="send" aria-label="送出">${CHECK}</button></div>`
       : '';
@@ -92,7 +93,7 @@ export class WordPanel {
       ? ''
       : `<button class="mic ${opts.listening ? 'live' : ''}" data-act="mic">${MIC}<span>${opts.listening ? '聽著…' : opts.micLabel ?? (mode === 'defend' ? '念出防禦咒語' : '按下去，說說看')}</span></button>`;
     this.$('#body').innerHTML = `
-      <div class="wordrow" data-act="hear">${pic}<div><div class="word" id="theWord">${esc(word.w)}</div><div class="zh">${esc(word.zh)}</div></div></div>
+      <div class="wordrow ${pic ? '' : 'nopic'}" data-act="hear">${pic}<div><div class="word" id="theWord">${esc(word.w)}</div><div class="zh">${esc(word.zh)}</div></div></div>
       ${opts.timer ? '<div class="timer"><i id="timerBar"></i></div>' : ''}
       <p class="note" id="note">${esc(opts.note ?? '')}</p>
       ${typing}

@@ -36,6 +36,14 @@ describe('songs', () => {
     for (const line of [s.lead, s.bass]) line.forEach((n, i) => { if (n === HOLD) expect(i > 0 && line[i - 1] !== null).toBe(true); });
     expect(s.lead.some((n) => typeof n === 'number' && n > 0)).toBe(true);
   });
+  it('battle music is quick (the walking music is the lazy one)', () => {
+    for (const n of ['battle', 'gym', 'final'] as SongName[]) expect(SONGS[n].bpm).toBeGreaterThanOrEqual(168);
+    for (const n of ['map', 'field', 'trail', 'cave'] as SongName[]) expect(SONGS[n].bpm).toBeLessThanOrEqual(125);
+    // the battle tune keeps moving: no long stretches of one repeated note
+    const lead = SONGS.battle.lead;
+    let run = 1;
+    for (let i = 1; i < lead.length; i++) { run = lead[i] === lead[i - 1] ? run + 1 : 1; expect(run).toBeLessThanOrEqual(2); }
+  });
   it('gets faster and busier as the stakes rise', () => {
     expect(SONGS.gym.bpm).toBeGreaterThan(SONGS.battle.bpm);
     expect(SONGS.final.bpm).toBeGreaterThan(SONGS.gym.bpm);
