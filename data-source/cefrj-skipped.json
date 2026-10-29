@@ -1,0 +1,518 @@
+[
+ {
+  "id": "a.m.:adv",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "cd:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "cd player:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "coke:n",
+  "why": "商標專有名詞"
+ },
+ {
+  "id": "dvd:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "kill:v",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "mr.:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "mrs.:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "olympics:n",
+  "why": "純專有名詞"
+ },
+ {
+  "id": "p.m.:adv",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "smith:n",
+  "why": "純專有名詞"
+ },
+ {
+  "id": "smoking:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "tv:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "war:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "armed:adj",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "beer:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "bra:n",
+  "why": "貼身衣物不宜幼兒"
+ },
+ {
+  "id": "champagne:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "cigarette:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "drug:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "gun:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "id:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "id card:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "it:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "killer:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "mp3 player:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "ms.:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "murder:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "olympic:adj",
+  "why": "純專有名詞"
+ },
+ {
+  "id": "pc:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "rob:v",
+  "why": "暴力犯罪相關"
+ },
+ {
+  "id": "robbery:n",
+  "why": "暴力犯罪相關"
+ },
+ {
+  "id": "smoke:v",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "terrorist:adj",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "violent:adj",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "wine:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "arm:v",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "barman:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "bomb:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "bomb:v",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "breast:n",
+  "why": "身體隱私部位不宜幼兒"
+ },
+ {
+  "id": "bullet:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "cd-rom:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "cv:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "dj:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "doc:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "drunk:adj",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "eco:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "ecstasy:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "gay:adj",
+  "why": "性相關詞彙"
+ },
+ {
+  "id": "hiv:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "killing:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "mediterranean:n",
+  "why": "純專有名詞"
+ },
+ {
+  "id": "murder:v",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "murderer:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "naked:adj",
+  "why": "身體隱私不宜幼兒"
+ },
+ {
+  "id": "ness:n",
+  "why": "純專有名詞"
+ },
+ {
+  "id": "pub:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "sex:n",
+  "why": "不適合兒童"
+ },
+ {
+  "id": "smoker:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "suicide:n",
+  "why": "不適合兒童"
+ },
+ {
+  "id": "terrorism:n",
+  "why": "暴力犯罪相關"
+ },
+ {
+  "id": "terrorist:n",
+  "why": "暴力犯罪相關"
+ },
+ {
+  "id": "tobacco:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "violence:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "violently:adv",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "weapon:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "abuse:n",
+  "why": "暴力傷害相關詞彙"
+ },
+ {
+  "id": "addict:n",
+  "why": "成癮與藥物相關"
+ },
+ {
+  "id": "alcoholic:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "alcoholism:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "antiaircraft:adj",
+  "why": "軍事暴力武器相關"
+ },
+ {
+  "id": "assault:n",
+  "why": "暴力傷害相關詞彙"
+ },
+ {
+  "id": "bartender:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "battlefield:n",
+  "why": "戰爭暴力相關詞彙"
+ },
+ {
+  "id": "bikini:n",
+  "why": "貼身衣物不宜幼兒"
+ },
+ {
+  "id": "bio:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "bloody:adj",
+  "why": "粗話或血腥暴力詞彙"
+ },
+ {
+  "id": "bloody:adv",
+  "why": "粗話或血腥暴力詞彙"
+ },
+ {
+  "id": "bombard:n",
+  "why": "軍事暴力武器相關"
+ },
+ {
+  "id": "bomber:n",
+  "why": "軍事暴力武器相關"
+ },
+ {
+  "id": "bombing:n",
+  "why": "暴力犯罪相關"
+ },
+ {
+  "id": "bourbon:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "brewery:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "bully:v",
+  "why": "暴力欺凌相關詞彙"
+ },
+ {
+  "id": "bum:n",
+  "why": "粗話與侮辱性用語"
+ },
+ {
+  "id": "burglary:n",
+  "why": "暴力犯罪相關"
+ },
+ {
+  "id": "burgle:v",
+  "why": "暴力犯罪相關"
+ },
+ {
+  "id": "cannonball:n",
+  "why": "軍事暴力武器相關"
+ },
+ {
+  "id": "cocktail:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "cripple:n",
+  "why": "侮辱性用語"
+ },
+ {
+  "id": "damn:adj",
+  "why": "粗話與侮辱性用語"
+ },
+ {
+  "id": "damn:adv",
+  "why": "粗話與侮辱性用語"
+ },
+ {
+  "id": "damn:interj",
+  "why": "粗話與侮辱性用語"
+ },
+ {
+  "id": "dna:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "firearm:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "gangster:n",
+  "why": "暴力犯罪相關"
+ },
+ {
+  "id": "gook:n",
+  "why": "粗話與侮辱性用語"
+ },
+ {
+  "id": "guerrilla:n",
+  "why": "軍事暴力相關"
+ },
+ {
+  "id": "gunshot:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "hemp:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "hijack:n",
+  "why": "暴力犯罪相關"
+ },
+ {
+  "id": "hijack:v",
+  "why": "暴力犯罪相關"
+ },
+ {
+  "id": "holocaust:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "idiot:n",
+  "why": "粗話與侮辱性用語"
+ },
+ {
+  "id": "massacre:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "missile:n",
+  "why": "軍事暴力武器相關"
+ },
+ {
+  "id": "mistreat:v",
+  "why": "暴力傷害相關詞彙"
+ },
+ {
+  "id": "nano:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "nightclub:n",
+  "why": "成人夜生活場所不宜幼兒"
+ },
+ {
+  "id": "non-smoking:adj",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "olympia:n",
+  "why": "純專有名詞"
+ },
+ {
+  "id": "olympiad:n",
+  "why": "純專有名詞"
+ },
+ {
+  "id": "ph:n",
+  "why": "縮寫符號"
+ },
+ {
+  "id": "prick:n",
+  "why": "粗話與侮辱性用語"
+ },
+ {
+  "id": "queer:adj",
+  "why": "性相關詞彙"
+ },
+ {
+  "id": "rape:n",
+  "why": "性與暴力相關詞彙"
+ },
+ {
+  "id": "rape:v",
+  "why": "性與暴力相關詞彙"
+ },
+ {
+  "id": "retard:v",
+  "why": "侮辱性用語"
+ },
+ {
+  "id": "sexual:adj",
+  "why": "性相關詞彙"
+ },
+ {
+  "id": "sexy:adj",
+  "why": "性相關詞彙"
+ },
+ {
+  "id": "shakespearean:adj",
+  "why": "純專有名詞"
+ },
+ {
+  "id": "slaughter:n",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "soviet:n",
+  "why": "純專有名詞"
+ },
+ {
+  "id": "stab:v",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "strangle:v",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "torture:v",
+  "why": "暴力相關詞彙"
+ },
+ {
+  "id": "whiskey:n",
+  "why": "菸酒藥物相關"
+ },
+ {
+  "id": "x-ray:n",
+  "why": "縮寫符號"
+ }
+]

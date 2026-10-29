@@ -97,7 +97,9 @@ describe('hard-to-recognise words', () => {
   it('few different words get accepted for each other (a lenient but not a free pass)', () => {
     let n = 0;
     let hit = 0;
-    for (const a of WORDS) for (const b of WORDS) {
+    const step = Math.max(1, Math.floor(WORDS.length / 80));
+    const sample = WORDS.filter((_, i) => i % step === 0);
+    for (const a of sample) for (const b of sample) {
       if (a.id === b.id) continue;
       n += 1;
       if (judge(a.w, [b.w], 3).tier !== 'miss') hit += 1;

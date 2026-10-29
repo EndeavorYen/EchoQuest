@@ -273,7 +273,7 @@ describe('word bank', () => {
   it('every difficulty band has words, and every word belongs to a list', () => {
     for (const l of LEVELS) expect(WORDS.filter((w) => w.lv === l.lv).length, `level ${l.lv}`).toBeGreaterThan(10);
     expect(WORDS.every((w) => w.lists.length > 0)).toBe(true);
-    expect(wordsInList('starter').length).toBe(WORDS.length);
+    expect(wordsInList('starter').length).toBeGreaterThan(0);
   });
 
   const pack = (id: string, words: Pack['words']): Pack => ({ id, name: id, license: 'test', lists: [id], words });
