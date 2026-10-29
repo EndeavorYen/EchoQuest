@@ -7,6 +7,8 @@
  * homophones, and grade by similarity instead of a hard right/wrong.
  */
 
+import { soundSimilarity, keyLength } from './sound';
+
 export type Tier = 'perfect' | 'good' | 'miss';
 
 export interface Judgement {
@@ -100,19 +102,44 @@ export function similarity(a: string, b: string): number {
   return 1 - levenshtein(a, b) / max;
 }
 
+/** Plain plural / third-person endings the engine likes to add or drop ("egg" ↔ "eggs"). */
+function stem(w: string): string {
+  return w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w;
+}
+
+/**
+ * How well one heard word fits the target: spelling first, then sound.
+ * Sound matches are capped below 1 so an exact hearing still beats a lucky guess.
+ */
+function scoreToken(target: string, token: string): number {
+  if (!token) return 0;
+  if (token === target) return 1;
+  if (stem(token) === stem(target)) return 0.95;
+  const spelling = similarity(target, token);
+  const sim = soundSimilarity(target, token);
+  const keyLen = Math.min(keyLength(target), keyLength(token));
+  // identical sound keys of two or more sounds: very likely the same word, badly heard
+  if (sim >= 1 && keyLen >= 2) return Math.max(spelling, 0.8);
+  if (sim >= 1) return Math.max(spelling, 0.55);
+  return Math.max(spelling, sim * 0.7);
+}
+
 /** Score a single heard phrase against the target. */
-function scorePhrase(target: string, phrase: string): number {
+function scorePhrase(target: string, phrase: string, extra: Set<string>): number {
   if (!phrase) return 0;
   if (phrase === target) return 1;
+  // transcripts this player was confirmed to have said for this word before
+  if (extra.has(phrase)) return 0.97;
   const tokens = phrase.split(' ');
   // the engine often wraps a single word in extra words ("the apple")
   if (tokens.includes(target)) return 1;
+  if (tokens.some((t) => extra.has(t))) return 0.97;
   const homs = HOMOPHONE_INDEX.get(target);
   if (homs && (homs.has(phrase) || tokens.some((t) => homs.has(t)))) return 0.97;
   // multi-word targets ("ice cream"): compare against joined tokens too
-  let best = similarity(target, phrase);
-  for (const t of tokens) best = Math.max(best, similarity(target, t));
-  if (tokens.length > 1) best = Math.max(best, similarity(target, tokens.join('')));
+  let best = scoreToken(target, phrase);
+  for (const t of tokens) best = Math.max(best, scoreToken(target, t));
+  if (tokens.length > 1) best = Math.max(best, scoreToken(target, tokens.join('')));
   return best;
 }
 
@@ -121,12 +148,17 @@ export function perfectThreshold(level: number): number {
   return [0.66, 0.66, 0.76, 0.82, 0.85][Math.max(0, Math.min(4, level))];
 }
 
-export function judge(targetRaw: string, candidates: string[], level: number): Judgement {
+/**
+ * @param extra transcripts that are known to mean this word for this player
+ *              (word-bank hints, or things a parent confirmed earlier)
+ */
+export function judge(targetRaw: string, candidates: string[], level: number, extra: readonly string[] = []): Judgement {
   const target = normalize(targetRaw);
+  const known = new Set(extra.map(normalize).filter(Boolean));
   let best = { score: 0, heard: '' };
   for (const c of candidates) {
     const phrase = normalize(c);
-    const s = scorePhrase(target, phrase);
+    const s = scorePhrase(target, phrase, known);
     if (s > best.score) best = { score: s, heard: c.trim() };
   }
   const perfect = perfectThreshold(level);

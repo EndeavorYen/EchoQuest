@@ -14,6 +14,8 @@ export interface Save {
   relics: string[];
   /** monsters the little ones grew into stickers (toddler mode), newest first */
   stickers: MonsterSpec[];
+  /** per word: transcripts a grown-up confirmed as "said it right" on this device */
+  aliases: Record<string, string[]>;
   treks: number;
   sound: boolean;
   music: boolean;
@@ -32,6 +34,7 @@ export function defaultSave(): Save {
     collection: [],
     relics: [],
     stickers: [],
+    aliases: {},
     treks: 0,
     sound: true,
     music: true,
@@ -86,6 +89,7 @@ function normalise(data: Raw): Save {
     collection: data.collection ?? [],
     relics: data.relics ?? [],
     stickers: Array.isArray(data.stickers) ? data.stickers : [],
+    aliases: data.aliases && typeof data.aliases === 'object' ? data.aliases : {},
   };
 }
 

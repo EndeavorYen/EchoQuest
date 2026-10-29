@@ -41,7 +41,7 @@ export class Speaker {
   }
 
   /** Start the mic. Must be called straight from a tap handler. */
-  listen(cb: (r: SpeakResult) => void): void {
+  listen(cb: (r: SpeakResult) => void, hints: string[] = []): void {
     this.cancel();
     this.cb = cb;
     this.mode = 'listening';
@@ -52,7 +52,7 @@ export class Speaker {
       this.cb = null;
       if (o.ok) done?.({ kind: 'heard', candidates: o.candidates });
       else done?.({ kind: 'fail', reason: o.reason });
-    });
+    }, hints);
   }
 
   /** Show the on-screen text box and raise the keyboard. Call from a tap handler. */

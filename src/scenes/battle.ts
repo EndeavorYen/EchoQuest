@@ -8,6 +8,8 @@ import { emojiSprite } from '../gfx/emoji';
 import { generateMonster, type Monster, type FrameName } from '../gfx/monster';
 import { sfx, say, stopSay } from '../audio/sfx';
 import { judge, type Tier } from '../speech/match';
+import { knownHearings, learnHearing } from '../speech/learn';
+import { logHeard } from '../speech/heardlog';
 import { Speaker, type SpeakResult } from '../speech/speaker';
 import { Battle, attackName, type MonsterState } from '../game/battle';
 import { dealCard, pickDefenseWord, type Card } from '../game/deck';
@@ -42,6 +44,9 @@ interface Proj {
 
 const PANEL_H = 142;
 
+/** Chances at one word before it is let go (a grown-up can also wave it through). */
+const MAX_TRIES = 3;
+
 /** Seconds a defender gets, by level. Little kids get no clock at all. */
 const DEFENSE_TIME: Record<number, number> = { 1: 0, 2: 8, 3: 7, 4: 6 };
 
@@ -66,6 +71,8 @@ export class BattleScene implements Scene {
   /** What the beaten monster turns into (a sticker friend). */
   private friend: Monster | null = null;
   private friendShown = false;
+  /** What the engine returned for the latest attempt on this word (kept so a grown-up can confirm it). */
+  private lastHeard: string[] = [];
   private manage = false;
   private manageLevel = 1;
   /** The current spell is a word the player missed earlier in this battle. */
@@ -156,6 +163,7 @@ export class BattleScene implements Scene {
     this.sel = back ? { word: back } : dealCard(att, Date.now(), this.app.rng, this.recent, stretch);
     this.tries = 0;
     this.note = '';
+    this.lastHeard = [];
     this.speaker.cancel();
     this.phase = 'speak';
     this.pt = 0;
@@ -260,12 +268,35 @@ export class BattleScene implements Scene {
     app.ui.button(fb, 10, by, W - 20, 22, 'DONE', BTN.primary, () => this.closeManage());
   }
 
+  /**
+   * A grown-up heard the right word even though the engine did not: wave it through
+   * (as a "good" hit), and remember this mishearing for next time.
+   */
+  private confirm(): void {
+    const word = this.phase === 'speak' ? this.sel?.word : this.defWord;
+    if (!word || (this.phase !== 'speak' && this.phase !== 'defend')) return;
+    const app = this.app;
+    sfx.unlock();
+    this.speaker.cancel();
+    const who = this.b.attacker;
+    app.save = { ...app.save, aliases: learnHearing(app.save.aliases, word, this.lastHeard) };
+    app.persist();
+    logHeard({ w: word.w, c: this.lastHeard, r: 'confirmed', lv: who.level });
+    who.progress = record(who.progress, word.id, true, Date.now());
+    if (this.phase === 'speak') {
+      const card = this.sel!;
+      if (this.boss) this.bossStrike(card, 'good', this.isRevenge);
+      else this.strike(card, 'good', this.isRevenge);
+    } else this.resolveDefense(true);
+  }
+
   private mic(): void {
     sfx.unlock();
     stopSay();
     sfx.play('listen');
     const cb = (r: SpeakResult) => (this.phase === 'speak' ? this.onSpoken(r) : this.onDefended(r));
-    if (this.speaker.supported && !this.forceTyping) this.speaker.listen(cb);
+    const target = this.phase === 'speak' ? this.sel?.word : this.defWord;
+    if (this.speaker.supported && !this.forceTyping) this.speaker.listen(cb, target ? [target.w] : []);
     else this.speaker.openTyping(cb);
   }
 
@@ -300,7 +331,9 @@ export class BattleScene implements Scene {
     const card = this.sel;
     if (!cand || !card) return;
     const att = this.b.attacker;
-    const j = judge(card.word.w, cand, att.level);
+    const j = judge(card.word.w, cand, att.level, knownHearings(this.app.save.aliases, card.word));
+    this.lastHeard = cand;
+    logHeard({ w: card.word.w, c: cand, r: j.tier, lv: att.level });
     if (j.tier !== 'miss') {
       att.progress = record(att.progress, card.word.id, true, Date.now());
       if (this.boss) this.bossStrike(card, j.tier, this.isRevenge);
@@ -308,7 +341,7 @@ export class BattleScene implements Scene {
       return;
     }
     this.tries += 1;
-    if (this.tries >= 2) {
+    if (this.tries >= MAX_TRIES) {
       att.progress = record(att.progress, card.word.id, false, Date.now());
       this.revenge.miss(att.id, card.word, this.b.round);
       this.fizzle(card);
@@ -488,6 +521,7 @@ export class BattleScene implements Scene {
     this.defLeft = this.defLimit;
     this.tries = 0;
     this.note = '';
+    this.lastHeard = [];
     this.speaker.cancel();
     say(this.defWord.w, 0.9);
     void first;
@@ -498,14 +532,16 @@ export class BattleScene implements Scene {
     const w = this.defWord;
     if (!cand || !w) return;
     const def = this.b.defender;
-    const j = judge(w.w, cand, def.level);
+    const j = judge(w.w, cand, def.level, knownHearings(this.app.save.aliases, w));
+    this.lastHeard = cand;
+    logHeard({ w: w.w, c: cand, r: j.tier, lv: def.level });
     if (j.tier !== 'miss') {
       def.progress = record(def.progress, w.id, true, Date.now());
       this.resolveDefense(true);
       return;
     }
     this.tries += 1;
-    if (this.tries >= 2) {
+    if (this.tries >= MAX_TRIES) {
       def.progress = record(def.progress, w.id, false, Date.now());
       this.resolveDefense(false);
     } else {
@@ -964,6 +1000,10 @@ export class BattleScene implements Scene {
     // hear again / keyboard
     app.ui.button(fb, W - 34, py + 98, 26, 20, '', BTN.blue, () => { sfx.unlock(); sfx.play('tap'); say(word.w); }, { icon: ICON.speaker, name: 'hear' });
     app.ui.button(fb, 8, py + 98, 26, 20, '', BTN.gray, () => this.toggleTyping(), { icon: ICON.kbd, name: 'keyboard' });
+    // after a miss: the grown-up can say "that was right"
+    if (this.tries >= 1 && mode !== 'typing' && !this.speaker.listening) {
+      app.ui.button(fb, W - 66, py + 98, 28, 20, '', BTN.green, () => this.confirm(), { icon: ICON.check, name: 'confirm' });
+    }
   }
 
   private drawSpeak(py: number): void {

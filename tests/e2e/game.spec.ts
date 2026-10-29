@@ -61,7 +61,7 @@ test.describe('core loop', () => {
 });
 
 test.describe('failing is safe', () => {
-  test('two wrong tries fizzle: no damage, combo stays 0, then the shield round starts', async ({ game }) => {
+  test('three wrong tries fizzle: no damage, combo stays 0, then the shield round starts', async ({ game }) => {
     await game.newGameToMap();
     await game.startBattle();
     const full = await game.battle();
@@ -71,6 +71,10 @@ test.describe('failing is safe', () => {
     await expect.poll(async () => (await game.battle()).tries).toBe(1);
     expect((await game.battle()).phase).toBe('speak');
     await game.say('qqqq');
+    await game.tap('mic');
+    await expect.poll(async () => (await game.battle()).tries).toBe(2);
+    expect((await game.battle()).phase).toBe('speak');
+    await game.say('xxxx');
     await game.tap('mic');
     await game.waitPhase('defend');
     const b = await game.battle();
@@ -85,11 +89,7 @@ test.describe('failing is safe', () => {
     await game.waitPhase('defend');
     const hit = await game.battle();
     expect(hit.hp).toBeLessThan(hit.maxHp);
-    await game.say('zzzz', 'qqqq');
-    await game.tap('mic');
-    await expect.poll(async () => (await game.battle()).tries).toBe(1);
-    await game.tap('mic');
-    await game.waitPhase('resolve');
+    await game.failWord();
     await game.waitPhase('speak');
     const b = await game.battle();
     expect(b.combo).toBe(0);
@@ -147,6 +147,64 @@ test.describe('shield timer', () => {
   });
 });
 
+test.describe('help for hard-to-recognise words', () => {
+  test('after a miss a grown-up can confirm "that was right": it counts, and the mishearing is remembered', async ({ game }) => {
+    await game.newGameToMap();
+    await game.startBattle();
+    await game.setMonsterHp(9999);
+    expect(await game.has('confirm')).toBe(false); // nothing to confirm before a miss
+    const b0 = await game.battle();
+    await game.say('zork');
+    await game.tap('mic');
+    await expect.poll(async () => (await game.battle()).tries).toBe(1);
+    await game.tap('confirm');
+    await game.waitPhase('defend');
+    const b1 = await game.battle();
+    expect(b1.hp).toBeLessThan(b0.hp);
+    expect(b1.combo).toBe(1);
+    const save = await game.save();
+    const id = Object.keys(save.aliases)[0];
+    expect(save.aliases[id]).toContain('zork');
+    expect(save.players[0].progress[id].correct).toBe(1);
+    await game.reload();
+    expect((await game.save()).aliases[id]).toContain('zork');
+  });
+
+  test('the same mishearing passes the next time the word comes up', async ({ game }) => {
+    await game.newGameToMap();
+    await game.startBattle();
+    await game.setMonsterHp(9999);
+    await game.eval((a) => {
+      a.save = { ...a.save, aliases: { ...a.save.aliases, [a.scene.sel.word.id]: ['zork'] } };
+    });
+    await game.say('zork');
+    await game.tap('mic');
+    await game.waitPhase('defend');
+    expect((await game.battle()).combo).toBe(1);
+  });
+
+  test('what the engine heard is logged on the device', async ({ game, page }) => {
+    await game.newGameToMap();
+    await game.startBattle();
+    const word = (await game.battle()).word!;
+    await game.say([word.toUpperCase(), 'other']);
+    await game.tap('mic');
+    await game.waitPhase('defend');
+    const log = await page.evaluate(() => JSON.parse(localStorage.getItem('echoquest.heard') ?? '[]'));
+    expect(log).toHaveLength(1);
+    expect(log[0]).toMatchObject({ w: word, r: 'perfect', lv: 1 });
+    expect(log[0].c).toContain('other');
+  });
+
+  test('the party screen can copy the log', async ({ game, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => undefined);
+    await game.open();
+    await game.tap('PARTY');
+    await game.tap('copylog');
+    await expect.poll(() => game.eval((a) => a.scene.copied)).not.toBe(0);
+  });
+});
+
 test.describe('missed words come back', () => {
   test('a word that got away returns as REVENGE two rounds later, and tapping to hear costs nothing', async ({ game }) => {
     test.slow();
@@ -160,10 +218,7 @@ test.describe('missed words come back', () => {
     await game.tap('word');
     expect(Object.keys((await game.save()).players[0].progress)).toHaveLength(0);
 
-    await game.say('zzzz', 'qqqq');
-    await game.tap('mic');
-    await expect.poll(async () => (await game.battle()).tries).toBe(1);
-    await game.tap('mic');
+    await game.failWord();
     await game.waitPhase('defend');
     await game.shield();
     await game.waitPhase('speak'); // round 2: an ordinary new word
@@ -424,10 +479,7 @@ test.describe('map stops', () => {
     expect((await game.battle()).attacker).toBe(players[1].name);
 
     // a miss costs nothing: the shield stays and a new word comes around
-    await game.say('zzzz', 'qqqq');
-    await game.tap('mic');
-    await expect.poll(async () => (await game.battle()).tries).toBe(1);
-    await game.tap('mic');
+    await game.failWord();
     await game.waitPhase('strike');
     await game.waitPhase('speak');
     expect(await layers()).toBe(3);

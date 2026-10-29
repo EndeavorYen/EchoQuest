@@ -8,6 +8,7 @@ import { LEVELS, WORDS } from '../data/words';
 import { levelStat } from '../game/progress';
 import { sfx } from '../audio/sfx';
 import { backdrop, levelPips } from './common';
+import { exportLog, readLog } from '../speech/heardlog';
 
 /**
  * Party setup. Everyone picks their own level, and it can be changed at any
@@ -15,6 +16,8 @@ import { backdrop, levelPips } from './common';
  */
 export class PlayersScene implements Scene {
   readonly id = 'players';
+  private copied = 0;
+
   constructor(private app: App, private back: () => void) {}
 
   enter(): void {
@@ -36,6 +39,18 @@ export class PlayersScene implements Scene {
     sfx.play('tap');
   }
 
+  /** Copy what the speech engine has been returning, to send along when tuning recognition. */
+  private copyLog(): void {
+    sfx.play('tap');
+    const text = exportLog();
+    const done = () => { this.copied = readLog().length || -1; };
+    try {
+      void navigator.clipboard.writeText(text).then(done, () => window.prompt('Copy this:', text));
+    } catch {
+      window.prompt('Copy this:', text);
+    }
+  }
+
   private patch(i: number, patch: Partial<{ name: string; face: number }>): void {
     const app = this.app;
     app.save = {
@@ -53,6 +68,8 @@ export class PlayersScene implements Scene {
     fb.copyFrom(backdrop(app, 'night', 33));
     fb.veil(0, 0, W, H, C.ink, 11);
 
+    app.ui.button(fb, W - 32, 6, 26, 16, 'LOG', BTN.dark, () => this.copyLog(), { name: 'copylog' });
+    if (this.copied !== 0) drawText(fb, this.copied > 0 ? `${this.copied} copied` : 'empty', W - 6, 24, C.mist, { align: 'right' });
     drawText(fb, 'PARTY', W / 2, 8, C.sun, { align: 'center', scale: 2, outline: C.ink, pixel: true });
     drawText(fb, '點頭像或名字可換，等級隨時調', W / 2, 36, C.mist, { align: 'center' });
 

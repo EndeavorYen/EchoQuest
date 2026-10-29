@@ -21,6 +21,8 @@ export interface Word {
   zh: string;
   lv: Lv;
   icon?: string;
+  /** transcripts speech engines are known to return for this word ("egg" → "ag") */
+  heard?: string[];
   /** every word list this word belongs to */
   lists: string[];
 }
@@ -31,6 +33,7 @@ export interface PackWord {
   zh: string;
   lv: Lv;
   icon?: string;
+  heard?: string[];
   /** extra lists on top of the pack's own */
   lists?: string[];
 }
@@ -76,8 +79,9 @@ export function buildBank(packs: Pack[]): Word[] {
       const have = byId.get(id);
       if (have) {
         for (const l of lists) if (!have.lists.includes(l)) have.lists.push(l);
+        if (e.heard) have.heard = [...new Set([...(have.heard ?? []), ...e.heard])];
       } else {
-        byId.set(id, { id, w: e.w.trim(), pos: e.pos, zh: e.zh, lv: e.lv, icon: e.icon, lists: [...new Set(lists)] });
+        byId.set(id, { id, w: e.w.trim(), pos: e.pos, zh: e.zh, lv: e.lv, icon: e.icon, heard: e.heard, lists: [...new Set(lists)] });
       }
     }
   }

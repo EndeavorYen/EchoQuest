@@ -197,13 +197,24 @@ export class Game {
   }
 
   /** Wait for the game to react to an answer: the phase moves on, or a retry is consumed. */
-  private async settle(from: { phase: string; tries: number }): Promise<void> {
+  async settle(from: { phase: string; tries: number }): Promise<void> {
     await expect
       .poll(async () => {
         const b = await this.battle();
         return b.phase !== from.phase || b.tries !== from.tries;
       }, { timeout: 15_000, message: 'waiting for the answer to be processed' })
       .toBe(true);
+  }
+
+  /** Get the current word wrong until the game lets it go (three chances). */
+  async failWord(): Promise<void> {
+    for (let i = 0; i < 3; i++) {
+      const from = await this.battle();
+      if (from.phase !== 'speak' && from.phase !== 'defend') return;
+      await this.say('zzzz');
+      await this.tap('mic');
+      await this.settle(from);
+    }
   }
 
   /** Play the whole battle with perfect answers until the victory panel. */

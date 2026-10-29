@@ -144,7 +144,20 @@
    "pos": "n",
    "zh": "蛋",
    "lv": 1,
-   "icon": "🥚"
+   "icon": "🥚",
+   "heard": [
+    "a",
+    "x",
+    "ex",
+    "ache",
+    "edge",
+    "add",
+    "aig",
+    "ag",
+    "eg",
+    "agg",
+    "ack"
+   ]
   },
   {
    "w": "milk",
@@ -305,7 +318,12 @@
    "pos": "n",
    "zh": "鞋子",
    "lv": 2,
-   "icon": "👟"
+   "icon": "👟",
+   "heard": [
+    "shoe",
+    "shoos",
+    "choose"
+   ]
   },
   {
    "w": "hat",
@@ -333,7 +351,10 @@
    "pos": "n",
    "zh": "雪",
    "lv": 2,
-   "icon": "❄️"
+   "icon": "❄️",
+   "heard": [
+    "snowed"
+   ]
   },
   {
    "w": "bicycle",
@@ -368,7 +389,10 @@
    "pos": "n",
    "zh": "柳橙",
    "lv": 2,
-   "icon": "🍊"
+   "icon": "🍊",
+   "heard": [
+    "oranges"
+   ]
   },
   {
    "w": "elephant",

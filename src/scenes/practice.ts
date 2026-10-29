@@ -6,6 +6,8 @@ import { drawText, measure, wrap } from '../gfx/text';
 import { emojiSprite } from '../gfx/emoji';
 import { sfx, say, stopSay } from '../audio/sfx';
 import { judge } from '../speech/match';
+import { knownHearings, learnHearing } from '../speech/learn';
+import { logHeard } from '../speech/heardlog';
 import { Speaker, type SpeakResult } from '../speech/speaker';
 import { LEVELS, type Word } from '../data/words';
 import { pickPractice } from '../game/deck';
@@ -26,6 +28,7 @@ export class PracticeScene implements Scene {
   private recent: string[] = [];
   private result: 'none' | 'perfect' | 'good' | 'miss' = 'none';
   private heard = '';
+  private lastCand: string[] = [];
   private note = '';
   private streak = 0;
   private resultT = 0;
@@ -63,7 +66,7 @@ export class PracticeScene implements Scene {
     stopSay();
     sfx.play('listen');
     const cb = (r: SpeakResult) => this.onResult(r);
-    if (this.speaker.supported && !this.forceTyping) this.speaker.listen(cb);
+    if (this.speaker.supported && !this.forceTyping) this.speaker.listen(cb, this.word ? [this.word.w] : []);
     else this.speaker.openTyping(cb);
   }
 
@@ -92,7 +95,9 @@ export class PracticeScene implements Scene {
       return;
     }
     const app = this.app;
-    const j = judge(w.w, cand, this.lv);
+    const j = judge(w.w, cand, this.lv, knownHearings(app.save.aliases, w));
+    this.lastCand = cand;
+    logHeard({ w: w.w, c: cand, r: j.tier, lv: this.lv });
     this.heard = j.heard;
     this.result = j.tier;
     this.resultT = 0;
@@ -109,6 +114,25 @@ export class PracticeScene implements Scene {
       sfx.play(j.tier === 'perfect' ? 'perfect' : 'good');
       app.fx.burst(app.W / 2, 110, 16, [C.sun, C.snow, C.ice, C.lime], 70, 60, 0.7);
     }
+  }
+
+  /** A grown-up heard it right although the engine did not. */
+  private confirm(w: Word): void {
+    const app = this.app;
+    const p = app.active;
+    const updated = { ...p, progress: record(p.progress, w.id, true, Date.now()) };
+    app.save = {
+      ...app.save,
+      aliases: learnHearing(app.save.aliases, w, this.lastCand),
+      players: app.save.players.map((q) => (q.id === p.id ? updated : q)),
+    };
+    app.persist();
+    logHeard({ w: w.w, c: this.lastCand, r: 'confirmed', lv: this.lv });
+    this.result = 'good';
+    this.resultT = 0;
+    this.streak += 1;
+    sfx.play('good');
+    app.fx.burst(app.W / 2, 110, 16, [C.sun, C.snow, C.ice, C.lime], 70, 60, 0.7);
   }
 
   private cycleActive(): void {
@@ -192,6 +216,7 @@ export class PracticeScene implements Scene {
       });
       app.ui.button(fb, W - 34, H - 72, 26, 20, '', BTN.blue, () => { sfx.unlock(); say(w.w); }, { icon: ICON.speaker, name: 'hear' });
       if (this.result === 'miss') {
+        app.ui.button(fb, W - 66, H - 72, 28, 20, '', BTN.green, () => this.confirm(w), { icon: ICON.check, name: 'confirm' });
         app.ui.button(fb, 8, H - 72, 60, 20, 'RETRY', BTN.green, () => {
           sfx.play('tap');
           this.result = 'none';

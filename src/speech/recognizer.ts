@@ -12,6 +12,8 @@ interface Rec {
   continuous: boolean;
   interimResults: boolean;
   maxAlternatives: number;
+  /** Chrome's on-device contextual biasing (newer versions only) */
+  phrases?: unknown[];
   onstart: (() => void) | null;
   onaudiostart: (() => void) | null;
   onresult: ((e: RecEvent) => void) | null;
@@ -27,6 +29,18 @@ function ctor(): RecCtor | null {
   if (typeof window === 'undefined') return null;
   const w = window as unknown as { SpeechRecognition?: RecCtor; webkitSpeechRecognition?: RecCtor };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+/** Ask the engine to favour the words we are listening for. Ignored where unsupported. */
+function bias(rec: Rec, hints: string[]): void {
+  try {
+    const w = window as unknown as { SpeechRecognitionPhrase?: new (phrase: string, boost?: number) => unknown };
+    if (hints.length && w.SpeechRecognitionPhrase && 'phrases' in rec) {
+      rec.phrases = hints.map((h) => new w.SpeechRecognitionPhrase!(h, 8));
+    }
+  } catch {
+    // biasing is only a nudge
+  }
 }
 
 export const speechSupported = (): boolean => ctor() !== null;
@@ -49,7 +63,10 @@ export class Recognizer {
     return speechSupported();
   }
 
-  listen(done: (o: ListenOutcome) => void, lang = 'en-US'): void {
+  /**
+   * @param hints words we expect to hear; engines that support contextual biasing lean towards them
+   */
+  listen(done: (o: ListenOutcome) => void, hints: string[] = [], lang = 'en-US'): void {
     const C = ctor();
     if (!C) {
       done({ ok: false, reason: 'unsupported' });
@@ -72,7 +89,8 @@ export class Recognizer {
     rec.lang = lang;
     rec.continuous = false;
     rec.interimResults = true;
-    rec.maxAlternatives = 5;
+    rec.maxAlternatives = 10;
+    bias(rec, hints);
     rec.onstart = () => { if (this.rec === rec) this.status = 'listening'; };
     rec.onaudiostart = () => { if (this.rec === rec) this.status = 'listening'; };
     rec.onresult = (e) => {
