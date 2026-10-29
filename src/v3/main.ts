@@ -1,6 +1,7 @@
 import './battle.css';
 import './theme.css';
 import { load, persist, type Save } from '../game/save';
+import { haptics } from '../audio/haptics';
 import { Recognizer } from '../speech/recognizer';
 import { sfx } from '../audio/sfx';
 import { Rng } from '../util/rng';
@@ -23,6 +24,7 @@ let current: Screen | void = undefined;
 let save: Save = load();
 sfx.enabled = save.sound;
 sfx.musicOn = save.music;
+haptics.enabled = save.haptics !== false;
 
 const ctx: Ctx = {
   get save() { return save; },

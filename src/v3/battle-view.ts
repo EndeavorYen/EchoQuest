@@ -1,5 +1,6 @@
 import { artUrl, typeOf, type Mon } from '../mon/dex';
 import { gradeOf, type Grade } from '../mon/rarity';
+import { BALL_COLOR, BEATS, CAPTURE_MS, LAND_AT, LOCK_AT, SUCK_MS, WOBBLE_AT, WOBBLE_MS, type Beat } from './capture';
 import { glyph, svg } from './icons';
 import type { Word } from '../data/words';
 import { blockSpark, dropShield, playMove, raiseShield, type FxHost } from './effects';
@@ -201,6 +202,8 @@ export class BattleView {
     const t = typeOf(m);
     const foe = this.$('#foe');
     foe.classList.remove('faint');
+    foe.getAnimations().forEach((a) => a.cancel());
+    this.$('#fx').querySelectorAll('.ball, .cstar').forEach((e) => e.remove());
     foe.innerHTML = this.monImg(m) + '<div class="shield-rings" id="rings"></div>';
     this.ringLayers = 0;
     this.$('#foeName').textContent = m.name;
@@ -438,6 +441,71 @@ export class BattleView {
     void el.offsetWidth;
     el.classList.add('shake');
     window.setTimeout(() => el.classList.remove('shake'), 450);
+  }
+
+  /**
+   * The win: the creature shrinks into a ball that drops, wobbles three times and locks, with a
+   * burst of stars. `beat` fires at each step (for sound and vibration); `done` when it is over.
+   */
+  capture(o: { grade: Grade; isNew: boolean }, beat: (b: Beat) => void, done: () => void): void {
+    const foe = this.$('#foe');
+    const p = this.center(foe);
+    const ground = Math.min(p.y + 90, this.$('#arena').clientHeight - 60);
+    const dy = Math.max(30, ground - p.y);
+    const color = BALL_COLOR[o.grade];
+    const ball = this.spawn('ball', p.x, p.y, color);
+    foe.animate(
+      [{ transform: 'scale(1)', opacity: 1, filter: 'brightness(1)' }, { transform: 'scale(.08)', opacity: 0, filter: 'brightness(4)' }],
+      { duration: SUCK_MS, easing: 'ease-in', fill: 'forwards' },
+    );
+    // one timeline for the ball: appear, drop and bounce, three wobbles, a little swell when it locks
+    const at: Array<[number, string]> = [
+      [0, 'translate(0,0) scale(.2) rotate(0deg)'],
+      [SUCK_MS, 'translate(0,0) scale(1) rotate(0deg)'],
+      [LAND_AT, `translate(0,${dy}px) scale(1) rotate(0deg)`],
+      [LAND_AT + 70, `translate(0,${dy - 14}px) scale(1) rotate(0deg)`],
+      [WOBBLE_AT[0], `translate(0,${dy}px) scale(1) rotate(0deg)`],
+    ];
+    for (const s of WOBBLE_AT) {
+      at.push([s + WOBBLE_MS * 0.25, `translate(0,${dy}px) rotate(-24deg)`], [s + WOBBLE_MS * 0.5, `translate(0,${dy}px) rotate(0deg)`], [s + WOBBLE_MS * 0.75, `translate(0,${dy}px) rotate(24deg)`], [s + WOBBLE_MS, `translate(0,${dy}px) rotate(0deg)`]);
+    }
+    at.push([LOCK_AT, `translate(0,${dy}px) scale(1)`], [LOCK_AT + 90, `translate(0,${dy}px) scale(1.18)`], [LOCK_AT + 220, `translate(0,${dy}px) scale(1)`], [CAPTURE_MS, `translate(0,${dy}px) scale(1)`]);
+    const sorted = at.sort((a, b) => a[0] - b[0]);
+    ball.animate(
+      sorted.map(([t, transform]) => ({ transform, opacity: t === 0 ? 0 : 1, offset: t / CAPTURE_MS })),
+      { duration: CAPTURE_MS, fill: 'forwards' },
+    );
+    for (const b of BEATS) {
+      window.setTimeout(() => {
+        beat(b);
+        if (b.kind === 'lock') this.lockBall(ball, { x: p.x, y: p.y + dy }, color, o);
+      }, b.at);
+    }
+    window.setTimeout(done, CAPTURE_MS);
+  }
+
+  private lockBall(ball: HTMLElement, at: { x: number; y: number }, color: string, o: { grade: Grade; isNew: boolean }): void {
+    ball.classList.add('locked');
+    this.fxHost().flash(color, 0.35, 450);
+    const n = o.grade === 'legend' ? 12 : 8;
+    for (let i = 0; i < n; i++) {
+      const s = this.spawn('cstar', at.x, at.y, color);
+      s.innerHTML = svg('sparkle');
+      const a = (i / n) * Math.PI * 2;
+      const r = 62 + (i % 2) * 22;
+      s.animate(
+        [{ transform: 'translate(-50%,-50%) scale(.3)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(a) * r}px), calc(-50% + ${Math.sin(a) * r}px)) scale(1)`, opacity: 0 }],
+        { duration: 750, easing: 'ease-out', fill: 'forwards' },
+      ).onfinish = () => s.remove();
+    }
+    const f = this.spawn('float', at.x, at.y - 56, '#c98600');
+    f.textContent = o.isNew ? '新收服！' : '收服！';
+    f.animate([{ transform: 'translate(-50%,10px)', opacity: 0 }, { transform: 'translate(-50%,-4px)', opacity: 1, offset: 0.2 }, { transform: 'translate(-50%,-30px)', opacity: 1, offset: 0.8 }, { transform: 'translate(-50%,-40px)', opacity: 0 }], { duration: 1300, easing: 'ease-out' }).onfinish = () => f.remove();
+    if (o.isNew) {
+      const g = this.spawn('float small', at.x, at.y - 22, '#18202e');
+      g.textContent = '已加進圖鑑';
+      g.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }], { duration: 1300 }).onfinish = () => g.remove();
+    }
   }
 
   faintFoe(): void {

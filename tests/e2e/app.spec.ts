@@ -217,6 +217,47 @@ test.describe('scan and battle', () => {
     await expect(p.locator('.reveal.g-legend .rarebanner')).toContainText('傳說登場');
   });
 
+  test('a win is a catch: the creature goes into a ball that wobbles three times and locks, with a buzz on each beat', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => { (window as any).__vib = []; (navigator as any).vibrate = (v: unknown) => ((window as any).__vib.push(v), true); });
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => c.win());
+    await expect(p.locator('.ball')).toHaveCount(1);
+    await expect(p.locator('.ball.locked')).toHaveCount(1, { timeout: 5000 });
+    await expect(p.locator('[data-act=next]')).toBeVisible({ timeout: 5000 });
+    const vib = await p.evaluate(() => (window as any).__vib);
+    expect(vib).toEqual([[35], [20], [20], [20], [140]]);
+    // the next fight starts with a clean arena
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await expect(p.locator('.ball')).toHaveCount(0);
+  });
+
+  test('a legendary catch gets a golden ball and a longer rumble; the vibration switch turns it off', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => { (window as any).__vib = []; (navigator as any).vibrate = (v: unknown) => ((window as any).__vib.push(v), true); });
+    await go(p, 'battle', { foe: { id: 383, name: '固拉多', type: 'ground', rarity: 5, colors: ['#D11115'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => c.win());
+    await expect(p.locator('.ball.locked')).toHaveCount(1, { timeout: 5000 });
+    const vib: number[][] = await p.evaluate(() => (window as any).__vib);
+    expect(vib.at(-1)!.length).toBeGreaterThan(3);
+    expect(await p.locator('.ball').evaluate((e) => getComputedStyle(e).getPropertyValue('--c').trim())).toBe('#f5b800');
+    // switch it off in the party settings
+    await go(p, 'party');
+    await p.click('#buzz');
+    expect(await save(p, (s) => s.haptics)).toBe(false);
+    await p.evaluate(() => { (window as any).__vib = []; });
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => c.win());
+    await expect(p.locator('[data-act=next]')).toBeVisible({ timeout: 5000 });
+    expect(await p.evaluate(() => (window as any).__vib)).toEqual([]);
+  });
+
   test('winning adds the creature to the dex and the trek moves on', async ({ game }) => {
     const p = game.page;
     await open(p);

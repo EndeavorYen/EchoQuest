@@ -6,6 +6,7 @@ import { MON_BY_ID, STARTER_IDS, artUrl, typeOf } from '../../mon/dex';
 import { buildExport, commitExport, pendingCount, readLog, type ExportScope } from '../../speech/heardlog';
 import { CHANGELOG } from '../../data/changelog';
 import { sfx } from '../../audio/sfx';
+import { haptics } from '../../audio/haptics';
 import { partnerMon } from '../partner';
 import { bar, esc, type ScreenFactory } from '../ctx';
 
@@ -19,6 +20,7 @@ function credits(): string {
 export const party: ScreenFactory = (root, ctx) => {
   function draw(): void {
     const { players, sound, music } = ctx.save;
+    const buzz = ctx.save.haptics !== false;
     const cards = players
       .map((p, i) => {
         const m = partnerMon(p, i);
@@ -41,6 +43,7 @@ export const party: ScreenFactory = (root, ctx) => {
         ${players.length < MAX_PLAYERS ? '<button class="btn ghost" id="add">＋ 加入玩家</button>' : ''}
         <div class="card stack"><div class="row"><span class="grow"><b>音效</b></span><button class="btn sm ${sound ? 'good' : 'ghost'}" id="snd">${sound ? '開' : '關'}</button></div>
           <div class="row"><span class="grow"><b>音樂</b></span><button class="btn sm ${music ? 'good' : 'ghost'}" id="mus">${music ? '開' : '關'}</button></div>
+          ${haptics.supported ? `<div class="row"><span class="grow"><b>震動</b><br><span class="muted">收服時手機會震動</span></span><button class="btn sm ${buzz ? 'good' : 'ghost'}" id="buzz">${buzz ? '開' : '關'}</button></div>` : ''}
           <div class="row"><span class="grow"><b>辨識紀錄</b><br><span class="muted">語音聽不準時，複製給開發者調整（複製後紀錄仍保留在手機裡）</span></span></div>
           <div class="row"><button class="btn sm good grow" id="logNew">複製新的（${pendingCount()}）</button><button class="btn sm ghost grow" id="logAll">複製全部（${readLog().length}）</button></div>
           <div class="muted" id="logmsg"></div></div>
@@ -74,6 +77,7 @@ export const party: ScreenFactory = (root, ctx) => {
       draw();
     });
     root.querySelector('#snd')!.addEventListener('click', () => { ctx.update((s) => ({ ...s, sound: !s.sound })); sfx.enabled = ctx.save.sound; draw(); });
+    root.querySelector('#buzz')?.addEventListener('click', () => { ctx.update((s) => ({ ...s, haptics: s.haptics === false })); haptics.enabled = ctx.save.haptics !== false; haptics.pulse(30); draw(); });
     root.querySelector('#mus')!.addEventListener('click', () => { ctx.update((s) => ({ ...s, music: !s.music })); sfx.musicOn = ctx.save.music; draw(); });
     const copyLog = async (scope: ExportScope): Promise<void> => {
       const msg = root.querySelector('#logmsg') as HTMLElement;

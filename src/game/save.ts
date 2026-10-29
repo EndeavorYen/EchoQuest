@@ -32,6 +32,8 @@ export interface Save {
   journeys: { title: string; size: string; date: string }[];
   sound: boolean;
   music: boolean;
+  /** phone vibration on a catch; absent (older saves) means on */
+  haptics?: boolean;
 }
 
 /** Saves live under a versioned key. Older keys are only ever read (never deleted), so an update can't lose anyone's progress. */

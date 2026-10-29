@@ -10,7 +10,7 @@ type Wave = 'square' | 'triangle' | 'sawtooth' | 'sine';
 export type SfxName =
   | 'tap' | 'select' | 'back' | 'listen' | 'hit' | 'perfect' | 'good' | 'miss' | 'combo'
   | 'appear' | 'monsterAttack' | 'warn' | 'shield' | 'block' | 'hurt' | 'win' | 'chest'
-  | 'step' | 'scan' | 'shutter' | 'heal' | 'boss' | 'rare'
+  | 'step' | 'scan' | 'shutter' | 'heal' | 'boss' | 'rare' | 'catchSuck' | 'catchWobble' | 'catchLock'
   | 'dodge' | 'reflect' | 'shieldBreak' | 'status' | 'lose';
 
 const midiToHz = (m: number): number => 440 * Math.pow(2, (m - 69) / 12);
@@ -156,6 +156,25 @@ class Sfx {
         if (arg === 2) this.tone(n(40), 0.7, 'sawtooth', 0.22, 0, n(34));
         break;
       }
+      case 'catchSuck':
+        // sucked into the ball: a falling whoosh and a little pop
+        this.tone(n(88), 0.5, 'triangle', 0.3, 0, n(52));
+        this.noise(0.45, 0.22, 0, 2500);
+        this.tone(n(96), 0.07, 'square', 0.22, 0.5);
+        break;
+      case 'catchWobble':
+        // arg 0..2: each wobble a touch higher
+        this.tone(n(52 + arg * 2), 0.14, 'square', 0.3, 0, n(46 + arg * 2));
+        this.noise(0.06, 0.3, 0, 900);
+        break;
+      case 'catchLock':
+        // arg: 0 ordinary, 1 rare, 2 legendary. A click, then a ding that gets bigger with the grade
+        this.noise(0.05, 0.5, 0, 6000);
+        this.tone(n(79), 0.5, 'triangle', 0.4, 0.04);
+        this.tone(n(91), 0.5, 'triangle', 0.3, 0.04);
+        if (arg >= 1) this.tone(n(98), 0.5, 'triangle', 0.26, 0.12);
+        if (arg >= 2) [103, 107, 110, 115].forEach((m, i) => this.tone(n(m), 0.2, 'square', 0.2, 0.22 + i * 0.07));
+        break;
       case 'rare': {
         // a rising sparkle; arg 1 (legendary) is longer, lower underneath and ends on a high chord
         const run = arg ? [72, 76, 79, 84, 88, 91, 96] : [72, 79, 84, 88, 91];

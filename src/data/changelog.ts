@@ -11,6 +11,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '2.4',
+    date: '2026-10-29',
+    title: '打贏了，把怪物收進球裡',
+    items: [
+      '打倒怪物後，牠會被吸進球裡，搖晃三下，「叮」一聲收服',
+      '第一次收服會寫「新收服」；稀有怪是藍球，傳說怪是金球',
+      '收服時手機會跟著震動（設定裡可以關掉；iPhone 沒有震動）',
+    ],
+  },
+  {
     version: '2.3',
     date: '2026-10-29',
     title: '麥克風聽不懂不卡住、稀有怪更有氣勢',

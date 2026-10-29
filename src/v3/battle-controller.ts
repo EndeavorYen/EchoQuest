@@ -1,5 +1,7 @@
 import { Battle } from '../game/battle';
 import { Shield } from '../game/shield';
+import { haptics } from '../audio/haptics';
+import { vibrationFor } from './capture';
 import { ENTRANCE, gradeOf, heartsFor, shieldLayersFor, type Grade } from '../mon/rarity';
 import { DEFENSE, rollDefense, type DefenseKind } from '../game/defense';
 import { Afflictions, STATUS, STATUS_ORDER, rollStatus } from '../game/status';
@@ -635,12 +637,23 @@ export class BattleController {
     if (this.dead) return;
     this.stopTimer();
     this.phase = 'victory';
-    this.view.faintFoe();
     sfx.setMusic(null);
-    sfx.play('win');
     const seen = new Set<string>();
     const words = this.learned.filter((w) => !seen.has(w.id) && seen.add(w.id));
     const r = this.onWin(this.foe, words);
-    window.setTimeout(() => this.view.showVictory(this.foe, words, r ? { isNew: r.isNew, nextLabel: r.nextLabel } : {}), 900);
+    const g = this.grade;
+    const gi = g === 'legend' ? 2 : g === 'rare' ? 1 : 0;
+    this.view.capture(
+      { grade: g, isNew: !!r?.isNew },
+      (b) => {
+        sfx.play(b.kind === 'suck' ? 'catchSuck' : b.kind === 'wobble' ? 'catchWobble' : 'catchLock', b.kind === 'wobble' ? b.n - 1 : gi);
+        haptics.pulse(vibrationFor(b.kind, g));
+      },
+      () => {
+        if (this.dead) return;
+        sfx.play('win');
+        this.view.showVictory(this.foe, words, r ? { isNew: r.isNew, nextLabel: r.nextLabel } : {});
+      },
+    );
   }
 }
