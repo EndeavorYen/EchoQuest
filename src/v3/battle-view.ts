@@ -1,4 +1,5 @@
 import { artUrl, typeOf, type Mon } from '../mon/dex';
+import { gradeOf, type Grade } from '../mon/rarity';
 import { glyph, svg } from './icons';
 import type { Word } from '../data/words';
 import { blockSpark, dropShield, playMove, raiseShield, type FxHost } from './effects';
@@ -209,8 +210,27 @@ export class BattleView {
     this.$('#stars').textContent = '★'.repeat(m.rarity) + '☆'.repeat(5 - m.rarity);
     this.$('#title').textContent = (boss ? '首領 ' : '野生的') + m.name;
     this.$('#arena').style.setProperty('--type', t.color);
+    this.$('#arena').dataset.grade = gradeOf(m.rarity);
     this.root.style.setProperty('--type', t.color);
     this.setShields(0, 0);
+  }
+
+  /** A rare or legendary creature arrives: a banner, a flash and (for a legend) a rumble. */
+  entrance(grade: Exclude<Grade, 'common'>, text: string): void {
+    const legend = grade === 'legend';
+    const b = document.createElement('div');
+    b.className = `banner ${grade}`;
+    b.textContent = text;
+    this.$('#fx').appendChild(b);
+    const at = (s: number, o: number): Keyframe => ({ opacity: o, transform: `translate(-50%, -50%) scale(${s})` });
+    b.animate([{ ...at(0.4, 0), offset: 0 }, { ...at(1.12, 1), offset: 0.22 }, { ...at(1, 1), offset: 0.75 }, { ...at(1.2, 0), offset: 1 }], { duration: legend ? 2200 : 1600, easing: 'ease-out' }).onfinish = () => b.remove();
+    this.fxHost().flash(legend ? '#ffd54a' : '#fff3b0', legend ? 0.55 : 0.4, 700);
+    if (legend) this.fxHost().shake(10, 600);
+  }
+
+  /** Rattle the whole arena. */
+  shake(px: number, ms = 260): void {
+    this.fxHost().shake(px, ms);
   }
 
   setPartner(m: Mon): void {

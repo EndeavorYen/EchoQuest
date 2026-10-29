@@ -186,6 +186,37 @@ test.describe('scan and battle', () => {
     expect(await p.evaluate(() => JSON.parse(localStorage.getItem('echoquest.heard')!).length)).toBe(4);
   });
 
+  test('a wild 5★ met outside a gym still has a shield, a legendary look and a bigger entrance', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: { id: 383, name: '固拉多', type: 'ground', rarity: 5, colors: ['#D11115', '#DAD7DE'] }, boss: false });
+    await p.waitForFunction(() => (window as any).__v3?.shield);
+    expect(await ctl(p, (c) => c.shield.max)).toBe(3);
+    await expect(p.locator('#shields')).toBeVisible();
+    await expect(p.locator('#arena')).toHaveAttribute('data-grade', 'legend');
+    await expect(p.locator('.banner.legend')).toContainText('傳說');
+  });
+
+  test('a wild 4★ has a two-layer shield and the rare look; a 3★ wild has neither', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: { id: 149, name: '快龍', type: 'dragon', rarity: 4, colors: ['#D11115'] }, boss: false });
+    await p.waitForFunction(() => (window as any).__v3?.shield);
+    expect(await ctl(p, (c) => c.shield.max)).toBe(2);
+    await expect(p.locator('#arena')).toHaveAttribute('data-grade', 'rare');
+    await go(p, 'battle', { foe: { id: 3, name: '妙蛙花', type: 'normal', rarity: 3, colors: ['#A179B1'] }, boss: false });
+    await p.waitForFunction(() => (window as any).__v3?.battle && !(window as any).__v3.shield);
+    await expect(p.locator('#arena')).toHaveAttribute('data-grade', 'common');
+    await expect(p.locator('.banner')).toHaveCount(0);
+  });
+
+  test('the reveal screen of a 5★ is dressed up too', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'scan', { kind: 'trek', foe: { id: 383, name: '固拉多', type: 'ground', rarity: 5, colors: ['#D11115'] }, place: { key: 'cave', types: ['ground'], maxRarity: 5 } });
+    await expect(p.locator('.reveal.g-legend .rarebanner')).toContainText('傳說登場');
+  });
+
   test('winning adds the creature to the dex and the trek moves on', async ({ game }) => {
     const p = game.page;
     await open(p);

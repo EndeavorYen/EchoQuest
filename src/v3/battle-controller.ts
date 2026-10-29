@@ -1,5 +1,6 @@
 import { Battle } from '../game/battle';
 import { Shield } from '../game/shield';
+import { ENTRANCE, gradeOf, heartsFor, shieldLayersFor, type Grade } from '../mon/rarity';
 import { DEFENSE, rollDefense, type DefenseKind } from '../game/defense';
 import { Afflictions, STATUS, STATUS_ORDER, rollStatus } from '../game/status';
 import { foeHp, typicalHit, TIRED_ROUND } from './pacing';
@@ -109,8 +110,9 @@ export class BattleController {
     this.foe = foe ?? this.foe;
     const maxHp = foeHp(this.players, this.foe.rarity, bossFoe);
     this.battle = new Battle({ name: this.foe.name, hp: maxHp, maxHp, boss: bossFoe }, this.players, firstPlayer);
-    this.shield = bossFoe ? new Shield(this.foe.rarity >= 4 ? 3 : 2) : null;
-    this.maxHearts = bossFoe ? 7 : 5;
+    const layers = shieldLayersFor(this.foe.rarity, bossFoe);
+    this.shield = layers > 0 ? new Shield(layers) : null;
+    this.maxHearts = heartsFor(this.foe.rarity, bossFoe);
     this.hearts = this.maxHearts;
     this.view.setHearts(this.hearts, this.maxHearts);
     this.aff = new Afflictions();
@@ -121,8 +123,17 @@ export class BattleController {
     this.view.setFoe(this.foe, bossFoe);
     this.view.setFoeHp(maxHp, maxHp);
     if (this.shield) this.view.setShields(this.shield.layers, this.shield.max);
+    if (this.grade !== 'common') {
+      this.view.entrance(this.grade, ENTRANCE[this.grade]);
+      sfx.play('rare', this.grade === 'legend' ? 1 : 0);
+    }
     this.refreshParty();
     this.newRound();
+  }
+
+  /** How special the foe is: rare and legendary ones look, sound and hit differently. */
+  get grade(): Grade {
+    return gradeOf(this.foe.rarity);
   }
 
   private refreshParty(): void {
@@ -460,8 +471,10 @@ export class BattleController {
     this.defLeft = seconds;
     this.defTotal = seconds;
     this.view.setCharging(true);
-    sfx.play('warn');
-    this.view.floatText('foe', '要攻擊了！', '#d9534f', true);
+    const g = this.grade;
+    sfx.play('warn', g === 'legend' ? 2 : g === 'rare' ? 1 : 0);
+    this.view.floatText('foe', g === 'legend' ? '強大的攻擊要來了！' : '要攻擊了！', '#d9534f', true);
+    if (g !== 'common') this.view.flash('#d9534f', g === 'legend' ? 0.3 : 0.18);
     this.showDefend();
     this.lastTick = performance.now();
     this.stopTimer();
@@ -528,10 +541,10 @@ export class BattleController {
     };
 
     if (!kind) {
-      sfx.cast(foeFx.style);
-      this.view.cast('foe', foeFx.style, foeFx.colors, 1, () => {
+      this.foeCast(foeFx, { dx: 0, dy: 0 }, () => {
         sfx.play('hurt');
         this.view.flash('#d9534f', 0.25);
+        if (this.grade !== 'common') this.view.shake(this.grade === 'legend' ? 16 : 10, 420);
         this.view.hurt('me');
         this.view.floatText('me', '好痛！', '#ff5a5a');
         this.hearts = Math.max(0, this.hearts - 1);
@@ -558,8 +571,7 @@ export class BattleController {
     }
     if (kind === 'dodge') this.view.dodge(); else this.view.raiseShield(mine.color);
     window.setTimeout(() => {
-      sfx.cast(foeFx.style);
-      this.view.cast('foe', foeFx.style, foeFx.colors, 1, () => {
+      this.foeCast(foeFx, kind === 'dodge' ? { dx: -120, dy: -50 } : { dx: 0, dy: 0 }, () => {
         if (kind === 'dodge') {
           label();
           done();
@@ -578,8 +590,22 @@ export class BattleController {
             done();
           });
         } else done();
-      }, kind === 'dodge' ? { dx: -120, dy: -50 } : { dx: 0, dy: 0 });
+      });
     }, 280);
+  }
+
+  /**
+   * The creature's own move. A rare one throws it bigger; a legendary one throws it twice (the
+   * second only for show) and rattles the screen when it lands.
+   */
+  private foeCast(fx: { style: string; colors: string[] }, aim: { dx: number; dy: number }, hit: () => void): void {
+    const g = this.grade;
+    sfx.cast(fx.style);
+    if (g === 'legend') window.setTimeout(() => this.view.cast('foe', fx.style, fx.colors, 2, () => {}, aim), 170);
+    this.view.cast('foe', fx.style, fx.colors, g === 'common' ? 1 : 2, () => {
+      if (g !== 'common') this.view.shake(g === 'legend' ? 12 : 7, 380);
+      hit();
+    }, aim);
   }
 
   /** Leave the screen: stop timers and the microphone. */

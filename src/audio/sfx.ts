@@ -10,7 +10,7 @@ type Wave = 'square' | 'triangle' | 'sawtooth' | 'sine';
 export type SfxName =
   | 'tap' | 'select' | 'back' | 'listen' | 'hit' | 'perfect' | 'good' | 'miss' | 'combo'
   | 'appear' | 'monsterAttack' | 'warn' | 'shield' | 'block' | 'hurt' | 'win' | 'chest'
-  | 'step' | 'scan' | 'shutter' | 'heal' | 'boss'
+  | 'step' | 'scan' | 'shutter' | 'heal' | 'boss' | 'rare'
   | 'dodge' | 'reflect' | 'shieldBreak' | 'status' | 'lose';
 
 const midiToHz = (m: number): number => 440 * Math.pow(2, (m - 69) / 12);
@@ -145,12 +145,27 @@ class Sfx {
         this.tone(n(55), 0.5, 'sawtooth', 0.28, 0, n(33));
         this.noise(0.4, 0.3, 0.1, 900);
         break;
-      case 'warn':
-        for (let i = 0; i < 2; i++) {
-          this.tone(n(81), 0.09, 'square', 0.28, i * 0.16);
-          this.tone(n(76), 0.09, 'square', 0.28, i * 0.16 + 0.08);
+      case 'warn': {
+        // arg 0 ordinary, 1 rare (three beats), 2 legendary (four, lower and heavier)
+        const beats = 2 + arg;
+        const drop = arg === 2 ? 7 : 0;
+        for (let i = 0; i < beats; i++) {
+          this.tone(n(81 - drop), 0.09, 'square', 0.28, i * 0.16);
+          this.tone(n(76 - drop), 0.09, 'square', 0.28, i * 0.16 + 0.08);
         }
+        if (arg === 2) this.tone(n(40), 0.7, 'sawtooth', 0.22, 0, n(34));
         break;
+      }
+      case 'rare': {
+        // a rising sparkle; arg 1 (legendary) is longer, lower underneath and ends on a high chord
+        const run = arg ? [72, 76, 79, 84, 88, 91, 96] : [72, 79, 84, 88, 91];
+        run.forEach((m, i) => this.tone(n(m), 0.12, 'square', 0.22, i * 0.07));
+        this.tone(n(48), 0.5, 'triangle', 0.3, 0, n(60));
+        const at = run.length * 0.07;
+        [84, 91, 96].forEach((m) => this.tone(n(m), arg ? 0.7 : 0.4, 'triangle', 0.26, at));
+        if (arg) this.noise(0.5, 0.2, at, 8000);
+        break;
+      }
       case 'shield':
         [79, 84, 91].forEach((m, i) => this.tone(n(m), 0.14, 'triangle', 0.38, i * 0.05));
         break;
