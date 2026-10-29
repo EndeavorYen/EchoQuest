@@ -43,6 +43,7 @@ export class WordPanel {
   onConfirm: () => void = () => {};
   onSubmitTyped: (text: string) => void = () => {};
   onNext: () => void = () => {};
+  onLose: () => void = () => {};
 
   constructor(readonly el: HTMLElement) {
     el.className = 'panel';
@@ -56,6 +57,7 @@ export class WordPanel {
         case 'kbd': this.onKeyboard(); break;
         case 'ok': this.onConfirm(); break;
         case 'next': this.onNext(); break;
+        case 'lose': this.onLose(); break;
         case 'send': this.submitTyped(); break;
       }
     });
@@ -139,6 +141,7 @@ export class BattleView {
   onPartner: (i: number) => void = () => {};
   onSubmitTyped: (text: string) => void = () => {};
   onNext: () => void = () => {};
+  onLose: () => void = () => {};
   onLeave: () => void = () => {};
 
   constructor(root: HTMLElement) {
@@ -146,7 +149,7 @@ export class BattleView {
     root.innerHTML = `
       <div class="app" data-screen="battle">
         <div class="bar">
-          <button class="icon-btn" data-act="leave" aria-label="離開">${BACK}</button>
+          <button class="flee-btn" data-act="leave" aria-label="逃走">${BACK}<span>逃走</span></button>
           <h1 id="title">野生的寶可夢出現了！</h1>
           <span class="stars" id="stars"></span>
         </div>
@@ -157,7 +160,7 @@ export class BattleView {
             <div class="hp"><i id="foeHp"></i></div><div class="hpnum" id="foeHpNum"></div></div>
           <div class="mon foe" id="foe"></div>
           <div class="mon me" id="me"></div>
-          <div class="plate me"><div class="nm"><span id="meName"></span><span class="chip" id="meType"></span></div></div>
+          <div class="plate me"><div class="nm"><span id="meName"></span><span class="chip" id="meType"></span></div><div class="hearts" id="hearts" aria-label="愛心"></div></div>
           <div class="fx" id="fx"></div>
         </div>
         <div class="party" id="party"></div>
@@ -170,6 +173,7 @@ export class BattleView {
     this.panel.onConfirm = () => this.onConfirm();
     this.panel.onSubmitTyped = (t) => this.onSubmitTyped(t);
     this.panel.onNext = () => this.onNext();
+    this.panel.onLose = () => this.onLose();
     this.$('#party').addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('[data-i]') as HTMLElement | null;
       if (b) this.onPartner(Number(b.dataset.i));
@@ -187,7 +191,8 @@ export class BattleView {
     const t = typeOf(m);
     const foe = this.$('#foe');
     foe.classList.remove('faint');
-    foe.innerHTML = this.monImg(m);
+    foe.innerHTML = this.monImg(m) + '<div class="shield-rings" id="rings"></div>';
+    this.ringLayers = 0;
     this.$('#foeName').textContent = m.name;
     const chip = this.$('#foeType');
     chip.textContent = t.name;
@@ -227,6 +232,20 @@ export class BattleView {
     this.$('#foeHpNum').textContent = `${Math.max(0, Math.ceil(hp))} / ${max}`;
   }
 
+  /** The party's hearts: lose them all and the fight is lost. */
+  setHearts(n: number, max: number): void {
+    const el = this.$('#hearts');
+    el.innerHTML = Array.from({ length: max }, (_, i) => `<i class="${i < n ? 'on' : ''}">${i < n ? '❤️' : '🤍'}</i>`).join('');
+    el.dataset.left = String(n);
+  }
+
+  showDefeat(foe: Mon): void {
+    this.panel.showHtml('', `<div class="victory">
+      <div class="big">被${esc(foe.name)}打敗了…</div>
+      <div class="zh">沒關係！回到上一格，換個辦法再來。</div>
+      <button class="btn" data-act="lose">回到地圖</button></div>`);
+  }
+
   /** The condition on the wild creature (burn, sleep…), or none. */
   setStatus(s: { zh: string; icon: string; color: string; left: number } | null): void {
     const el = this.$('#status');
@@ -237,8 +256,31 @@ export class BattleView {
     }
   }
 
+  private ringLayers = 0;
+
+  /** Rings around the creature, one per shield layer; the outer ring pops when a layer breaks. */
+  private drawRings(layers: number): void {
+    const box = this.root.querySelector<HTMLElement>('#rings');
+    if (!box) return;
+    if (layers < this.ringLayers) {
+      const gone = document.createElement('i');
+      gone.className = 'pop';
+      gone.style.setProperty('--k', String(this.ringLayers - 1));
+      box.appendChild(gone);
+      window.setTimeout(() => gone.remove(), 600);
+    }
+    box.querySelectorAll('i:not(.pop)').forEach((n) => n.remove());
+    for (let k = 0; k < layers; k++) {
+      const r = document.createElement('i');
+      r.style.setProperty('--k', String(k));
+      box.appendChild(r);
+    }
+    this.ringLayers = layers;
+  }
+
   /** Boss shield: one pip per layer left. */
   setShields(layers: number, max: number): void {
+    this.drawRings(layers);
     const el = this.$('#shields');
     el.hidden = max <= 0;
     el.innerHTML = Array.from({ length: max }, (_, i) => `<i class="${i < layers ? 'on' : ''}"></i>`).join('') + (layers > 0 ? '<span>護盾</span>' : '<span>護盾破了！</span>');

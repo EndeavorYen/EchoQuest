@@ -25,7 +25,7 @@ export const party: ScreenFactory = (root, ctx) => {
         return `<div class="card pcard" style="--type:${typeOf(m).color}">
           <button class="av" data-pick="${i}" aria-label="換夥伴"><img src="${artUrl(m.id)}" alt="" onerror="this.style.visibility='hidden'"></button>
           <div class="grow">
-            <div class="nm">${esc(p.name)} <span class="muted">· ${esc(m.name)}</span></div>
+            <div class="nm"><input class="nameinput" data-name="${i}" value="${esc(p.name)}" maxlength="8" aria-label="名字" autocomplete="off" spellcheck="false"> <span class="muted">· ${esc(m.name)}</span></div>
             <div class="stepper"><button data-lv="${i}" data-d="-1" ${p.level <= 1 ? 'disabled' : ''} aria-label="簡單一點">−</button>
               <b>Lv.${p.level} ${esc(info.name)}</b>
               <button data-lv="${i}" data-d="1" ${p.level >= 4 ? 'disabled' : ''} aria-label="難一點">＋</button></div>
@@ -48,6 +48,15 @@ export const party: ScreenFactory = (root, ctx) => {
       sfx.play('select');
       draw();
     }));
+    root.querySelectorAll<HTMLInputElement>('[data-name]').forEach((inp) => {
+      const i = Number(inp.dataset.name);
+      inp.addEventListener('input', () => {
+        const name = inp.value.trim().slice(0, 8);
+        if (name) ctx.update((s) => ({ ...s, players: s.players.map((p, k) => (k === i ? { ...p, name } : p)) }));
+      });
+      inp.addEventListener('blur', () => { if (!inp.value.trim()) inp.value = ctx.save.players[i].name; });
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); });
+    });
     root.querySelectorAll<HTMLInputElement>('[data-adult]').forEach((b) => b.addEventListener('change', () => {
       const i = Number(b.dataset.adult);
       ctx.update((s) => ({ ...s, players: s.players.map((p, k) => (k === i ? { ...p, adult: b.checked } : p)) }));

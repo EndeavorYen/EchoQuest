@@ -24,7 +24,7 @@ export const MAX_TRIES = 3;
 /** Seconds to raise a shield once the wild creature winds up. Even the youngest players get one, with plenty of time. */
 const DEFENSE_TIME: Record<number, number> = { 1: 14, 2: 9, 3: 7, 4: 6 };
 
-export type Phase = 'speak' | 'strike' | 'defend' | 'resolve' | 'victory';
+export type Phase = 'speak' | 'strike' | 'defend' | 'resolve' | 'victory' | 'lost';
 
 function failText(reason: string): string {
   switch (reason) {
@@ -65,6 +65,10 @@ export class BattleController {
   onWin: (foe: Mon, words: Word[]) => { isNew: boolean; nextLabel: string } | void = () => {};
   onLeave: () => void = () => {};
   onNextFoe: () => void = () => {};
+  /** The party ran out of hearts and picked "back to the map". */
+  onLose: () => void = () => {};
+  hearts = 0;
+  maxHearts = 0;
 
   constructor(
     private view: BattleView,
@@ -82,6 +86,7 @@ export class BattleController {
     view.onPartner = (i) => this.switchTo(i);
     view.onSubmitTyped = (t) => this.answer({ kind: 'typed', text: t });
     view.onNext = () => this.onNextFoe();
+    view.onLose = () => this.onLose();
     view.onLeave = () => { this.stopTimer(); this.speaker.cancel(); stopSay(); this.onLeave(); };
   }
 
@@ -98,6 +103,9 @@ export class BattleController {
     const maxHp = foeHp(this.players, this.foe.rarity, bossFoe);
     this.battle = new Battle({ name: this.foe.name, hp: maxHp, maxHp, boss: bossFoe }, this.players, firstPlayer);
     this.shield = bossFoe ? new Shield(this.foe.rarity >= 4 ? 3 : 2) : null;
+    this.maxHearts = bossFoe ? 7 : 5;
+    this.hearts = this.maxHearts;
+    this.view.setHearts(this.hearts, this.maxHearts);
     this.aff = new Afflictions();
     this.view.setStatus(null);
     this.learned = [];
@@ -127,7 +135,13 @@ export class BattleController {
     this.typing = false;
     this.battle.select(i);
     this.refreshParty();
-    if (this.phase === 'defend') this.showDefend(); else this.deal();
+    if (this.phase === 'defend') {
+      // the new defender gets a shield word at their own level, with a fresh set of tries
+      this.defWord = pickDefenseWord(this.me, Date.now(), this.rng, this.recent);
+      this.tries = 0;
+      this.lastHeard = [];
+      this.showDefend();
+    } else this.deal();
   }
 
   private newRound(): void {
@@ -480,6 +494,12 @@ export class BattleController {
         this.view.flash('#d9534f', 0.25);
         this.view.hurt('me');
         this.view.floatText('me', '好痛！', '#ff5a5a');
+        this.hearts = Math.max(0, this.hearts - 1);
+        this.view.setHearts(this.hearts, this.maxHearts);
+        if (this.hearts === 0) {
+          window.setTimeout(() => this.lose(), 700);
+          return;
+        }
         done();
       });
       return;
@@ -525,6 +545,18 @@ export class BattleController {
     this.stopTimer();
     this.speaker.cancel();
     stopSay();
+  }
+
+  // ---- defeat ---------------------------------------------------------------
+
+  private lose(): void {
+    if (this.dead) return;
+    this.stopTimer();
+    this.speaker.cancel();
+    this.phase = 'lost';
+    this.view.setCharging(false);
+    sfx.play('hurt');
+    this.view.showDefeat(this.foe);
   }
 
   // ---- victory --------------------------------------------------------------

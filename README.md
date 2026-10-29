@@ -40,6 +40,7 @@ HTTPS). Where it's unavailable or the mic is blocked, a typing box takes over.
 ## Two front ends
 
 - `/` — the Pokémon-style app (`src/v3/`): DOM screens, colormon's colour matching (`src/mon/colorpick.ts`) and data (`src/data/mon/`, see its README for the image/IP note).
+  - **Trek map** (`src/game/trail.ts`): a branching map generated from a seed, so every trek is new and each one is longer than the last. Rules: rows of 2–3 stops, paths only go up one row and never cross, every stop is reachable and leads to the single boss at the top, chests are never back to back. The party shares 5 hearts per fight (7 against a boss); a failed shield word costs one. Losing all of them, or running away, just returns to the stop the party came from.
 - `/classic.html` — the earlier pixel-art canvas version (`src/main.ts`, `src/scenes/`). Kept for now; same save, same word bank and speech code.
 
 ## Word bank & saves

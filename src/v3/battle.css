@@ -42,7 +42,7 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 }
 .mon { position: absolute; display: block; filter: drop-shadow(0 8px 6px rgba(20, 30, 50, .22)); }
 .mon img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
-.mon.foe { right: 4%; top: 12%; width: 46%; animation: idle 3.2s ease-in-out infinite; }
+.mon.foe { right: 7%; top: 12%; width: 46%; animation: idle 3.2s ease-in-out infinite; }
 .mon.me { left: 2%; bottom: 3%; width: 40%; animation: idle 3.6s ease-in-out infinite reverse; }
 .mon .fallback { width: 100%; aspect-ratio: 1; border-radius: 50%; background: var(--type); opacity: .7; }
 @keyframes idle { 50% { transform: translateY(-6px); } }
@@ -124,6 +124,17 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 .cards span { background: #f1f5fa; border-radius: 12px; padding: 4px 10px; font-weight: 800; }
 
 /* boss shield, locked/downed partners, new-creature banner */
+.shield-rings { position: absolute; inset: 0; pointer-events: none; }
+.shield-rings i {
+  position: absolute; inset: calc(-3% - var(--k) * 4.5%); border-radius: 50%;
+  border: 3px solid rgba(74, 144, 226, calc(.9 - var(--k) * .18));
+  background: radial-gradient(circle, transparent 58%, rgba(130, 190, 255, .3) 100%);
+  box-shadow: 0 0 14px 2px rgba(74, 144, 226, .4), inset 0 0 16px rgba(160, 205, 255, .55);
+  animation: ringpulse 2.4s ease-in-out infinite; animation-delay: calc(var(--k) * -.5s);
+}
+.shield-rings i.pop { animation: ringpop .55s ease-out forwards; }
+@keyframes ringpulse { 50% { transform: scale(1.025); opacity: .8; } }
+@keyframes ringpop { to { transform: scale(1.35); opacity: 0; border-width: 1px; } }
 .shields { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: .72rem; font-weight: 800; color: #3b78c4; }
 .shields i { width: 22px; height: 8px; border-radius: 6px; background: #d6e2f1; }
 .shields i.on { background: #4a90e2; }
@@ -250,3 +261,35 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 .status { display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px; font-size: .72rem; font-weight: 800; color: #fff; background: var(--c, #888); }
 .mon.dodge { animation: dodge .7s ease-in-out; }
 @keyframes dodge { 25%, 60% { transform: translate(-44px, -18px) rotate(-8deg); opacity: .55; } }
+.pcard .nm { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.nameinput { width: 7.5em; font: inherit; font-weight: 900; color: inherit; background: transparent; border: 0; border-bottom: 2px dashed var(--line); padding: 2px 0; border-radius: 0; }
+.nameinput:focus { outline: none; border-bottom-color: var(--type, #4a90e2); background: color-mix(in srgb, var(--type, #4a90e2) 8%, #fff); }
+
+/* branching trek map */
+.mapnote { display: flex; justify-content: space-between; align-items: baseline; padding: 0 4px; }
+.trail { position: relative; margin: 6px 14px 12px; }
+.trail svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.trail line { stroke: #cfd9e6; stroke-width: 5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.trail line.walked { stroke: var(--sun, #ffc53d); }
+.trail line.live { stroke: #4a90e2; stroke-dasharray: 2 9; }
+.stop {
+  position: absolute; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 1.5rem; background: #eef3f9; border: 3px solid #cfd9e6; color: #5b6b80; font-weight: 900; padding: 0;
+}
+.stop:disabled { background: #e6edf5; color: #9aa8ba; }
+.stop.done { background: #fff4cc; border-color: var(--sun, #ffc53d); color: #b8860b; }
+.stop.here { background: #fff; border-color: #4a90e2; opacity: 1; box-shadow: 0 0 0 5px rgba(74, 144, 226, .25); }
+.stop.here img { width: 44px; height: 44px; object-fit: contain; }
+.stop.opt { opacity: 1; background: #fff; border-color: #4a90e2; animation: stopPulse 1.6s ease-in-out infinite; }
+.stop.sel { border-color: var(--sun, #ffc53d); background: #fff8e0; transform: scale(1.12); animation: none; box-shadow: 0 0 0 5px rgba(255, 197, 61, .35); }
+.stop.boss { width: 66px; height: 66px; margin: -33px 0 0 -33px; font-size: 1.9rem; }
+.stop.boss:not(.done) { background: #ffe9b3; border-color: #e0a62b; }
+.stop.rare { border-style: dashed; }
+@keyframes stopPulse { 50% { box-shadow: 0 0 0 7px rgba(74, 144, 226, .22); } }
+
+/* hearts and the run-away button */
+.hearts { display: flex; gap: 2px; margin-top: 4px; font-size: .8rem; line-height: 1; }
+.hearts i { font-style: normal; transition: transform .2s; }
+.hearts i:not(.on) { opacity: .55; }
+.flee-btn { display: inline-flex; align-items: center; gap: 2px; border: 0; background: #eef3f9; color: #4a5a70; font-weight: 800; border-radius: 999px; padding: 6px 12px 6px 6px; font-size: .85rem; }
+.flee-btn svg { width: 20px; height: 20px; fill: currentColor; }

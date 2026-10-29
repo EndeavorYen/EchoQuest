@@ -11,14 +11,14 @@ export const scan: ScreenFactory = (root, ctx, params: ScanParams) => {
   let cam: CameraHandle | null = null;
   let dead = false;
   const back = params.kind === 'toddler' ? 'home' : 'trek';
-  const rarity = params.boss ? { minRarity: 3 } : params.kind === 'toddler' ? { maxRarity: 2 } : { maxRarity: 3 };
+  const rarity = params.boss ? { minRarity: 3 } : params.rare ? { minRarity: 3, maxRarity: 4 } : params.kind === 'toddler' ? { maxRarity: 2 } : { maxRarity: 3 };
   const owned = new Set(ctx.save.caught);
 
   const stop = (): void => { cam?.stop(); cam = null; };
 
   function ask(msg = ''): void {
     stop();
-    root.innerHTML = `<div class="app" data-screen="scan">${bar(params.boss ? '首領出沒！' : '拍照找寶可夢', back)}
+    root.innerHTML = `<div class="app" data-screen="scan">${bar(params.boss ? '首領出沒！' : params.rare ? '稀有寶可夢！' : '拍照找寶可夢', back)}
       <div class="screen" style="justify-content:center;text-align:center;gap:14px">
         <div class="card"><div style="font-size:3rem">📷</div>
           <p><b>拍一拍身邊的東西</b><br>顏色會決定遇到哪一隻寶可夢！</p>

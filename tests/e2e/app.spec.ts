@@ -18,6 +18,12 @@ const go = (page: Page, name: string, params?: unknown) => page.evaluate(([n, p]
 const ctl = <T>(page: Page, fn: (c: any) => T): Promise<T> => page.evaluate(`(${fn.toString()})(window.__v3)`) as Promise<T>;
 const save = <T>(page: Page, fn: (s: any) => T): Promise<T> => page.evaluate(`(${fn.toString()})(window.__app.save)`) as Promise<T>;
 
+/** On the trek map: pick the first lit-up stop and head there. */
+async function startFirstStop(page: Page): Promise<void> {
+  await page.locator('[data-screen=trek] .stop.opt').first().click();
+  await page.click('[data-screen=trek] #go');
+}
+
 async function sayWord(game: any, page: Page): Promise<void> {
   const word = await page.locator('#theWord').innerText();
   await game.say(word);
@@ -43,7 +49,7 @@ test.describe('scan and battle', () => {
     const p = game.page;
     await open(p);
     await p.click('[data-go=trek]');
-    await p.click('#go');
+    await startFirstStop(p);
     await p.click('#summon');
     await expect(p.locator('[data-screen=reveal] #go')).toBeEnabled();
     await p.click('[data-screen=reveal] #go');
@@ -57,7 +63,7 @@ test.describe('scan and battle', () => {
     const p = game.page;
     await open(p);
     await p.click('[data-go=trek]');
-    await p.click('#go');
+    await startFirstStop(p);
     await p.click('#cam');
     await expect(p.locator('#shot')).toBeVisible();
     await p.click('#shot');
@@ -85,7 +91,7 @@ test.describe('scan and battle', () => {
     const p = game.page;
     await open(p);
     await p.click('[data-go=trek]');
-    await p.click('#go');
+    await startFirstStop(p);
     await p.click('#summon');
     await p.click('[data-screen=reveal] #go:not([disabled])');
     await p.waitForFunction(() => (window as any).__v3?.battle);
@@ -94,9 +100,11 @@ test.describe('scan and battle', () => {
     await expect(p.locator('.victory')).toBeVisible({ timeout: 8000 });
     await expect(p.locator('.newmon')).toBeVisible();
     expect(await save(p, (s) => s.caught.length)).toBe(1);
-    expect(await save(p, (s) => s.run.idx)).toBe(1);
+    expect(await save(p, (s) => s.trail.cleared.length)).toBe(2);
     await p.click('[data-act=next]');
-    await expect(p.locator('[data-screen=trek] .node.done')).toHaveCount(1);
+    await expect(p.locator('[data-screen=trek] .stop.here')).toBeVisible();
+    await expect(p.locator('[data-screen=trek] .stop.done')).toHaveCount(1);
+    expect(await save(p, (s) => s.trail.at)).toBeGreaterThan(0);
   });
 });
 
@@ -113,6 +121,7 @@ async function playUntil(game: any, page: Page, done: () => Promise<boolean>, li
   throw new Error('battle did not reach the expected state');
 }
 
+const MOUSE = { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] };
 const BOSS = { id: 150, name: '超夢', type: 'psychic', rarity: 5, colors: ['#B8A8C8'] };
 
 test.describe('co-op boss', () => {
@@ -171,8 +180,6 @@ test.describe('co-op boss', () => {
 });
 
 test.describe('defense', () => {
-  const MOUSE = { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] };
-
   test('even a level-1 player gets a shield round after casting, and a good defense shows its outcome', async ({ game }) => {
     const p = game.page;
     await open(p);
@@ -315,5 +322,157 @@ test.describe('practice and toddler', () => {
     await expect(p.locator('[data-screen=book] .sticker-grid > div')).toHaveCount(1, { timeout: 6000 });
     expect(await save(p, (s) => s.pals.length)).toBe(1);
     expect(await p.evaluate(() => (window as any).__voice.starts)).toBe(0);
+  });
+});
+
+
+test.describe('trek map', () => {
+  test('a branching map: only the stops next to the party are lit, and choosing one is needed to go', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    await expect(p.locator('[data-screen=trek] .stop.here')).toBeVisible();
+    const lit = await p.locator('[data-screen=trek] .stop.opt').count();
+    expect(lit).toBeGreaterThanOrEqual(2);
+    await expect(p.locator('[data-screen=trek] #go')).toBeDisabled();
+    expect(await p.locator('[data-screen=trek] .stop').count()).toBeGreaterThan(8);
+    await p.locator('[data-screen=trek] .stop.opt').nth(1).click();
+    await expect(p.locator('[data-screen=trek] #go')).toBeEnabled();
+  });
+
+  test('every new trek gets a different map', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    const seeds = new Set<number>();
+    for (let i = 0; i < 3; i++) {
+      await p.click('[data-go=trek]');
+      seeds.add(await save(p, (s) => s.trail.seed));
+      await p.evaluate(() => { const a = (window as any).__app; a.update((s: any) => ({ ...s, trail: null, treks: s.treks + 1 })); a.go('home'); });
+    }
+    expect(seeds.size).toBe(3);
+  });
+
+  test('running away goes back to the same stop, and nothing changes', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    const before = await save(p, (s) => ({ at: s.trail.at, cleared: s.trail.cleared }));
+    await startFirstStop(p);
+    await p.click('#summon');
+    await p.click('[data-screen=reveal] #go:not([disabled])');
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await p.click('[data-act=leave]');
+    await expect(p.locator('[data-screen=trek]')).toBeVisible();
+    expect(await save(p, (s) => ({ at: s.trail.at, cleared: s.trail.cleared }))).toEqual(before);
+    expect(await save(p, (s) => s.trail.target)).toBeNull();
+    expect(await save(p, (s) => s.caught.length)).toBe(0);
+  });
+
+  test('losing all hearts ends the fight, back on the same stop, with no other cost', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    const before = await save(p, (s) => ({ at: s.trail.at, cleared: s.trail.cleared, relics: s.relics, caught: s.caught }));
+    await startFirstStop(p);
+    await p.click('#summon');
+    await p.click('[data-screen=reveal] #go:not([disabled])');
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => { c.statusEnabled = false; c.hearts = 1; });
+    await sayWord(game, p);
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
+    await ctl(p, (c) => { c.defLeft = 0.05; });
+    await expect(p.locator('[data-act=lose]')).toBeVisible({ timeout: 8000 });
+    await p.click('[data-act=lose]');
+    await expect(p.locator('[data-screen=trek]')).toBeVisible();
+    expect(await save(p, (s) => ({ at: s.trail.at, cleared: s.trail.cleared, relics: s.relics, caught: s.caught }))).toEqual(before);
+  });
+
+  test('hearts go down by one each time a hit gets through', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: MOUSE });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => { c.statusEnabled = false; });
+    const max = await ctl(p, (c) => c.maxHearts);
+    await expect(p.locator('#hearts i.on')).toHaveCount(max);
+    await sayWord(game, p);
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
+    await ctl(p, (c) => { c.defLeft = 0.05; });
+    await expect(p.locator('#hearts i.on')).toHaveCount(max - 1, { timeout: 6000 });
+  });
+
+  test('the boss stop ends the map and the next one is new and longer', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=trek]');
+    const first = await save(p, (s) => ({ seed: s.trail.seed, n: s.trail.stops.length }));
+    await p.evaluate(() => {
+      const a = (window as any).__app;
+      const t = a.save.trail;
+      const boss = t.stops.find((s: any) => s.kind === 'boss');
+      const pre = t.stops.find((s: any) => s.next.includes(boss.id));
+      a.update((s: any) => ({ ...s, trail: { ...t, at: pre.id, cleared: [0, pre.id] } }));
+      a.go('trek');
+    });
+    await expect(p.locator('[data-screen=trek] .stop.opt')).toHaveCount(1);
+    await startFirstStop(p);
+    await p.click('#summon');
+    await p.click('[data-screen=reveal] #go:not([disabled])');
+    await p.waitForFunction(() => (window as any).__v3?.shield);
+    await ctl(p, (c) => { c.shield.layers = 0; c.battle.monster.hp = 1; });
+    await p.evaluate(() => (window as any).__v3.view.setShields(0, 3));
+    await playUntil(game, p, async () => (await p.locator('.victory').count()) > 0, 80);
+    await p.click('[data-act=next]');
+    await expect(p.locator('[data-screen=home]')).toBeVisible();
+    expect(await save(p, (s) => s.treks)).toBe(1);
+    await p.click('[data-go=trek]');
+    const second = await save(p, (s) => ({ seed: s.trail.seed, n: s.trail.stops.length }));
+    expect(second.seed).not.toBe(first.seed);
+    expect(second.n).toBeGreaterThan(first.n - 1);
+  });
+});
+
+test.describe('party details', () => {
+  test('a player can be renamed and the name sticks', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'party');
+    const input = p.locator('.nameinput').first();
+    await input.fill('小明');
+    await input.blur();
+    expect(await save(p, (s) => s.players[0].name)).toBe('小明');
+    await go(p, 'party');
+    await expect(p.locator('.nameinput').first()).toHaveValue('小明');
+  });
+
+  test('switching the defender gives a shield word at that player\'s own level', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => {
+      const a = (window as any).__app;
+      a.update((s: any) => ({ ...s, players: [{ ...s.players[0], level: 1 }, { ...s.players[0], id: 'p2', name: 'B', level: 4, progress: {} }] }));
+    });
+    await go(p, 'battle', { foe: MOUSE });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => { c.statusEnabled = false; });
+    await sayWord(game, p);
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
+    expect(await ctl(p, (c) => c.defWord.lv)).toBe(1);
+    await p.locator('#party [data-i="1"]').click();
+    await expect.poll(() => ctl(p, (c) => c.defWord.lv)).toBe(3);
+    await expect(p.locator('#theWord')).toHaveText(await ctl(p, (c) => c.defWord.w));
+  });
+
+  test('a boss shield shows as rings around the creature, one per layer', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: BOSS, boss: true });
+    await p.waitForFunction(() => (window as any).__v3?.shield);
+    const layers = await ctl(p, (c) => c.shield.layers);
+    await expect(p.locator('#foe .shield-rings i:not(.pop)')).toHaveCount(layers);
+    await p.evaluate(() => (window as any).__v3.view.setShields(1, 3));
+    await expect(p.locator('#foe .shield-rings i:not(.pop)')).toHaveCount(1);
+    await p.evaluate(() => (window as any).__v3.view.setShields(0, 3));
+    await expect(p.locator('#foe .shield-rings i:not(.pop)')).toHaveCount(0);
   });
 });

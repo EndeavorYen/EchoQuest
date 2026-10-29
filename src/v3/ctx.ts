@@ -5,7 +5,7 @@ import type { Mon } from '../mon/dex';
 
 export type ScreenName = 'home' | 'trek' | 'scan' | 'battle' | 'dex' | 'party' | 'practice' | 'toddler';
 
-export interface ScanParams { kind: 'trek' | 'toddler'; boss?: boolean }
+export interface ScanParams { kind: 'trek' | 'toddler'; boss?: boolean; rare?: boolean }
 export interface BattleParams { foe: Mon; boss?: boolean; trek?: boolean }
 export interface ScreenParams { scan?: ScanParams; battle?: BattleParams; toddler?: { foe?: Mon; book?: boolean } }
 

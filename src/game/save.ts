@@ -3,6 +3,7 @@ import { newRun, type Run } from './run';
 import { legacyIdMap } from '../data/bank';
 import { LEDGER, BANK_REV } from '../data/ledger';
 import { reconcile } from './reconcile';
+import { isTrail, type Trail } from './trail';
 import type { MonsterSpec } from '../gfx/monster';
 
 export interface Save {
@@ -11,6 +12,8 @@ export interface Save {
   /** index of the player highlighted in menus */
   active: number;
   run: Run | null;
+  /** the branching trek map of the new front end (the classic game keeps using `run`) */
+  trail: Trail | null;
   /** word ids the party has defeated monsters with */
   collection: string[];
   relics: string[];
@@ -39,6 +42,7 @@ export function defaultSave(): Save {
     players: [newPlayer(0, 1)],
     active: 0,
     run: null,
+    trail: null,
     collection: [],
     relics: [],
     stickers: [],
@@ -97,6 +101,7 @@ function normalise(data: Raw): Save {
     })),
     active: Math.min(data.active ?? 0, players.length - 1),
     run: data.run ?? null,
+    trail: isTrail(data.trail) ? data.trail : null,
     collection: data.collection ?? [],
     relics: data.relics ?? [],
     stickers: Array.isArray(data.stickers) ? data.stickers : [],

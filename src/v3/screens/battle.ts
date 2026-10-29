@@ -1,4 +1,5 @@
-import { advance, isFinished, nextRelic } from '../../game/run';
+import { nextRelic } from '../../game/run';
+import { arrive, stay } from '../../game/trail';
 import { sfx } from '../../audio/sfx';
 import { BattleView } from '../battle-view';
 import { BattleController } from '../battle-controller';
@@ -21,9 +22,10 @@ export const battle: ScreenFactory = (root, ctx, params: BattleParams) => {
         caught: isNew ? [...s.caught, foe.id] : s.caught,
         relics: relic && !s.relics.includes(relic.id) ? [...s.relics, relic.id] : s.relics,
       };
-      if (params.trek && s.run) {
-        const run = advance(s.run);
-        return isFinished(run) ? { ...next, run: null, treks: s.treks + 1 } : { ...next, run };
+      if (params.trek && s.trail) {
+        // the party walks on to the stop it just cleared; a beaten boss ends the map
+        if (boss) return { ...next, trail: null, treks: s.treks + 1 };
+        return { ...next, trail: s.trail.target === null ? s.trail : arrive(s.trail, s.trail.target) };
       }
       return next;
     });
@@ -33,7 +35,13 @@ export const battle: ScreenFactory = (root, ctx, params: BattleParams) => {
     if (params.trek) ctx.go(boss ? 'home' : 'trek');
     else ctl.start(pickWild(ctx.rng, { maxRarity: 3, owned: new Set(ctx.save.caught) }));
   };
-  ctl.onLeave = () => ctx.go(params.trek ? 'trek' : 'home');
+  // running away or losing changes nothing: the party stays on the stop it came from
+  const back = (): void => {
+    if (params.trek) ctx.update((s) => (s.trail ? { ...s, trail: stay(s.trail) } : s));
+    ctx.go(params.trek ? 'trek' : 'home');
+  };
+  ctl.onLeave = back;
+  ctl.onLose = back;
   ctl.start(params.foe, boss, Math.min(ctx.save.active, ctx.save.players.length - 1));
   if (new URLSearchParams(location.search).has('debug')) Object.assign(window, { __v3: Object.assign(ctl, { view }), __types: TYPES });
   return { destroy: () => ctl.dispose() };

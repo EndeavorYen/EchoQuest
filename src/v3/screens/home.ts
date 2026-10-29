@@ -8,7 +8,7 @@ export const home: ScreenFactory = (root, ctx) => {
   const p = save.players[Math.min(save.active, save.players.length - 1)];
   const mon = partnerMon(p, save.players.indexOf(p));
   const caught = new Set(save.caught).size;
-  const midTrek = !!save.run && save.run.idx > 0 && save.run.idx < save.run.nodes.length;
+  const midTrek = !!save.trail && save.trail.cleared.length > 1;
   sfx.setMusic('map');
   root.innerHTML = `
     <div class="app home" data-screen="home">
