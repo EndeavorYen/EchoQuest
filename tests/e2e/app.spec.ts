@@ -767,6 +767,67 @@ test.describe('robustness', () => {
   });
 });
 
+test.describe('family play', () => {
+  const SPY = () => {
+    (window as any).__said = [];
+    const real = window.speechSynthesis?.speak?.bind(window.speechSynthesis);
+    if (window.speechSynthesis) window.speechSynthesis.speak = (u: SpeechSynthesisUtterance) => { (window as any).__said.push(u.text); try { real?.(u); } catch { /* headless */ } };
+  };
+
+  test('level 1: every spoken card is said aloud first (repeat after me); level 2 is not', async ({ game }) => {
+    const p = game.page;
+    await p.addInitScript(SPY);
+    await open(p);
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    const word = await ctl(p, (c) => c.word.w);
+    await expect.poll(() => p.evaluate(() => (window as any).__said)).toContain(word);
+    await p.evaluate(() => { (window as any).__said = []; (window as any).__app.update((s: any) => ({ ...s, players: s.players.map((x: any) => ({ ...x, level: 2 })) })); });
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await p.waitForTimeout(900);
+    expect(await p.evaluate(() => (window as any).__said)).toEqual([]);
+  });
+
+  test('turns pass on their own after each exchange, with a "換 … 了" note', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, active: 0, players: [{ ...s.players[0], name: '哥哥' }, { ...s.players[0], id: 'k2', name: '妹妹' }] })));
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => { c.statusEnabled = false; c.battle.monster.hp = c.battle.monster.maxHp = 999; });
+    expect(await ctl(p, (c) => c.battle.turn)).toBe(0);
+    await sayWord(game, p);
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
+    await sayWord(game, p);
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('speak');
+    expect(await ctl(p, (c) => c.battle.turn)).toBe(1);
+    await expect(p.locator('#note')).toContainText('換 妹妹 了');
+  });
+
+  test('a tap skips the catch animation', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => c.win());
+    await expect(p.locator('.panel .hint')).toContainText('點一下畫面可以跳過');
+    const t0 = Date.now();
+    await p.locator('#arena').click({ position: { x: 20, y: 20 } });
+    await expect(p.locator('[data-act=next]')).toBeVisible({ timeout: 2000 });
+    expect(Date.now() - t0).toBeLessThan(1800);
+    await expect(p.locator('.ball.locked')).toHaveCount(1);
+  });
+
+  test('new players get Chinese names', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'party');
+    await p.click('#add');
+    expect(await save(p, (s) => s.players[1].name)).toBe('小星星');
+  });
+});
+
 test.describe('what is new', () => {
   test('a brand-new install has no red dot (nothing is new to them yet)', async ({ game }) => {
     const p = game.page;

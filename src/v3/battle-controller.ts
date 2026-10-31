@@ -69,6 +69,8 @@ export class BattleController {
   private recent: string[] = [];
   /** what kind of attack round this is (say it, hear-and-pick, spell, memory) */
   round: RoundType = 'speak';
+  /** a note for the next card ("換 小寶 了！") */
+  private handoff = '';
   /** this card is a hard one: right = a critical hit */
   hard = false;
   /** were the last attack cards hard (never more than one in three) */
@@ -206,7 +208,27 @@ export class BattleController {
       this.defLeft = Math.max(this.defLeft, this.defTotal);
       this.lastTick = performance.now();
       this.showDefend();
+      this.sayDefenceWord();
     } else this.deal();
+  }
+
+  /**
+   * After each exchange the next player is up (a tap on a chip still picks anyone). While a shield is up
+   * the grown-ups are skipped: their spells would only bounce.
+   */
+  private passTurn(): void {
+    const n = this.players.length;
+    if (n <= 1) return;
+    const skipAdults = !!this.shield?.up && this.hasKid();
+    for (let k = 1; k <= n; k++) {
+      const i = (this.battle.turn + k) % n;
+      if (skipAdults && this.players[i].adult) continue;
+      if (i === this.battle.turn) return;
+      this.battle.select(i);
+      this.handoff = `換 ${this.players[i].name} 了！`;
+      sfx.play('select');
+      return;
+    }
   }
 
   private newRound(): void {
@@ -242,8 +264,14 @@ export class BattleController {
     this.typing = false;
     this.setupRound();
     this.refreshParty();
-    this.render();
-    if (this.round === 'listen') window.setTimeout(() => { if (!this.dead && this.round === 'listen' && this.phase === 'speak') sayWord(this.word.w, ''); }, 350);
+    this.render(this.handoff);
+    this.handoff = '';
+    // listening says the word by design; the youngest also hear every spoken card first (repeat after me)
+    const sayIt = this.round === 'listen' || (this.round === 'speak' && this.me.level <= 1);
+    if (sayIt) {
+      const w = this.word;
+      window.setTimeout(() => { if (!this.dead && this.word === w && this.phase === 'speak' && !this.speaker.listening) sayWord(w.w, ''); }, 450);
+    }
   }
 
   /** Decide the kind of round and build its puzzle; anything that cannot be built is spoken. */
@@ -747,6 +775,7 @@ export class BattleController {
       if (this.dead) return;
       if (m.hp <= 0) return this.win();
       this.battle.nextRound();
+      this.passTurn();
       // after a few rounds the creature is worn out: one more hit will do
       if (!this.shield && this.battle.round >= TIRED_ROUND) {
         const one = typicalHit(this.players);
@@ -776,11 +805,19 @@ export class BattleController {
     this.view.floatText('foe', g === 'legend' ? '強大的攻擊要來了！' : '要攻擊了！', '#d9534f', true);
     if (g !== 'common') this.view.flash('#d9534f', g === 'legend' ? 0.3 : 0.18);
     this.showDefend();
+    this.sayDefenceWord();
     this.lastTick = performance.now();
     this.stopTimer();
     this.timerId = window.setInterval(() => this.tick(), 100);
   }
   private defTotal = 1;
+
+  /** The youngest hear the shield word too. */
+  private sayDefenceWord(): void {
+    if (this.me.level > 1 || !this.defWord) return;
+    const w = this.defWord;
+    window.setTimeout(() => { if (!this.dead && this.defWord === w && this.phase === 'defend' && !this.speaker.listening) sayWord(w.w, ''); }, 700);
+  }
 
   private showDefend(note = ''): void {
     if (!this.defWord) return;
@@ -972,6 +1009,7 @@ export class BattleController {
     this.phase = 'victory';
     sfx.setMusic(null);
     this.view.clearFoe();
+    this.view.showWait('收服中…（點一下畫面可以跳過）');
     const seen = new Set<string>();
     const words = this.learned.filter((w) => !seen.has(w.id) && seen.add(w.id));
     // the win first (so "new to the dex" is judged before any evolution joins it), then growth;

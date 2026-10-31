@@ -108,7 +108,7 @@ export const scan: ScreenFactory = (root, ctx, params: ScanParams) => {
       root.querySelector('#nm')!.textContent = mon.name;
       (root.querySelector('#go') as HTMLButtonElement).disabled = false;
       sfx.play('good');
-    }, 900);
+    }, 600);
     root.querySelector('#go')!.addEventListener('click', () => {
       if (params.kind === 'toddler') ctx.go('toddler', { foe: mon });
       else ctx.go('battle', { foe: mon, boss: !!params.boss, final: !!params.final, trek: true });

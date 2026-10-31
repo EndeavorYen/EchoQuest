@@ -3,7 +3,7 @@ import { inkOn, starsHtml, typeChip } from './ui';
 import { TYPES } from '../mon/dex';
 import { plausible, learnHearing } from '../speech/learn';
 import { WORDS } from '../data/words';
-import { dealCard, pickDefenseWord, dealHardCard } from '../game/deck';
+import { dealCard, pickDefenseWord, dealHardCard, onRamp, RAMP_A1, RAMP_PICTURES } from '../game/deck';
 import { newPlayer } from '../game/model';
 import { Rng } from '../util/rng';
 import { load } from '../game/save';
@@ -85,5 +85,26 @@ describe('a broken save never stops the game from starting', () => {
   });
   it('an empty party gets a first player', () => {
     expect(load(mem({ v: 3, players: [] })).players).toHaveLength(1);
+  });
+});
+
+describe('level 2 starts small', () => {
+  const learnedAt2 = (n: number) => {
+    const p = newPlayer(0, 2);
+    const words = WORDS.filter((w) => w.lv === 2).slice(0, n);
+    return { ...p, progress: Object.fromEntries(words.map((w) => [w.id, { attempts: 3, correct: 3, misses: 0, mastery: 2 as const, lastAt: 0, dueAt: 0, streak: 3 }])) } as typeof p;
+  };
+  it('a newcomer gets picture words, then picture or A1 words, then everything', () => {
+    const fresh = newPlayer(0, 2);
+    for (let s = 0; s < 100; s++) expect(dealCard(fresh, 0, new Rng(s)).word.icon, 'fresh').toBeTruthy();
+    const mid = learnedAt2(RAMP_PICTURES);
+    expect(onRamp(mid)).not.toBeNull();
+    for (let s = 0; s < 100; s++) {
+      const w = dealCard(mid, 0, new Rng(s)).word;
+      // a picture word, an easy (A1) word, or one they have already met
+      expect(!!w.icon || w.cefr === 'A1' || !!mid.progress[w.id]).toBe(true);
+    }
+    expect(onRamp(learnedAt2(RAMP_A1))).toBeNull();
+    expect(onRamp(newPlayer(0, 3))).toBeNull();
   });
 });

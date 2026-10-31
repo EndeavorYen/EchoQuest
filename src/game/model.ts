@@ -17,8 +17,8 @@ export interface Player {
 }
 
 export const PLAYER_NAMES = [
-  'Pixel', 'Nova', 'Mochi', 'Bean', 'Pepper', 'Luna', 'Taro', 'Momo', 'Ziggy', 'Coco', 'Rio', 'Juju',
-  'Sunny', 'Berry', 'Otto', 'Kiki',
+  '小勇者', '小星星', '小火花', '小水滴', '小葉子', '小雷電', '小月亮', '小太陽', '小彩虹', '小雪花', '小石頭', '小雲朵',
+  '小糖果', '小泡泡', '小蘋果', '小企鵝',
 ];
 
 export const MAX_PLAYERS = 4;

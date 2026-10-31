@@ -41,7 +41,8 @@ describe('which round', () => {
     expect(canSpell(withIcon(1)[0], 1)).toBe(false);
     const noPic = WORDS.find((x) => x.lv === 1 && !x.icon)!;
     expect(canListen(noPic, 1)).toBe(false);
-    expect(canListen(noPic, 2)).toBe(true);
+    expect(canListen(noPic, 2)).toBe(false); // lower primary: pictures only too
+    expect(canListen(noPic, 3)).toBe(true);
   });
   it('a forced kind is used when the word allows it', () => {
     forceRound('spell');

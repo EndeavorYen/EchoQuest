@@ -154,7 +154,7 @@ test.describe('help for hard-to-recognise words', () => {
     await game.setMonsterHp(9999);
     expect(await game.has('confirm')).toBe(false); // nothing to confirm before a miss
     const b0 = await game.battle();
-    await game.say('zork');
+    await game.say('qxqxq');
     await game.tap('mic');
     await expect.poll(async () => (await game.battle()).tries).toBe(1);
     await game.tap('confirm');
@@ -164,10 +164,10 @@ test.describe('help for hard-to-recognise words', () => {
     expect(b1.combo).toBe(1);
     const save = await game.save();
     const id = Object.keys(save.aliases)[0];
-    expect(save.aliases[id]).toContain('zork');
+    expect(save.aliases[id]).toContain('qxqxq');
     expect(save.players[0].progress[id].correct).toBe(1);
     await game.reload();
-    expect((await game.save()).aliases[id]).toContain('zork');
+    expect((await game.save()).aliases[id]).toContain('qxqxq');
   });
 
   test('the same mishearing passes the next time the word comes up', async ({ game }) => {
@@ -175,9 +175,9 @@ test.describe('help for hard-to-recognise words', () => {
     await game.startBattle();
     await game.setMonsterHp(9999);
     await game.eval((a) => {
-      a.save = { ...a.save, aliases: { ...a.save.aliases, [a.scene.sel.word.id]: ['zork'] } };
+      a.save = { ...a.save, aliases: { ...a.save.aliases, [a.scene.sel.word.id]: ['qxqxq'] } };
     });
-    await game.say('zork');
+    await game.say('qxqxq');
     await game.tap('mic');
     await game.waitPhase('defend');
     expect((await game.battle()).combo).toBe(1);

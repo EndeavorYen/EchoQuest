@@ -244,11 +244,23 @@ export class BattleView {
   /** this screen's own element: timers that fire after leaving draw on it (detached), never on the next screen */
   private app!: HTMLElement;
   private gone = false;
+  /** a running catch or evolution: a tap on the arena or the panel jumps to its end */
+  private skipper: (() => void) | null = null;
+  private animTimers: number[] = [];
+  private later(fn: () => void, ms: number): void {
+    this.animTimers.push(window.setTimeout(fn, ms));
+  }
+  private stopAnim(): void {
+    this.animTimers.forEach((id) => window.clearTimeout(id));
+    this.animTimers = [];
+    this.skipper = null;
+  }
   private $ = <T extends HTMLElement>(sel: string): T => (this.app.querySelector(sel) ?? document.createElement('div')) as T;
 
   /** The screen is going away. */
   dispose(): void {
     this.gone = true;
+    this.stopAnim();
   }
 
   onMic: () => void = () => {};
@@ -290,6 +302,12 @@ export class BattleView {
       </div>`;
     this.app = root.querySelector('.app') as HTMLElement;
     this.panel = new WordPanel(this.$('#panel'));
+    const skip = (e: Event): void => {
+      if (!this.skipper || (e.target as HTMLElement).closest('button')) return;
+      this.skipper();
+    };
+    this.$('#arena').addEventListener('click', skip);
+    this.$('#panel').addEventListener('click', skip);
     this.panel.onMic = () => this.onMic();
     this.panel.onHear = () => this.onHear();
     this.panel.onKeyboard = () => this.onKeyboard();
@@ -366,21 +384,34 @@ export class BattleView {
     const me = this.$('#me');
     me.getAnimations().forEach((a) => a.cancel());
     const at = this.center(me);
+    this.stopAnim();
+    let ended = false;
+    const end = (): void => {
+      if (ended) return;
+      ended = true;
+      this.stopAnim();
+      done();
+    };
     if (o.kind === 'star') {
       me.innerHTML = this.monImg(o.from);
       const img = me.querySelector('img') as HTMLElement | null;
       img?.animate([{ filter: 'none' }, { filter: 'brightness(1.35) drop-shadow(0 0 16px #ffd54a)' }, { filter: 'none' }, { filter: 'brightness(1.35) drop-shadow(0 0 16px #ffd54a)' }, { filter: 'none' }], { duration: 1100 });
       beat('pulse', 0);
-      window.setTimeout(() => beat('pulse', 3), 550);
-      window.setTimeout(() => {
+      let shown = false;
+      const show = (): void => {
+        if (shown) return;
+        shown = true;
         this.fxHost().flash('#ffd54a', 0.45, 500);
         this.burst(at, '#ffd54a', 10);
         const s = this.spawn('float', at.x, at.y - 70, '#c98600');
         s.textContent = '★'.repeat(Math.max(1, o.stars));
         s.animate([{ transform: 'translate(-50%,-60px) scale(.4)', opacity: 0 }, { transform: 'translate(-50%,0) scale(1.3)', opacity: 1, offset: 0.4 }, { transform: 'translate(-50%,-10px) scale(1)', opacity: 1, offset: 0.85 }, { transform: 'translate(-50%,-20px) scale(1)', opacity: 0 }], { duration: 1500 }).onfinish = () => s.remove();
         beat('done', 0);
-        window.setTimeout(done, 1300);
-      }, 1150);
+      };
+      this.later(() => beat('pulse', 3), 550);
+      this.later(show, 1150);
+      this.later(end, 2450);
+      this.skipper = () => { this.stopAnim(); show(); window.setTimeout(end, 500); };
       return;
     }
     me.innerHTML = `${this.monImg(o.from).replace('<img ', '<img data-form="from" ')}${this.monImg(o.to).replace('<img ', '<img data-form="to" style="display:none" ')}`;
@@ -394,12 +425,15 @@ export class BattleView {
     let t = 650;
     gaps.forEach((g, i) => {
       t += g;
-      window.setTimeout(() => {
+      this.later(() => {
         imgs.forEach((im, k) => { im.style.display = (i + k) % 2 === 0 ? 'none' : ''; });
         beat('pulse', i);
       }, t);
     });
-    window.setTimeout(() => {
+    let revealed = false;
+    const reveal = (): void => {
+      if (revealed) return;
+      revealed = true;
       imgs.forEach((im) => { im.style.display = im.dataset.form === 'to' ? '' : 'none'; });
       this.fxHost().flash('#ffffff', still ? 0.25 : 0.6, 700);
       imgs.forEach((im) => im.animate([{ filter: white }, { filter: 'none' }], { duration: 700, fill: 'forwards' }));
@@ -408,8 +442,15 @@ export class BattleView {
       this.fxHost().shake(8, 400);
       this.$('#meName').textContent = o.to.name;
       beat('done', gaps.length);
-      window.setTimeout(done, 1500);
-    }, t + 250);
+    };
+    this.later(reveal, t + 250);
+    this.later(end, t + 1750);
+    this.skipper = () => {
+      this.stopAnim();
+      me.getAnimations().forEach((a) => a.cancel());
+      reveal();
+      window.setTimeout(end, 600);
+    };
   }
 
   /** Stars flying out from a point. */
@@ -740,13 +781,31 @@ export class BattleView {
       sorted.map(([t, transform]) => ({ transform, opacity: t === 0 ? 0 : 1, offset: t / CAPTURE_MS })),
       { duration: CAPTURE_MS, fill: 'forwards' },
     );
-    for (const b of BEATS) {
-      window.setTimeout(() => {
-        beat(b);
-        if (b.kind === 'lock') this.lockBall(ball, { x: p.x, y: p.y + dy }, color, o);
-      }, b.at);
-    }
-    window.setTimeout(done, CAPTURE_MS);
+    let locked = false;
+    let finished = false;
+    const lock = (b: Beat): void => {
+      if (locked) return;
+      locked = true;
+      beat(b);
+      this.lockBall(ball, { x: p.x, y: p.y + dy }, color, o);
+    };
+    const finish = (): void => {
+      if (finished) return;
+      finished = true;
+      this.stopAnim();
+      done();
+    };
+    this.stopAnim();
+    for (const b of BEATS) this.later(() => (b.kind === 'lock' ? lock(b) : beat(b)), b.at);
+    this.later(finish, CAPTURE_MS);
+    // a tap jumps to the end: the ball locks at once and the fight's result shows
+    this.skipper = () => {
+      this.stopAnim();
+      foe.getAnimations().forEach((a) => a.finish());
+      ball.getAnimations().forEach((a) => a.finish());
+      lock(BEATS[BEATS.length - 1]);
+      window.setTimeout(finish, 450);
+    };
   }
 
   private lockBall(ball: HTMLElement, at: { x: number; y: number }, color: string, o: { grade: Grade; isNew: boolean }): void {
