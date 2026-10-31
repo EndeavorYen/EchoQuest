@@ -30,6 +30,19 @@ export function growthOf(gs: Growths | undefined, id: number): Growth {
   return gs?.[id] ?? NONE;
 }
 
+/** 0 for a first form, 1 for its evolution, 2 for the one after. */
+export function stageOf(id: number, evo: EvoMap = EVO): number {
+  let n = 0;
+  let at = id;
+  const seen = new Set([at]);
+  while (evo[at]?.from && !seen.has(evo[at]!.from!)) {
+    at = evo[at]!.from!;
+    seen.add(at);
+    n += 1;
+  }
+  return n;
+}
+
 /** Forms this creature can evolve into (all of them known to the dex). */
 export function evolvesTo(id: number, evo: EvoMap = EVO): number[] {
   return (evo[id]?.to ?? []).filter((k) => MON_BY_ID.has(k));

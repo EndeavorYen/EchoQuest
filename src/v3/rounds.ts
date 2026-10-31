@@ -31,6 +31,24 @@ export const ODDS = { memory: 0.12, listen: 0.25, spell: 0.15 } as const;
 
 const plain = (w: Word): string => w.w.toLowerCase();
 
+/** Words a child cannot tell apart by ear (the bank has others spelled alike: fly 🦅 / fly 🪰). */
+const SOUND_ALIKE = [
+  ['sun', 'son'], ['sea', 'see'], ['red', 'read'], ['eye', 'i'], ['two', 'too', 'to'], ['four', 'for'], ['eight', 'ate'],
+  ['here', 'hear'], ['no', 'know'], ['right', 'write'], ['meat', 'meet'], ['flower', 'flour'], ['pear', 'pair'],
+  ['bee', 'be'], ['tail', 'tale'], ['sail', 'sale'], ['night', 'knight'], ['one', 'won'], ['blue', 'blew'],
+  ['by', 'buy', 'bye'], ['deer', 'dear'], ['hole', 'whole'], ['mail', 'male'], ['road', 'rode'], ['week', 'weak'],
+  ['wear', 'where'], ['wood', 'would'], ['hour', 'our'], ['piece', 'peace'], ['plane', 'plain'], ['rain', 'reign'],
+  ['bear', 'bare'], ['tea', 'tee'], ['ant', 'aunt'], ['knot', 'not'], ['knows', 'nose'], ['so', 'sew'], ['tie', 'thai'],
+];
+const ALIKE = new Map(SOUND_ALIKE.flatMap((g) => g.map((w) => [w, g] as const)));
+
+/** Same spelling, or a known sound-alike: never two of these among the choices. */
+export function soundsAlike(a: Word, b: Word): boolean {
+  const x = plain(a);
+  const y = plain(b);
+  return x === y || !!ALIKE.get(x)?.includes(y);
+}
+
 /** The youngest players cannot read yet: they get pictures only. */
 export function canListen(word: Word, level: number): boolean {
   return level >= 2 || !!word.icon;
@@ -107,7 +125,7 @@ export function listenChoices(word: Word, level: number, rng: Rng, pool: readonl
   const usable = pool.filter((w) => !w.retired);
   if (word.icon) {
     const near = usable.filter((w) => w.icon && w.lv <= Math.max(2, level + 1));
-    const others = pickDistinct(near, n - 1, rng, (a, b) => a.icon === b.icon || a.zh === b.zh, [word]);
+    const others = pickDistinct(near, n - 1, rng, (a, b) => a.icon === b.icon || a.zh === b.zh || soundsAlike(a, b), [word]);
     if (others.length === n - 1) return { mode: 'pic', options: shuffle([word, ...others], rng) };
   }
   if (level <= 1) return null;
@@ -115,6 +133,7 @@ export function listenChoices(word: Word, level: number, rng: Rng, pool: readonl
   // meanings that share a character ("幫助" / "輔助的") are too close to tell apart by ear
   const han = (w: Word): Set<string> => new Set(w.zh.replace(/[的地得之、，,;；（）()\s]/g, '').split(''));
   const overlap = (a: Word, b: Word): boolean => {
+    if (soundsAlike(a, b)) return true;
     const ha = han(a);
     return [...han(b)].some((c) => ha.has(c));
   };
@@ -156,7 +175,7 @@ export interface MemoryCard {
 export function memoryDeck(word: Word, level: number, rng: Rng, pool: readonly Word[] = WORDS): MemoryCard[] | null {
   if (!word.icon) return null;
   const near = pool.filter((w) => !w.retired && w.icon && w.lv <= Math.max(1, level));
-  const others = pickDistinct(near, 2, rng, (a, b) => a.icon === b.icon, [word]);
+  const others = pickDistinct(near, 2, rng, (a, b) => a.icon === b.icon || soundsAlike(a, b), [word]);
   if (others.length < 2) return null;
   const cards = [word, ...others].flatMap((w): MemoryCard[] => [
     { word: w, face: 'pic' },

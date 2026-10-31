@@ -289,7 +289,7 @@ test.describe('scan and battle', () => {
     expect(await ctl(p, (c) => c.battle.monster.hp)).toBe(hp2);
   });
 
-  test('fill in the letters: tapping them in order attacks; three wrong letters fizzle', async ({ game }) => {
+  test('fill in the letters: any order attacks; trying every wrong letter fizzles', async ({ game }) => {
     const p = game.page;
     await open(p, '&rounds=spell');
     await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, players: s.players.map((x: any) => ({ ...x, level: 3 })) })));
@@ -302,8 +302,10 @@ test.describe('scan and battle', () => {
     for (;;) {
       const next = await ctl(p, (c) => {
         const s = c.spellR;
-        if (s.filled >= s.blanks.length) return -1;
-        const want = s.letters[s.blanks[s.filled]];
+        const open = s.blanks.filter((b: number) => !s.got.includes(b));
+        if (!open.length) return -1;
+        // the last gap first: any order works
+        const want = s.letters[open[open.length - 1]];
         return s.tiles.findIndex((x: string, i: number) => x === want && !s.used[i]);
       });
       if (next < 0) break;
@@ -316,8 +318,16 @@ test.describe('scan and battle', () => {
     await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('speak');
     expect(await until()).toBe('spell');
     const hp2 = await ctl(p, (c) => c.battle.monster.hp);
-    const bad = await ctl(p, (c) => { const s = c.spellR; const want = s.letters[s.blanks[0]]; return s.tiles.findIndex((x: string) => x !== want); });
-    for (let i = 0; i < 3; i++) await p.locator(`.tile[data-i="${bad}"]`).click();
+    const decoys: number[] = await ctl(p, (c) => {
+      const s = c.spellR;
+      const missing = s.blanks.map((b: number) => s.letters[b]);
+      return s.tiles.map((x: string, i: number) => (missing.includes(x) ? -1 : i)).filter((i: number) => i >= 0);
+    });
+    // a wrong letter switches off (tapping it again does nothing); trying every wrong one fizzles
+    await p.locator(`.tile[data-i="${decoys[0]}"]`).click();
+    await expect(p.locator(`.tile[data-i="${decoys[0]}"]`)).toBeDisabled();
+    expect(await ctl(p, (c) => c.phase)).toBe('speak');
+    await p.locator(`.tile[data-i="${decoys[1]}"]`).click();
     await expect.poll(() => ctl(p, (c) => c.phase)).not.toBe('speak');
     expect(await ctl(p, (c) => c.battle.monster.hp)).toBe(hp2);
   });
@@ -393,6 +403,24 @@ test.describe('scan and battle', () => {
     expect(s.g25).toBeUndefined();
     await expect(p.locator('#meName')).toHaveText('雷丘');
     await expect(p.locator('#meRank')).toHaveText('★');
+  });
+
+  test('two players on one family both grow: Charmeleon → Charizard and Charmander → Charmeleon', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({
+      ...s,
+      players: [{ ...s.players[0], mon: 4 }, { ...s.players[0], id: 'p2', name: 'Nova', mon: 5 }],
+      growth: { 4: { xp: 30, rank: 0, stars: 0 }, 5: { xp: 50, rank: 1, stars: 0 } },
+    })));
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => c.win());
+    await expect(p.locator('.victory .grown')).toHaveCount(2, { timeout: 25_000 });
+    const s = await save(p, (x) => ({ mons: x.players.map((q: any) => q.mon), g: x.growth }));
+    expect(s.mons).toEqual([5, 6]);
+    expect(s.g[5]).toEqual({ xp: 0, rank: 1, stars: 0 });
+    expect(s.g[6]).toEqual({ xp: 0, rank: 2, stars: 0 });
   });
 
   test('a creature that cannot evolve gains a star instead', async ({ game }) => {
@@ -788,7 +816,8 @@ test.describe('town map', () => {
     await p.click('[data-go=trek]');
     const total = await p.locator('.tnode').count();
     const hidden = () => p.locator('.tnode[data-fog="1"]').count();
-    expect(await hidden()).toBeGreaterThan(total / 2);
+    // at least half (a small map can have exactly half in view: the start, its neighbours and the league)
+    expect(await hidden()).toBeGreaterThanOrEqual(total / 2);
     await expect(p.locator('.tnode[data-kind=league][data-fog="0"]')).toHaveCount(1);
     await expect(p.locator('.tnode[data-state=next]').first()).toBeVisible();
     const puffs = await p.locator('.puff').count();

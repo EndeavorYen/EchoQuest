@@ -98,7 +98,8 @@ export function pickWild(rng: Rng, opts: { owned?: Set<number>; ownedWeight?: nu
  */
 export function pickEncounter(rng: Rng, opts: { rarity: number; types: string[]; owned?: Set<number>; ownedWeight?: number }): Mon {
   for (let d = 0; d <= 4; d++) {
-    for (const r of d === 0 ? [opts.rarity] : [opts.rarity - d, opts.rarity + d]) {
+    // a rare roll looks for something rarer first (a flying champion must not drop to 3★)
+    for (const r of d === 0 ? [opts.rarity] : opts.rarity >= 4 ? [opts.rarity + d, opts.rarity - d] : [opts.rarity - d, opts.rarity + d]) {
       if (r < 1 || r > 5) continue;
       if (DEX.some((m) => m.rarity === r && opts.types.includes(m.type))) return pickWild(rng, { owned: opts.owned, ownedWeight: opts.ownedWeight, minRarity: r, maxRarity: r, types: opts.types });
     }

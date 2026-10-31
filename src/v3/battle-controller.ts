@@ -6,8 +6,8 @@ import { ENTRANCE, gradeOf, heartsFor, shieldLayersFor, type Grade } from '../mo
 import { DEFENSE, rollDefense, type DefenseKind } from '../game/defense';
 import { Afflictions, STATUS, STATUS_ORDER, rollStatus } from '../game/status';
 import { foeHp, typicalHit, TIRED_ROUND } from './pacing';
-import { dealCard, dealHardCard, pickDefenseWord, rollHard } from '../game/deck';
-import { addXp, evolvesTo, growthOf, isReady, takeStep, xpFor, xpNeeded, type GrowStep } from '../mon/growth';
+import { dealCard, dealHardCard, pickDefenseWord, recordHard, rollHard } from '../game/deck';
+import { addXp, evolvesTo, growthOf, isReady, stageOf, takeStep, xpFor, xpNeeded, type GrowStep } from '../mon/growth';
 import { chooseRound, listenChoices, memoryDeck, roundPrefs, spellPuzzle, type ListenRound, type MemoryCard, type RoundType, type SpellRound } from './rounds';
 import { Revenge, REVENGE_MULT } from '../game/revenge';
 import { record } from '../game/progress';
@@ -75,7 +75,9 @@ export class BattleController {
   private hardHist: boolean[] = [];
   private memoryUsed = false;
   listenR: (ListenRound & { wrong: string[] }) | null = null;
-  spellR: (SpellRound & { filled: number; used: boolean[]; mistakes: number }) | null = null;
+  spellR: (SpellRound & { got: number[]; used: boolean[]; bad: boolean[]; mistakes: number }) | null = null;
+  /** the dealt attack card has been answered (a re-deal before that replaces it in the hard history) */
+  private cardPlayed = true;
   memR: { cards: MemoryCard[]; open: number[]; matched: string[]; misses: number; lock: boolean } | null = null;
   private revenge = new Revenge();
   private revengeActive = false;
@@ -211,17 +213,21 @@ export class BattleController {
     const due = this.revenge.take(p.id, this.battle.round);
     this.revengeActive = !!due;
     let hard = false;
+    // switching player before answering re-deals: that card never counted
+    const hist = this.cardPlayed ? this.hardHist : this.hardHist.slice(0, -1);
     if (due) this.word = due;
     else {
       const rank = growthOf(this.save.growth, this.partnerMon(p).id).rank;
-      const card = rollHard(rank, this.hardHist, this.rng)
+      const card = rollHard(rank, hist, this.rng)
         ? dealHardCard(p, Date.now(), this.rng, this.recent)
         : dealCard(p, Date.now(), this.rng, this.recent);
       this.word = card.word;
       hard = !!card.hard;
     }
     this.hard = hard;
-    this.hardHist = [...this.hardHist.slice(-2), hard];
+    // a revenge card that repeats a hard word still counts as hard for the one-in-three rule
+    this.hardHist = recordHard(this.hardHist, hard || (!!due && due.lv > p.level), !this.cardPlayed);
+    this.cardPlayed = false;
     this.recent = [...this.recent.slice(-6), this.word.id];
     this.tries = 0;
     this.attempts = 0;
@@ -230,7 +236,7 @@ export class BattleController {
     this.setupRound();
     this.refreshParty();
     this.render(this.round === 'speak' ? '說出這個英文單字，放出招式！' : '');
-    if (this.round === 'listen') window.setTimeout(() => { if (this.round === 'listen' && this.phase === 'speak') sayWord(this.word.w, ''); }, 350);
+    if (this.round === 'listen') window.setTimeout(() => { if (!this.dead && this.round === 'listen' && this.phase === 'speak') sayWord(this.word.w, ''); }, 350);
   }
 
   /** Decide the kind of round and build its puzzle; anything that cannot be built is spoken. */
@@ -246,7 +252,8 @@ export class BattleController {
       word: this.word,
       round: this.battle.round,
       memoryUsed: this.memoryUsed,
-      revenge: this.revengeActive,
+      // a hard card is always spoken: its critical hit is for saying the hard word
+      revenge: this.revengeActive || this.hard,
     });
     // listening needs a voice: with the sound off (or no speech synthesis) it is spoken instead
     const audible = sfx.enabled && typeof speechSynthesis !== 'undefined';
@@ -257,7 +264,7 @@ export class BattleController {
       else kind = 'speak';
     } else if (kind === 'spell') {
       const r = spellPuzzle(this.word, p.level, this.rng);
-      this.spellR = { ...r, filled: 0, used: r.tiles.map(() => false), mistakes: 0 };
+      this.spellR = { ...r, got: [], used: r.tiles.map(() => false), bad: r.tiles.map(() => false), mistakes: 0 };
     } else if (kind === 'memory') {
       const cards = memoryDeck(this.word, p.level, this.rng);
       if (cards) {
@@ -275,7 +282,7 @@ export class BattleController {
     }
     if (this.round === 'spell' && this.spellR) {
       const s = this.spellR;
-      return this.view.showSpell({ word: this.word, hint: hint ?? '把缺的字母補上！', letters: s.letters, blanks: s.blanks, filled: s.filled, tiles: s.tiles, used: s.used, hard: this.hard, note });
+      return this.view.showSpell({ word: this.word, hint: hint ?? '把缺的字母補上！', letters: s.letters, blanks: s.blanks, got: s.got, tiles: s.tiles, used: s.used, bad: s.bad, hard: this.hard, note });
     }
     if (this.round === 'memory' && this.memR) {
       return this.view.showMemory({ hint: hint ?? '翻牌配對，找出一樣的！', cards: this.memR.cards, hard: this.hard, note });
@@ -437,17 +444,21 @@ export class BattleController {
     sayWord(this.word.w, '');
   }
 
-  /** Fill in the letters, left to right. Three wrong letters fizzle. */
+  /**
+   * Fill in the letters, in any order. A wrong letter is switched off; trying every wrong one fizzles
+   * (like running out of choices when listening).
+   */
   private tile(i: number): void {
     const s = this.spellR;
-    if (this.phase !== 'speak' || this.round !== 'spell' || !s || s.used[i]) return;
+    if (this.phase !== 'speak' || this.round !== 'spell' || !s || s.used[i] || s.bad[i]) return;
     sfx.unlock();
-    const want = s.letters[s.blanks[s.filled]];
-    if (s.tiles[i] === want) {
+    const letter = s.tiles[i];
+    const spot = s.blanks.find((b) => !s.got.includes(b) && s.letters[b] === letter);
+    if (spot !== undefined) {
       s.used[i] = true;
-      s.filled += 1;
+      s.got.push(spot);
       sfx.play('select');
-      if (s.filled >= s.blanks.length) {
+      if (s.got.length >= s.blanks.length) {
         this.render('拼對了！');
         sayWord(this.word.w, '');
         this.phase = 'strike';
@@ -456,11 +467,12 @@ export class BattleController {
       }
       return this.render();
     }
+    s.bad[i] = true;
     s.mistakes += 1;
     sfx.play('miss');
     this.view.shakeTile(i);
-    if (s.mistakes >= MAX_TRIES) return this.fail(false);
-    this.view.setNote('再想想看！');
+    if (s.mistakes >= s.tiles.length - s.blanks.length) return this.fail(false);
+    window.setTimeout(() => { if (this.spellR === s && this.phase === 'speak') this.render('再想想看！'); }, 300);
   }
 
   /** Memory: flip two; a match stays up. All three pairs found = a strong attack. */
@@ -525,15 +537,17 @@ export class BattleController {
     const out: Grown[] = [];
     let gs = this.save.growth ?? {};
     const done = new Set<number>();
-    this.players.forEach((p, i) => {
-      const id = partnerMon(p, i).id;
-      if (done.has(id)) return;
+    // the further-along form first: Charmeleon → Charizard before Charmander → Charmeleon
+    const seats = this.players.map((p, i) => ({ i, id: partnerMon(p, i).id })).sort((a, b) => stageOf(b.id) - stageOf(a.id) || a.i - b.i);
+    for (const { i, id } of seats) {
+      if (done.has(id)) continue;
       done.add(id);
       const r = takeStep(gs, id, this.rng);
-      if (!r) return;
+      if (!r) continue;
       gs = r.gs;
       out.push({ seat: i, step: r.step });
-    });
+    }
+    out.sort((a, b) => a.seat - b.seat);
     if (!out.length) return out;
     const evolved = new Map(out.filter((o) => o.step.kind === 'evolve').map((o) => [o.step.from, o.step.to]));
     const players = this.players.map((p, i) => {
@@ -559,6 +573,7 @@ export class BattleController {
     this.view.evolve(
       { from, to, kind: next.step.kind, stars: next.step.rank },
       (beat, n) => {
+        if (this.dead) return;
         if (beat === 'pulse') { sfx.play('evoPulse', n); haptics.pulse(14); }
         if (beat === 'done') {
           this.showXp(next.step.to);
@@ -590,10 +605,12 @@ export class BattleController {
   // ---- attack ---------------------------------------------------------------
 
   private succeed(tier: Tier, defending: boolean): void {
+    if (this.dead) return;
     this.speaker.cancel();
     this.gainXp(tier, !defending && this.hard);
     if (defending) return this.resolveDefense(true, tier === 'perfect' ? 'perfect' : 'good');
     this.phase = 'strike';
+    this.cardPlayed = true;
     const sh = this.shield;
     const wasUp = !!sh?.up;
     const outcome = sh ? sh.resolve(!!this.me.adult, this.hasKid()) : 'hit';
@@ -647,11 +664,13 @@ export class BattleController {
   }
 
   private fail(defending: boolean): void {
+    if (this.dead) return;
     this.speaker.cancel();
     this.mark(defending && this.defWord ? this.defWord : this.word, false);
     if (defending) return this.resolveDefense(false);
     // no more taps or answers while the fizzle plays out
     this.phase = 'strike';
+    this.cardPlayed = true;
     this.battle.fizzle();
     this.revenge.miss(this.me.id, this.word, this.battle.round);
     this.view.showWait(`咒語是「${this.word.w}」，下次再來！`);
@@ -907,14 +926,16 @@ export class BattleController {
     sfx.setMusic(null);
     const seen = new Set<string>();
     const words = this.learned.filter((w) => !seen.has(w.id) && seen.add(w.id));
-    // evolutions are saved before the win itself, so the win builds on them
-    const grown = this.growUp();
+    // the win first (so "new to the dex" is judged before any evolution joins it), then growth;
+    // the screen merges what the controller writes, so neither undoes the other
     const r = this.onWin(this.foe, words);
+    const grown = this.growUp();
     const g = this.grade;
     const gi = g === 'legend' ? 2 : g === 'rare' ? 1 : 0;
     this.view.capture(
       { grade: g, isNew: !!r?.isNew },
       (b) => {
+        if (this.dead) return;
         sfx.play(b.kind === 'suck' ? 'catchSuck' : b.kind === 'wobble' ? 'catchWobble' : 'catchLock', b.kind === 'wobble' ? b.n - 1 : gi);
         haptics.pulse(vibrationFor(b.kind, g));
       },

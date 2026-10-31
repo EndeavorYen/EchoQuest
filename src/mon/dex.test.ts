@@ -57,3 +57,15 @@ describe('creature roster (imported from colormon)', () => {
     }
   });
 });
+
+describe('encounters', () => {
+  it('a rare roll never comes out below 4★, whatever the type', async () => {
+    const { pickEncounter, TYPES } = await import('./dex');
+    const { Rng } = await import('../util/rng');
+    for (const type of Object.keys(TYPES)) {
+      for (const rarity of [4, 5]) {
+        for (let s = 0; s < 5; s++) expect(pickEncounter(new Rng(s), { rarity, types: [type] }).rarity, `${type} ${rarity}`).toBeGreaterThanOrEqual(4);
+      }
+    }
+  });
+});

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Rng } from '../util/rng';
 import { WORDS, type Word } from '../data/words';
-import { canListen, canSpell, chooseRound, DEFAULT_ROUNDS, forceRound, listenChoices, memoryDeck, spellPuzzle } from './rounds';
-import { dealHardCard, rollHard } from '../game/deck';
+import { canListen, canSpell, chooseRound, DEFAULT_ROUNDS, forceRound, listenChoices, memoryDeck, soundsAlike, spellPuzzle } from './rounds';
+import { dealHardCard, recordHard, rollHard } from '../game/deck';
 import { newPlayer } from '../game/model';
 
 const w = (s: string): Word => WORDS.find((x) => x.w === s)!;
@@ -115,8 +115,9 @@ describe('hard cards', () => {
     for (let i = 0; i < 3000; i++) hist.push(rollHard(3, hist, rng));
     for (let i = 2; i < hist.length; i++) expect(hist.slice(i - 2, i + 1).filter(Boolean).length).toBeLessThanOrEqual(1);
     const rate = hist.filter(Boolean).length / hist.length;
+    // the chance is a third, but the gap rule after each hard card brings it to about a fifth
     expect(rate).toBeGreaterThan(0.15);
-    expect(rate).toBeLessThanOrEqual(1 / 3 + 0.01);
+    expect(rate).toBeLessThan(0.27);
     expect(Array.from({ length: 200 }, () => rollHard(0, [], rng)).some(Boolean)).toBe(false);
   });
   it('a hard card is one level up; level 4 gets a long word', () => {
@@ -128,5 +129,43 @@ describe('hard cards', () => {
     const top = dealHardCard(newPlayer(0, 4), 0, new Rng(4));
     expect(top.word.lv).toBe(4);
     expect(top.word.w.replace(/[^a-z]/gi, '').length).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe('the hard-card history', () => {
+  it('a re-deal before answering replaces the last card instead of adding one', () => {
+    let h = recordHard([], true, false);
+    h = recordHard(h, false, false);
+    expect(h).toEqual([true, false]);
+    // the party switches player before answering: the false card is replaced, not stacked
+    h = recordHard(h, false, true);
+    expect(h).toEqual([true, false]);
+    // so the next roll still sees the hard card within the last two
+    expect(Array.from({ length: 300 }, (_, s) => rollHard(3, h, new Rng(s))).some(Boolean)).toBe(false);
+    expect(recordHard([true, false, false], true, false)).toEqual([false, false, true]);
+  });
+});
+
+describe('choices that would sound the same', () => {
+  it('same spelling or a known sound-alike never appear together', () => {
+    const find = (s: string) => WORDS.find((x) => x.w === s);
+    const sun = find('sun');
+    const son = find('son');
+    if (sun && son) expect(soundsAlike(sun, son)).toBe(true);
+    const twins = WORDS.filter((a) => WORDS.some((b) => b !== a && b.w === a.w && b.icon && a.icon && b.icon !== a.icon));
+    for (const a of twins.slice(0, 20)) {
+      for (let s = 0; s < 20; s++) {
+        const r = listenChoices(a, 2, new Rng(s));
+        if (!r) continue;
+        expect(r.options.filter((o) => o.w === a.w)).toHaveLength(1);
+      }
+    }
+    for (let s = 0; s < 200; s++) {
+      const word = withIcon(1)[s % withIcon(1).length];
+      const r = listenChoices(word, 1, new Rng(s));
+      if (r) expect(soundsAlike(r.options[0], r.options[1])).toBe(false);
+      const d = memoryDeck(word, 2, new Rng(s));
+      if (d) expect(new Set(d.filter((c) => c.face === 'word').map((c) => c.word.w)).size).toBe(3);
+    }
   });
 });

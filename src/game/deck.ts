@@ -68,6 +68,15 @@ export function rollHard(rank: number, history: readonly boolean[], rng: Rng): b
   return p > 0 && rng.next() < p;
 }
 
+/**
+ * The hard-card history after a card is dealt. A re-deal in the same exchange (the party switched
+ * player before answering) replaces the last entry, so switching can never sneak in a second hard card.
+ */
+export function recordHard(history: readonly boolean[], hard: boolean, replaceLast: boolean): boolean[] {
+  const base = replaceLast ? history.slice(0, -1) : [...history];
+  return [...base, hard].slice(-3);
+}
+
 /** A short, easy word for the shield spell (one level below, never long). */
 export function pickDefenseWord(player: Player, now: number, rng: Rng, recent: string[] = []): Word {
   const lv = Math.max(1, player.level - 1);

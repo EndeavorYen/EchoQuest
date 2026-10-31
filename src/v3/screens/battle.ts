@@ -10,7 +10,11 @@ import type { BattleParams, ScreenFactory } from '../ctx';
 /** One fight: a wild creature (or a co-op boss) against the party's partners. */
 export const battle: ScreenFactory = (root, ctx, params: BattleParams) => {
   const view = new BattleView(root);
-  const ctl = new BattleController(view, ctx.save, ctx.rec, (s) => ctx.update(() => s));
+  // the controller keeps its own copy of the save; it only ever writes back what it owns, so a late
+  // write can never undo the map (or anything else the screen changed meanwhile)
+  const ctl = new BattleController(view, ctx.save, ctx.rec, (s) =>
+    ctx.update((cur) => ({ ...cur, players: s.players, growth: s.growth, aliases: s.aliases, caught: [...new Set([...cur.caught, ...s.caught])] })),
+  );
   const boss = !!params.boss;
   sfx.setMusic(battleTrack(boss, !!params.final));
   let finished = false;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Rng } from '../util/rng';
-import { addXp, evolvesTo, growthOf, hardChance, isReady, MAX_RANK, takeStep, xpFor, xpNeeded, XP_TO_RANK, type Growths } from './growth';
+import { addXp, evolvesTo, stageOf, growthOf, hardChance, isReady, MAX_RANK, takeStep, xpFor, xpNeeded, XP_TO_RANK, type Growths } from './growth';
 
 const fill = (gs: Growths, id: number) => addXp(gs, id, 999);
 
@@ -73,5 +73,11 @@ describe('hard-card chance', () => {
     expect(hardChance(2)).toBeGreaterThan(hardChance(1));
     expect(hardChance(3)).toBeCloseTo(1 / 3);
     expect(hardChance(10)).toBeCloseTo(1 / 3);
+  });
+});
+
+describe('stages', () => {
+  it('first form 0, its evolution 1, the one after 2; a lone legend 0', () => {
+    expect([4, 5, 6, 383].map((id) => stageOf(id))).toEqual([0, 1, 2, 0]);
   });
 });

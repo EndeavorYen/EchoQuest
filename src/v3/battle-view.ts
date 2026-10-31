@@ -146,12 +146,12 @@ export class WordPanel {
   }
 
   /** Fill in the letters: the word with gaps, and letter tiles underneath. */
-  showSpell(o: { word: Word; hint: string; letters: string[]; blanks: number[]; filled: number; tiles: string[]; used: boolean[]; hard?: boolean; note?: string }): void {
+  showSpell(o: { word: Word; hint: string; letters: string[]; blanks: number[]; got: number[]; tiles: string[]; used: boolean[]; bad: boolean[]; hard?: boolean; note?: string }): void {
     this.setMode('spell', !!o.hard);
     this.$('#hint').textContent = o.hint;
-    const got = new Set(o.blanks.slice(0, o.filled));
-    const open = new Set(o.blanks.slice(o.filled));
-    const next = o.blanks[o.filled];
+    const got = new Set(o.got);
+    const open = new Set(o.blanks.filter((b) => !got.has(b)));
+    const next = o.blanks.find((b) => !got.has(b));
     const letters = o.letters
       .map((c, i) => (open.has(i) ? `<i class="gap${i === next ? ' next' : ''}"></i>` : `<b class="${got.has(i) ? 'got' : ''}">${esc(c)}</b>`))
       .join('');
@@ -159,7 +159,7 @@ export class WordPanel {
     this.$('#body').innerHTML = `${hardTag(o.hard)}
       <div class="wordrow ${pic ? '' : 'nopic'}">${pic}<div><div class="word spellw" id="spellWord">${letters}</div><div class="zh">${esc(o.word.zh)}</div></div></div>
       <p class="note" id="note">${esc(o.note ?? '')}</p>
-      <div class="tiles">${o.tiles.map((c, i) => `<button class="tile" data-act="tile" data-i="${i}" ${o.used[i] ? 'disabled' : ''}>${esc(c)}</button>`).join('')}</div>
+      <div class="tiles">${o.tiles.map((c, i) => `<button class="tile${o.bad[i] ? ' x' : ''}" data-act="tile" data-i="${i}" ${o.used[i] || o.bad[i] ? 'disabled' : ''}>${esc(c)}</button>`).join('')}</div>
       <div class="actions"><button class="small-btn" data-act="hear" aria-label="聽一次">${SPEAKER}</button></div>`;
   }
 
@@ -176,7 +176,7 @@ export class WordPanel {
     this.$('#hint').textContent = o.hint;
     this.$('#body').innerHTML = `${hardTag(o.hard)}
       <div class="memo">${o.cards
-        .map((c, i) => `<button class="mcard" data-act="flip" data-i="${i}" data-word="${esc(c.word.id)}" aria-label="翻牌"><span class="mback">${svg('sparkle')}</span><span class="mfront f-${c.face}">${c.face === 'pic' ? c.word.icon ?? '' : esc(c.word.w)}</span></button>`)
+        .map((c, i) => `<button class="mcard" data-act="flip" data-i="${i}" data-word="${esc(c.word.id)}" data-label="${esc(c.word.w)}" aria-label="翻牌"><span class="mback">${svg('sparkle')}</span><span class="mfront f-${c.face}">${c.face === 'pic' ? c.word.icon ?? '' : esc(c.word.w)}</span></button>`)
         .join('')}</div>
       <p class="note" id="note">${esc(o.note ?? '')}</p>`;
   }
@@ -185,8 +185,10 @@ export class WordPanel {
   memoryState(open: number[], matched: string[]): void {
     this.el.querySelectorAll<HTMLElement>('.mcard').forEach((b, i) => {
       const done = matched.includes(b.dataset.word ?? '');
-      b.classList.toggle('up', done || open.includes(i));
+      const up = done || open.includes(i);
+      b.classList.toggle('up', up);
       b.classList.toggle('done', done);
+      b.setAttribute('aria-label', up ? b.dataset.label ?? '' : '翻牌');
     });
   }
 
@@ -353,7 +355,9 @@ export class BattleView {
     const white = 'brightness(0) invert(1) drop-shadow(0 0 14px #fff)';
     imgs.forEach((im) => im.animate([{ filter: 'none' }, { filter: white }], { duration: 600, fill: 'forwards' }));
     me.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.08)' }, { transform: 'scale(1)' }], { duration: 700, iterations: 5 });
-    const gaps = [420, 360, 300, 250, 200, 160, 130, 110, 90, 80, 70, 60];
+    // never more than three swaps a second (no flicker for young eyes); none with reduced motion
+    const calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const gaps = calm ? [] : [520, 470, 420, 380, 350, 340];
     let t = 650;
     gaps.forEach((g, i) => {
       t += g;
@@ -364,7 +368,7 @@ export class BattleView {
     });
     window.setTimeout(() => {
       imgs.forEach((im) => { im.style.display = im.dataset.form === 'to' ? '' : 'none'; });
-      this.fxHost().flash('#ffffff', 0.95, 700);
+      this.fxHost().flash('#ffffff', calm ? 0.25 : 0.6, 700);
       imgs.forEach((im) => im.animate([{ filter: white }, { filter: 'none' }], { duration: 700, fill: 'forwards' }));
       me.animate([{ transform: 'scale(1.3)' }, { transform: 'scale(1)' }], { duration: 500, easing: 'ease-out' });
       this.burst(at, typeOf(o.to).color, 14);

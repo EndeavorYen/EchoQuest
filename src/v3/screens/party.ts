@@ -58,7 +58,7 @@ export const party: ScreenFactory = (root, ctx) => {
       <div class="scroll"><div class="stack">${cards}
         ${players.length < MAX_PLAYERS ? '<button class="btn ghost" id="add">＋ 加入玩家</button>' : ''}
         <div class="card stack" id="rounds"><div><b>題型</b><br><span class="muted">念單字之外，偶爾換個玩法（太難可以關掉）</span></div>
-          <div class="row wrap">${ROUND_NAMES.map(([k, zh]) => `<button class="btn sm ${rounds[k] ? 'good' : 'ghost'}" data-round="${k}">${zh}${rounds[k] ? '：開' : '：關'}</button>`).join('')}</div></div>
+          <div class="row wrap">${ROUND_NAMES.map(([k, zh]) => `<button class="btn sm ${rounds[k] ? 'good' : 'ghost'}" data-round="${k}" aria-pressed="${rounds[k]}">${zh}${rounds[k] ? '：開' : '：關'}</button>`).join('')}</div></div>
         <div class="card stack"><div class="row"><span class="grow"><b>音效</b></span><button class="btn sm ${sound ? 'good' : 'ghost'}" id="snd">${sound ? '開' : '關'}</button></div>
           <div class="row"><span class="grow"><b>音樂</b></span><button class="btn sm ${music ? 'good' : 'ghost'}" id="mus">${music ? '開' : '關'}</button></div>
           ${haptics.supported ? `<div class="row"><span class="grow"><b>震動</b><br><span class="muted">收服時手機會震動</span></span><button class="btn sm ${buzz ? 'good' : 'ghost'}" id="buzz">${buzz ? '開' : '關'}</button></div>` : ''}
