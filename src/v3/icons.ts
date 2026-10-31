@@ -38,6 +38,8 @@ const ICONS = {
   sparkle: '<path d="M12 2.5l2.3 7.2L21.5 12l-7.2 2.3L12 21.5l-2.3-7.2L2.5 12l7.2-2.3z" fill="#ffcf3a"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5" stroke-width="3"/>',
   close: '<path d="M6 6l12 12M18 6L6 18" stroke-width="3"/>',
+  plus: '<path d="M12 5v14M5 12h14" stroke-width="3"/>',
+  minus: '<path d="M5 12h14" stroke-width="3"/>',
   // treasures
   key: '<circle cx="8" cy="8" r="4.5" fill="#ffcf3a"/><circle cx="8" cy="8" r="1.4" fill="#fff"/><path d="M11.5 11.5L21 21M17 17l2.5-2.5M14.5 14.5l2-2"/>',
   crown: '<path d="M3 18.5V8l5 5 4-7 4 7 5-5v10.5z" fill="#ffcf3a"/>',

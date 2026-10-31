@@ -505,3 +505,4 @@ button:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 .pcard .xpline { max-width: 220px; }
 .lchoices.n2 .cpic { font-size: 3.8rem; }
 .tile.x { background: #eee; opacity: .35; text-decoration: line-through; }
+

@@ -1,5 +1,6 @@
 import { artUrl, typeOf, type Mon } from '../mon/dex';
 import { gradeOf, type Grade } from '../mon/rarity';
+import { inkOn, starsHtml } from './ui';
 import type { MemoryCard } from './rounds';
 import { BALL_COLOR, BEATS, CAPTURE_MS, LAND_AT, LOCK_AT, SUCK_MS, WOBBLE_AT, WOBBLE_MS, type Beat } from './capture';
 import { glyph, svg } from './icons';
@@ -21,6 +22,10 @@ export interface PartyChip {
   on: boolean;
   /** a grown-up (shown with a badge) */
   adult?: boolean;
+  /** the player's name, shown under the chip */
+  name?: string;
+  /** the partner's name, for screen readers */
+  mon?: string;
 }
 
 const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -43,6 +48,20 @@ export interface WordOpts {
   hard?: boolean;
 }
 
+/** Shrink a long word (responsibility, refrigerator) until it fits its line; short words keep the big size. */
+function fitWord(el: HTMLElement | null): void {
+  if (!el || !el.isConnected) return;
+  el.style.fontSize = '';
+  let size = parseFloat(getComputedStyle(el).fontSize) || 44;
+  for (let i = 0; i < 14 && el.scrollWidth > el.clientWidth + 1 && size > 20; i++) {
+    size -= 2;
+    el.style.fontSize = `${size}px`;
+  }
+}
+
+/** The player asked the phone for less motion: no shaking, softer flashes, no flicker. */
+const calm = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 /** The little banner on a hard card. */
 const hardTag = (hard?: boolean): string => (hard ? `<div class="hardtag">${svg('sparkle')} 難字！答對就是必殺</div>` : '');
 
@@ -62,7 +81,7 @@ export class WordPanel {
 
   constructor(readonly el: HTMLElement) {
     el.className = 'panel';
-    el.innerHTML = '<p class="hint" id="hint"></p><div id="body"></div>';
+    el.innerHTML = '<p class="hint" id="hint" aria-live="polite"></p><div id="body"></div>';
     el.addEventListener('click', (e) => {
       const t = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
       if (!t) return;
@@ -113,15 +132,16 @@ export class WordPanel {
     this.$('#body').innerHTML = `${hardTag(opts.hard)}
       <div class="wordrow ${pic ? '' : 'nopic'}" data-act="hear">${pic}<div><div class="word" id="theWord">${esc(word.w)}</div><div class="zh">${esc(word.zh)}</div></div></div>
       ${opts.timer ? '<div class="timer"><i id="timerBar"></i></div>' : ''}
-      <p class="note" id="note">${esc(opts.note ?? '')}</p>
+      <p class="note" id="note" aria-live="polite">${esc(opts.note ?? '')}</p>
       ${typing}
+      ${opts.showConfirm && !opts.stuck ? `<button class="adultok" data-act="ok">${CHECK}<span>大人確認：其實念對了</span></button>` : ''}
       ${opts.stuck ? `<div class="stuck"><button class="btn good" data-act="ok">我念對了</button><button class="btn ghost" data-act="skip">跳過這個字</button></div>` : ''}
       <div class="actions">
         <button class="small-btn" data-act="kbd" aria-label="用鍵盤">${KEYBOARD}</button>
         ${micBtn}
-        ${opts.showConfirm && !opts.stuck ? `<button class="small-btn ok" data-act="ok" aria-label="他說對了" title="他說對了">${CHECK}</button>` : ''}
         <button class="small-btn" data-act="hear" aria-label="聽一次">${SPEAKER}</button>
       </div>`;
+    fitWord(this.$('#theWord'));
     if (opts.typing) (this.$('#typed') as HTMLInputElement | null)?.focus();
   }
 
@@ -161,6 +181,7 @@ export class WordPanel {
       <p class="note" id="note">${esc(o.note ?? '')}</p>
       <div class="tiles">${o.tiles.map((c, i) => `<button class="tile${o.bad[i] ? ' x' : ''}" data-act="tile" data-i="${i}" ${o.used[i] || o.bad[i] ? 'disabled' : ''}>${esc(c)}</button>`).join('')}</div>
       <div class="actions"><button class="small-btn" data-act="hear" aria-label="聽一次">${SPEAKER}</button></div>`;
+    fitWord(this.$('#spellWord'));
   }
 
   shakeTile(i: number): void {
@@ -176,7 +197,7 @@ export class WordPanel {
     this.$('#hint').textContent = o.hint;
     this.$('#body').innerHTML = `${hardTag(o.hard)}
       <div class="memo">${o.cards
-        .map((c, i) => `<button class="mcard" data-act="flip" data-i="${i}" data-word="${esc(c.word.id)}" data-label="${esc(c.word.w)}" aria-label="翻牌"><span class="mback">${svg('sparkle')}</span><span class="mfront f-${c.face}">${c.face === 'pic' ? c.word.icon ?? '' : esc(c.word.w)}</span></button>`)
+        .map((c, i) => `<button class="mcard" data-act="flip" data-i="${i}" data-word="${esc(c.word.id)}" data-label="${esc(c.word.w)}" aria-label="翻牌"><span class="mback">${svg('sparkle')}</span><span class="mfront f-${c.face}"${c.face === 'word' && c.word.w.length > 6 ? ` style="font-size:${c.word.w.length > 9 ? 0.74 : c.word.w.length > 7 ? 0.84 : 0.96}rem"` : ''}>${c.face === 'pic' ? c.word.icon ?? '' : esc(c.word.w)}</span></button>`)
         .join('')}</div>
       <p class="note" id="note">${esc(o.note ?? '')}</p>`;
   }
@@ -220,7 +241,15 @@ export class WordPanel {
 export class BattleView {
   readonly root: HTMLElement;
   readonly panel: WordPanel;
-  private $ = <T extends HTMLElement>(sel: string): T => this.root.querySelector(sel) as T;
+  /** this screen's own element: timers that fire after leaving draw on it (detached), never on the next screen */
+  private app!: HTMLElement;
+  private gone = false;
+  private $ = <T extends HTMLElement>(sel: string): T => (this.app.querySelector(sel) ?? document.createElement('div')) as T;
+
+  /** The screen is going away. */
+  dispose(): void {
+    this.gone = true;
+  }
 
   onMic: () => void = () => {};
   onHear: () => void = () => {};
@@ -259,6 +288,7 @@ export class BattleView {
         <div class="party" id="party"></div>
         <div id="panel"></div>
       </div>`;
+    this.app = root.querySelector('.app') as HTMLElement;
     this.panel = new WordPanel(this.$('#panel'));
     this.panel.onMic = () => this.onMic();
     this.panel.onHear = () => this.onHear();
@@ -296,11 +326,14 @@ export class BattleView {
     const chip = this.$('#foeType');
     chip.textContent = t.name;
     chip.style.background = t.color;
-    this.$('#stars').textContent = '★'.repeat(m.rarity) + '☆'.repeat(5 - m.rarity);
+    chip.style.color = inkOn(t.color);
+    this.$('#stars').innerHTML = starsHtml(m.rarity);
+    this.$('#stars').setAttribute('aria-label', `${m.rarity} 星`);
+    this.$('.plate.foe').classList.remove('gone');
     this.$('#title').textContent = (boss ? '首領 ' : '野生的') + m.name;
     this.$('#arena').style.setProperty('--type', t.color);
     this.$('#arena').dataset.grade = gradeOf(m.rarity);
-    this.root.style.setProperty('--type', t.color);
+    this.app.style.setProperty('--type', t.color);
     this.setShields(0, 0);
   }
 
@@ -356,8 +389,8 @@ export class BattleView {
     imgs.forEach((im) => im.animate([{ filter: 'none' }, { filter: white }], { duration: 600, fill: 'forwards' }));
     me.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.08)' }, { transform: 'scale(1)' }], { duration: 700, iterations: 5 });
     // never more than three swaps a second (no flicker for young eyes); none with reduced motion
-    const calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const gaps = calm ? [] : [520, 470, 420, 380, 350, 340];
+    const still = calm();
+    const gaps = still ? [] : [520, 470, 420, 380, 350, 340];
     let t = 650;
     gaps.forEach((g, i) => {
       t += g;
@@ -368,7 +401,7 @@ export class BattleView {
     });
     window.setTimeout(() => {
       imgs.forEach((im) => { im.style.display = im.dataset.form === 'to' ? '' : 'none'; });
-      this.fxHost().flash('#ffffff', calm ? 0.25 : 0.6, 700);
+      this.fxHost().flash('#ffffff', still ? 0.25 : 0.6, 700);
       imgs.forEach((im) => im.animate([{ filter: white }, { filter: 'none' }], { duration: 700, fill: 'forwards' }));
       me.animate([{ transform: 'scale(1.3)' }, { transform: 'scale(1)' }], { duration: 500, easing: 'ease-out' });
       this.burst(at, typeOf(o.to).color, 14);
@@ -406,6 +439,25 @@ export class BattleView {
     if (legend) this.fxHost().shake(10, 600);
   }
 
+  /** Ask before running away. */
+  confirmLeave(yes: () => void, no: () => void): void {
+    this.app.querySelector('.modal')?.remove();
+    const m = document.createElement('div');
+    m.className = 'modal';
+    m.setAttribute('role', 'dialog');
+    m.setAttribute('aria-label', '要逃走嗎？');
+    m.innerHTML = `<div class="card" style="text-align:center"><div class="big">要逃走嗎？</div>
+      <p class="muted">這場戰鬥的進度不會保留，會回到剛剛的地方。</p>
+      <div class="stack"><button class="btn" data-act="stay">繼續戰鬥</button><button class="btn ghost" data-act="yes">逃走</button></div></div>`;
+    m.addEventListener('click', (e) => {
+      const t = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
+      if (e.target === m || t?.dataset.act === 'stay') { m.remove(); no(); }
+      else if (t?.dataset.act === 'yes') { m.remove(); yes(); }
+    });
+    this.app.appendChild(m);
+    (m.querySelector('[data-act=stay]') as HTMLElement | null)?.focus();
+  }
+
   /** Rattle the whole arena. */
   shake(px: number, ms = 260): void {
     this.fxHost().shake(px, ms);
@@ -418,15 +470,21 @@ export class BattleView {
     const chip = this.$('#meType');
     chip.textContent = t.name;
     chip.style.background = t.color;
+    chip.style.color = inkOn(t.color);
   }
 
   setParty(chips: PartyChip[]): void {
-    this.$('#party').innerHTML = chips
+    const box = this.$('#party');
+    // one player: nothing to switch, so the strip gives its room to the arena
+    box.hidden = chips.length <= 1;
+    this.app.classList.toggle('multi', chips.length > 1);
+    box.innerHTML = chips
       .map(
-        (c, i) => `<button class="pbtn ${c.on ? 'on' : ''}" data-i="${i}" style="--type:${c.color}" aria-label="夥伴 ${i + 1}${c.adult ? '（大人）' : ''}">
+        (c, i) => `<button class="pbtn ${c.on ? 'on' : ''}" data-i="${i}" style="--type:${c.color}" aria-pressed="${c.on}" aria-label="${esc(c.name ?? `玩家 ${i + 1}`)}${c.mon ? `的${esc(c.mon)}` : ''}${c.adult ? '（大人）' : ''}">
           ${c.adult ? '<span class="adult">大人</span>' : ''}
           <img src="${c.img}" alt="" onerror="this.style.visibility='hidden'">
-          <span class="lv">${[1, 2, 3, 4].map((n) => `<i class="${n <= c.level ? 'f' : ''}"></i>`).join('')}</span></button>`,
+          <span class="lv">${[1, 2, 3, 4].map((n) => `<i class="${n <= c.level ? 'f' : ''}"></i>`).join('')}</span>
+          ${c.name ? `<span class="pname">${esc(c.name)}</span>` : ''}</button>`,
       )
       .join('');
   }
@@ -443,6 +501,8 @@ export class BattleView {
   setHearts(n: number, max: number): void {
     const el = this.$('#hearts');
     el.innerHTML = Array.from({ length: max }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
+    el.classList.toggle('many', max > 5);
+    el.setAttribute('aria-label', `愛心 ${n} / ${max}`);
     el.dataset.left = String(n);
   }
 
@@ -467,7 +527,7 @@ export class BattleView {
 
   /** Rings around the creature, one per shield layer; the outer ring pops when a layer breaks. */
   private drawRings(layers: number): void {
-    const box = this.root.querySelector<HTMLElement>('#rings');
+    const box = this.app.querySelector<HTMLElement>('#rings');
     if (!box) return;
     if (layers < this.ringLayers) {
       const gone = document.createElement('i');
@@ -537,9 +597,12 @@ export class BattleView {
     return (this.host ??= {
       layer: this.$('#fx'),
       shake: (px, ms = 260) => {
+        if (this.gone || calm()) return;
         void this.$('#arena').animate([{ transform: 'translate(0,0)' }, { transform: `translate(${-px}px,${px / 2}px)` }, { transform: `translate(${px}px,${-px / 2}px)` }, { transform: 'translate(0,0)' }], { duration: ms });
       },
       flash: (color, alpha = 0.3, ms = 300) => {
+        if (this.gone) return;
+        if (calm()) alpha = Math.min(alpha, 0.2);
         const w = document.createElement('div');
         w.className = 'washfx';
         w.style.background = color;
@@ -606,7 +669,22 @@ export class BattleView {
     const p = this.center(this.$(where === 'foe' ? '#foe' : '#me'));
     const f = this.spawn(`float${small ? ' small' : ''}`, p.x, p.y - 40 + dy, color);
     f.textContent = text;
+    this.keepInside(f, p.x);
     f.animate([{ transform: 'translate(-50%,10px)', opacity: 0 }, { transform: 'translate(-50%,-6px)', opacity: 1, offset: 0.2 }, { transform: 'translate(-50%,-46px)', opacity: 0 }], { duration: 1100, easing: 'ease-out' }).onfinish = () => f.remove();
+  }
+
+  /** Slide a centred label sideways so it never runs off the arena's edge. */
+  private keepInside(el: HTMLElement, x: number): void {
+    const w = el.offsetWidth;
+    const room = this.$('#arena').clientWidth;
+    if (!w || !room) return;
+    el.style.left = `${Math.min(Math.max(x, w / 2 + 6), room - w / 2 - 6)}px`;
+  }
+
+  /** The win: the foe's plate and condition are no longer news. */
+  clearFoe(): void {
+    this.setStatus(null);
+    this.$('.plate.foe').classList.add('gone');
   }
 
   hurt(where: 'foe' | 'me'): void {
@@ -632,8 +710,13 @@ export class BattleView {
   capture(o: { grade: Grade; isNew: boolean }, beat: (b: Beat) => void, done: () => void): void {
     const foe = this.$('#foe');
     const p = this.center(foe);
-    const ground = Math.min(p.y + 90, this.$('#arena').clientHeight - 60);
-    const dy = Math.max(30, ground - p.y);
+    // land a little below where the creature stood, but never on the partner's name plate
+    const arena = this.$('#arena').getBoundingClientRect();
+    const plate = this.$('.plate.me').getBoundingClientRect();
+    const overPlate = p.x + 32 > plate.left - arena.left && plate.height > 0;
+    const floor = (overPlate ? plate.top - arena.top : arena.height) - 36;
+    // on a short arena there may be no room to drop at all: then it stays where the creature was
+    const dy = Math.max(0, Math.min(90, floor - p.y));
     const color = BALL_COLOR[o.grade];
     const ball = this.spawn('ball', p.x, p.y, color);
     foe.animate(
@@ -680,12 +763,18 @@ export class BattleView {
         { duration: 750, easing: 'ease-out', fill: 'forwards' },
       ).onfinish = () => s.remove();
     }
-    const f = this.spawn('float', at.x, at.y - 56, '#c98600');
+    // the captions go above the ball; with no room above (a short phone) they move to the empty left side
+    const roomAbove = at.y - 86 >= 20;
+    const cx = roomAbove ? at.x : this.$('#arena').clientWidth * 0.3;
+    const ty = roomAbove ? at.y - 86 : 26;
+    const f = this.spawn('float', cx, ty, '#c98600');
     f.textContent = o.isNew ? '新收服！' : '收服！';
+    this.keepInside(f, cx);
     f.animate([{ transform: 'translate(-50%,10px)', opacity: 0 }, { transform: 'translate(-50%,-4px)', opacity: 1, offset: 0.2 }, { transform: 'translate(-50%,-30px)', opacity: 1, offset: 0.8 }, { transform: 'translate(-50%,-40px)', opacity: 0 }], { duration: 1300, easing: 'ease-out' }).onfinish = () => f.remove();
     if (o.isNew) {
-      const g = this.spawn('float small', at.x, at.y - 22, '#18202e');
+      const g = this.spawn('float small', cx, ty + 34, '#18202e');
       g.textContent = '已加進圖鑑';
+      this.keepInside(g, cx);
       g.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }], { duration: 1300 }).onfinish = () => g.remove();
     }
   }

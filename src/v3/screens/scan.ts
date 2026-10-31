@@ -5,6 +5,7 @@ import { artUrl, pickWild, typeOf, TYPES, type Mon } from '../../mon/dex';
 import { sfx, say } from '../../audio/sfx';
 import { PLACES } from '../../mon/habitat';
 import { ENTRANCE, gradeOf } from '../../mon/rarity';
+import { starsHtml, typeChip } from '../ui';
 import { bar, esc, type ScanParams, type ScreenFactory } from '../ctx';
 
 const N = 48;
@@ -85,14 +86,14 @@ export const scan: ScreenFactory = (root, ctx, params: ScanParams) => {
     const word = pal[0]?.word;
     const isNew = !ctx.save.caught.includes(mon.id);
     const g = gradeOf(mon.rarity);
-    root.innerHTML = `<div class="app" data-screen="reveal" style="--type:${t.color}">${bar(night ? '夜裡有東西在動…' : where ? `${where}出現了！` : '出現了！', back)}
+    root.innerHTML = `<div class="app" data-screen="reveal" style="--type:${t.color}">${bar(night ? '夜裡有東西在動…' : params.final ? '冠軍出現了！' : params.boss && where ? `${where}的館主！` : where ? `在${where}遇到了…` : '出現了！', back)}
       <div class="reveal${g === 'common' ? '' : ` g-${g}`}">
         ${g === 'common' ? '' : `<div class="rarebanner">★ ${ENTRANCE[g]} ★</div>`}
         ${pal.length ? `<div class="swatches">${pal.slice(0, 3).map((c) => `<i style="background:rgb(${c.rgb.join(',')})"></i>`).join('')}</div>
           <div class="muted">拍到的顏色：${esc(word?.zh ?? '')} <b>${esc(word?.en ?? '')}</b></div>` : ''}
         <img class="sil" id="art" src="${artUrl(mon.id)}" alt="">
         <div class="name" id="nm">？？？</div>
-        <div><span class="chip" style="background:${t.color}">${t.name}</span> <span class="stars">${'★'.repeat(mon.rarity)}${'☆'.repeat(5 - mon.rarity)}</span> ${isNew ? '<span class="newmon">NEW</span>' : ''}</div>
+        <div>${typeChip(t)} <span class="stars" aria-label="${mon.rarity} 星">${starsHtml(mon.rarity)}</span> ${isNew ? '<span class="newmon">NEW</span>' : ''}</div>
       </div>
       <button class="btn" id="go" disabled>${params.kind === 'toddler' ? '一起玩！' : params.boss ? '挑戰首領！' : '戰鬥！'}</button>
       ${params.foe ? '' : '<button class="btn ghost" id="again">再拍一次</button>'}</div>`;

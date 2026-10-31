@@ -110,9 +110,13 @@ function cleanGrowth(g: unknown): Growths {
   return out;
 }
 
+const clampLevel = (lv: unknown): 1 | 2 | 3 | 4 => (Number.isInteger(lv) ? (Math.min(4, Math.max(1, lv as number)) as 1 | 2 | 3 | 4) : 1);
+
 function normalise(data: Raw): Save {
   const base = defaultSave();
-  const players = data.players ?? [];
+  // drop anything that is not a player object; an empty party gets a fresh first player
+  const raw = (Array.isArray(data.players) ? data.players : []).filter((p) => p && typeof p === 'object');
+  const players = raw.length ? raw : base.players;
   return {
     ...base,
     ...data,
@@ -120,10 +124,11 @@ function normalise(data: Raw): Save {
     players: players.slice(0, MAX_PLAYERS).map((p, i) => ({
       ...newPlayer(i, 1),
       ...p,
-      progress: p.progress ?? {},
+      level: clampLevel(p.level),
+      progress: p.progress && typeof p.progress === 'object' ? p.progress : {},
       stats: Object.assign({ dealt: 0, perfect: 0, blocks: 0, words: 0 }, p.stats),
     })),
-    active: Math.min(data.active ?? 0, players.length - 1),
+    active: Math.max(0, Math.min(Number.isInteger(data.active) ? (data.active as number) : 0, Math.min(players.length, MAX_PLAYERS) - 1)),
     run: data.run ?? null,
     townmap: isTownMap(data.townmap) ? data.townmap : null,
     collection: data.collection ?? [],
@@ -153,10 +158,16 @@ export function load(s: StorageLike | null = store()): Save {
   if (!s) return defaultSave();
   const v3 = read(s, KEY);
   if (v3 && v3.v === 3) {
-    const save = normalise(v3);
-    const fixed = reconcile(save, LEDGER, BANK_REV);
-    if (fixed !== save) persist(fixed, s);
-    return fixed;
+    try {
+      const save = normalise(v3);
+      const fixed = reconcile(save, LEDGER, BANK_REV);
+      if (fixed !== save) persist(fixed, s);
+      return fixed;
+    } catch {
+      // a save this broken is kept aside (never deleted) and the game starts fresh
+      try { s.setItem(`${KEY}.broken.${Date.now()}`, s.getItem(KEY) ?? ''); } catch { /* full */ }
+      return defaultSave();
+    }
   }
   const v2 = read(s, KEY_V2);
   if (v2 && v2.v === 2) {

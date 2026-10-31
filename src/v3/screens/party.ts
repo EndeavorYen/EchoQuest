@@ -87,8 +87,23 @@ export const party: ScreenFactory = (root, ctx) => {
     }));
     root.querySelectorAll<HTMLElement>('[data-del]').forEach((b) => b.addEventListener('click', () => {
       const i = Number(b.dataset.del);
-      ctx.update((s) => ({ ...s, players: s.players.filter((_, k) => k !== i), active: 0 }));
-      draw();
+      const who = ctx.save.players[i]?.name ?? '';
+      const m = document.createElement('div');
+      m.className = 'modal';
+      m.setAttribute('role', 'dialog');
+      m.innerHTML = `<div class="card" style="text-align:center"><div class="big">要移除 ${esc(who)} 嗎？</div>
+        <p class="muted">${esc(who)} 學會的單字紀錄會一起刪掉。</p>
+        <div class="stack"><button class="btn ghost" data-act="no">先不要</button><button class="btn danger" data-act="yes">移除</button></div></div>`;
+      m.addEventListener('click', (e) => {
+        const t2 = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
+        if (e.target === m || t2?.dataset.act === 'no') return m.remove();
+        if (t2?.dataset.act === 'yes') {
+          ctx.update((s) => ({ ...s, players: s.players.filter((_, k) => k !== i), active: 0 }));
+          m.remove();
+          draw();
+        }
+      });
+      root.querySelector('.app')!.appendChild(m);
     }));
     root.querySelector('#add')?.addEventListener('click', () => {
       ctx.update((s) => ({ ...s, players: [...s.players, { ...newPlayer(s.players.length, 1), name: PLAYER_NAMES[s.players.length % PLAYER_NAMES.length] }] }));
@@ -123,10 +138,11 @@ export const party: ScreenFactory = (root, ctx) => {
 
   function pick(i: number): void {
     const ids = [...new Set([...STARTER_IDS, ...ctx.save.caught])];
+    const cur = partnerMon(ctx.save.players[i], i).id;
     const el = document.createElement('div');
     el.className = 'sheet';
     el.innerHTML = `<div><div class="big">選夥伴</div><div class="choices">${ids
-      .map((id) => `<button data-mon="${id}" aria-label="${esc(MON_BY_ID.get(id)?.name ?? '')}"><img src="${artUrl(id)}" alt="" onerror="this.style.visibility='hidden'"></button>`)
+      .map((id) => `<button data-mon="${id}" class="${id === cur ? 'cur' : ''}" aria-pressed="${id === cur}" aria-label="${esc(MON_BY_ID.get(id)?.name ?? '')}"><img src="${artUrl(id)}" alt="" onerror="this.style.visibility='hidden'"><span>${esc(MON_BY_ID.get(id)?.name ?? '')}</span></button>`)
       .join('')}</div><div class="muted">打倒的寶可夢都能當夥伴</div><button class="btn ghost" data-close>關閉</button></div>`;
     el.addEventListener('click', (e) => {
       const t = e.target as HTMLElement;

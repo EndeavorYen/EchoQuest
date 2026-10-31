@@ -9,6 +9,7 @@ import { partnerMon } from '../partner';
 import { sfx } from '../../audio/sfx';
 import { glyph, svg as icon } from '../icons';
 import { mapTrack, type Scene } from '../../audio/songs';
+import { holdTaps } from '../taps';
 import { bar, esc, type ScanParams, type ScreenFactory } from '../ctx';
 
 /** the zoom the player last used on the map: 1 = the map fills the width, and it stays that way between visits */
@@ -69,7 +70,9 @@ export const trek: ScreenFactory = (root, ctx) => {
     return { x: cx(c) + 3.5, y: cx(row) };
   };
 
-  root.innerHTML = `<div class="app" data-screen="trek">${bar('冒險')}
+  // the zoom buttons live in the top bar, so they never sit on top of a place on the map
+  const zoombar = `<div class="zoombar"><button id="zin" aria-label="放大">${icon('plus')}</button><button id="zout" aria-label="縮小">${icon('minus')}</button><button id="zme" aria-label="回到我的位置">${icon('target')}</button></div>`;
+  root.innerHTML = `<div class="app" data-screen="trek">${bar('冒險', 'home', zoombar)}
     <div class="mapnote"><b>${esc(m0.title)}　<small>${SIZE_NAME[m0.size]}</small></b><span class="muted" id="here"></span></div>
     <div class="mapwrap"><div class="mapbox" id="mapscroll"><div class="townmap" id="tm" style="aspect-ratio:100/${H}">
       ${svg}
@@ -77,8 +80,7 @@ export const trek: ScreenFactory = (root, ctx) => {
       ${m0.roads.map((r) => `<span class="rlabel" data-road="${r.id}" style="${pos(labelAt(r))}" hidden>${esc(r.name)}</span>`).join('')}
       ${m0.nodes.map((n) => `<button class="tnode ${isBig(n) ? 'big' : 'small'}${n.w > 1 ? ' wide' : ''}" data-id="${n.id}" data-kind="${n.kind}" style="${pos(n)}" aria-label="${esc(n.name)}"><i>${n.kind === 'cave' ? icon('cave') : glyph(n.icon)}</i>${isBig(n) ? `<span class="tname">${esc(n.name)}</span>` : ''}<span class="ttypes"></span><em class="gift" hidden>${icon('gift')}</em></button>`).join('')}
       <div class="partner" id="partner"><img src="${artUrl(mon.id)}" alt="" onerror="this.style.visibility='hidden'"></div>
-    </div></div>
-      <div class="zoombar"><button id="zin" aria-label="放大">＋</button><button id="zout" aria-label="縮小">－</button><button id="zme" aria-label="回到我的位置">${icon('target')}</button></div></div>
+    </div></div></div>
     <div class="tpanel" id="panel"></div></div>`;
 
   const tm = root.querySelector<HTMLElement>('#tm')!;
@@ -223,13 +225,15 @@ export const trek: ScreenFactory = (root, ctx) => {
         canQuiz(m) ? `<button class="btn" id="svc-quiz">${icon('chat')} 村民考考你</button>` : '',
       ].join('');
       panel.innerHTML = `<div class="ttitle">${here.kind === 'cave' ? icon('cave') : glyph(here.icon)} ${esc(here.name)} <small>${kindLabel[here.kind]}</small></div>
-        <div class="tsub">${svc ? '這裡可以做的事：' : '都做完了！點一下閃光的地方就出發'}</div>${svc ? `<div class="trow wrap">${svc}</div>` : ''}`;
+        <div class="tsub">${svc ? '點一下閃光的地方就出發，也可以先在這裡：' : '都做完了！點一下閃光的地方就出發'}</div>${svc ? `<div class="trow wrap">${svc}</div>` : ''}`;
       panel.querySelector('#svc-gift')?.addEventListener('click', openGift);
       panel.querySelector('#svc-info')?.addEventListener('click', () => {
         sfx.play('good');
         ctx.update((s) => ({ ...s, townmap: useInfo(s.townmap!) }));
         toast('烏雲散開了，附近的寶可夢屬性都看得到！');
         render();
+        // the buttons just moved under the finger: a second tap must not open the quiz
+        holdTaps();
       });
       panel.querySelector('#svc-quiz')?.addEventListener('click', () => ctx.go('practice', { quiz: true }));
       return;

@@ -97,3 +97,127 @@ body {
 .cards span { background: #fff3c4; border: 2px solid var(--ink); }
 .status { border: 2px solid var(--ink); }
 .stop { border-color: var(--ink); }
+
+/* =====================================================================================
+ * UI/UX pass: fitting every phone, readable text, fingers-sized targets
+ * ===================================================================================== */
+
+/* battle: the arena keeps one height (creatures and the caught ball never jump); the panel takes the rest
+   and scrolls on its own if a very short phone needs it. Creatures are sized by the arena's height too,
+   so on a short phone they never sit under the name plates. */
+.app[data-screen=battle] .arena { flex: 0 0 auto; height: clamp(150px, 48dvh, 460px); min-height: 0; container-type: size; }
+.app[data-screen=battle].multi .arena { height: clamp(140px, 40dvh, 440px); }
+@media (max-height: 700px) {
+  .app[data-screen=battle] .arena { height: clamp(136px, 35dvh, 400px); }
+  .app[data-screen=battle].multi .arena { height: clamp(130px, 29dvh, 400px); }
+}
+.app[data-screen=battle] .mon.foe { width: min(46%, 50cqh); top: 6%; }
+.app[data-screen=battle] .mon.me { width: min(40%, 50cqh); }
+.app[data-screen=battle] #arena[data-grade=legend] .mon.foe { width: min(52%, 56cqh); top: 4%; }
+.stuck .btn { white-space: nowrap; padding: 12px 8px; font-size: 1rem; }
+.app[data-screen=battle] .panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.app[data-screen=battle] .panel > #hint { margin-top: auto; }
+.app[data-screen=battle] .panel > #body { margin-bottom: auto; }
+.fx { z-index: 6; }
+.plate.foe { transition: opacity .4s; }
+.plate.foe.gone { opacity: 0; }
+.hearts.many i { width: 16px; height: 15px; }
+.party[hidden] { display: none; }
+.party { padding-bottom: 20px; }
+.pbtn .pname { position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .74rem; font-weight: 800; color: var(--ink); }
+.pbtn .adult { font-size: .72rem; }
+.wordrow { max-width: 100%; }
+.wordrow > div { min-width: 0; }
+.word { white-space: nowrap; }
+.small-btn { flex: none; }
+.mic { min-width: 0; }
+.mic span { white-space: nowrap; }
+@media (max-width: 360px) {
+  .mic { font-size: .92rem; gap: 4px; padding: 0 8px; }
+  .actions { gap: 8px; }
+}
+.stars .off { opacity: .35; }
+.victory > div, .victory .zh { text-wrap: balance; }
+.hpnum, .status { font-size: .78rem; }
+.chip { font-size: .82rem; }
+.flee-btn { min-height: 44px; }
+
+/* phones held sideways: the game is made for upright phones */
+@media (orientation: landscape) and (max-height: 500px) {
+  body::before {
+    content: '把手機轉成直的，比較好玩喔！'; position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center;
+    padding: 96px 24px 24px; text-align: center; font: 900 1.3rem/1.4 var(--display); color: var(--ink); background: var(--bg) no-repeat center 30% / 72px
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' fill='none' stroke='%231f2a44' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='15' y='6' width='18' height='32' rx='4' fill='%23fff'/%3E%3Cpath d='M22 33h4'/%3E%3Cpath d='M40 20a14 14 0 0 1-6 14M37 34l-3 .5.5-3'/%3E%3C/svg%3E");
+  }
+}
+
+/* home */
+.home .hero { min-height: 120px; }
+.menu { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.menu .btn { min-width: 0; }
+.menu [data-act=newtrip] { grid-template-columns: 1fr; white-space: normal; text-align: center; justify-items: center; }
+.menu [data-act=newtrip] small { grid-column: 1; }
+.menu .btn small { font-size: .78rem; }
+
+/* trek */
+.bar .zoombar { position: static; flex-direction: row; gap: 6px; }
+.zoombar button { width: 44px; height: 44px; display: grid; place-items: center; }
+.zoombar button .ico { width: 22px; height: 22px; }
+.toast { bottom: auto; top: calc(max(10px, env(safe-area-inset-top)) + 58px); max-width: calc(100% - 32px); text-align: center; }
+.trow .btn { white-space: nowrap; padding: 11px 8px; font-size: .98rem; }
+@media (max-width: 360px) { .trow .btn { font-size: .88rem; } .trow .btn .ico { margin-right: 3px; } }
+.tname { font-size: .74rem; }
+.rlabel { font-size: .68rem; }
+.tnode.small { min-width: 40px; min-height: 40px; }
+.tnode.big[data-done="1"] i::after { content: ''; right: 2px; bottom: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff no-repeat center/12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232c8a3a' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E"); box-shadow: 0 0 0 2px #2c8a3a; }
+.ttitle small { font-size: .8rem; }
+
+/* dex */
+.app[data-screen=dex] > .seg { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 2px 2px 6px; flex: none; }
+.app[data-screen=dex] > .seg::-webkit-scrollbar { display: none; }
+.app[data-screen=dex] > .seg button { flex: none; }
+.dexcell { font-size: .76rem; }
+.evo-chip b { font-size: .72rem; }
+.icon-btn.flip svg { transform: scaleX(-1); }
+.sheet .seg { justify-content: center; }
+@media (max-width: 360px) { .evo-kids.grid { grid-template-columns: repeat(3, auto); } }
+
+/* party */
+.pcard { position: relative; }
+.pcard > .grow { min-width: 0; }
+.pcard:has([data-del]) > .grow { padding-right: 34px; }
+.pcard [data-del] { position: absolute; top: 10px; right: 10px; }
+.stepper button { width: 44px; height: 44px; }
+.stepper b { white-space: nowrap; font-size: .95rem; }
+.nameinput { min-height: 40px; }
+.pcard label.row { align-items: flex-start; min-height: 44px; padding-top: 6px; }
+.pcard label.row input { width: 22px; height: 22px; flex: none; margin: 0; accent-color: var(--good); }
+
+/* everywhere: targets a small finger can hit */
+.icon-btn { width: 44px; height: 44px; }
+.seg button { min-height: 44px; }
+.btn.sm { min-height: 44px; }
+.muted.small { font-size: .82rem; }
+.app { position: relative; }
+.adultok { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 4px 14px; border-radius: 999px; border: 2px dashed var(--good); background: #f1fbf4; color: #1f6b3d; font-weight: 800; font-size: .86rem; }
+.adultok svg { width: 18px; height: 18px; fill: currentColor; }
+.xpline .rank { color: #7b4fd6; }
+.choices button { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: .74rem; font-weight: 800; }
+.choices button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.choices button.cur { border-color: var(--good); background: #e8f8ee; box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 35%, transparent); }
+.dexcell.latest { outline: 3px solid #ff8a5c; outline-offset: 2px; }
+.modal .stack { width: 100%; }
+/* a short arena (small phone, several players): compact name plates so the creatures stay in view */
+@container (max-height: 230px) {
+  .plate { padding: 3px 8px 4px; min-width: 40%; }
+  .plate .nm { font-size: .82rem; gap: 4px; }
+  .plate .chip { padding: 1px 7px; font-size: .74rem; }
+  .hp { height: 7px; margin-top: 3px; }
+  .hpnum { display: none; }
+  .shields { margin-top: 2px; font-size: 0; }
+  .shields i { width: 16px; height: 6px; }
+  .hearts { margin-top: 2px; }
+  .hearts i, .hearts.many i { width: 14px; height: 13px; }
+  .xpline { margin-top: 3px; }
+  .xpline .xp { height: 6px; }
+}

@@ -49,6 +49,23 @@ class Sfx {
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
+    // a tune asked for before the first tap starts now
+    if (this.song && this.timer === null) {
+      const s = this.song;
+      this.song = null;
+      this.setMusic(s);
+    }
+  }
+
+  /** The page went to the background (or came back): silence everything meanwhile. */
+  pause(hidden: boolean): void {
+    if (!this.ctx) return;
+    try {
+      if (hidden) void this.ctx.suspend();
+      else void this.ctx.resume();
+    } catch {
+      // ignore
+    }
   }
 
   private tone(freq: number, dur: number, wave: Wave, vol: number, when = 0, slideTo?: number, dest?: AudioNode): void {

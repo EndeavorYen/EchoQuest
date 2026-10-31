@@ -1,7 +1,8 @@
 import { DEX, MON_BY_ID, artUrl, spriteUrl, typeOf, type Mon } from '../../mon/dex';
 import { EVO, evoTree, paginate, type EvoNode } from '../../mon/evolve';
 import { partnerMon } from '../partner';
-import { bar, esc, type ScreenFactory } from '../ctx';
+import { starsHtml, typeChip } from '../ui';
+import { BACK_SVG, bar, esc, type ScreenFactory } from '../ctx';
 
 const GENS: Array<[string, number, number]> = [
   ['關都', 1, 151], ['城都', 152, 251], ['豐緣', 252, 386], ['神奧', 387, 493], ['合眾', 494, 649],
@@ -17,6 +18,16 @@ export const dex: ScreenFactory = (root, ctx) => {
   let page = 0;
   let onlyCaught = false;
   const caught = (): Set<number> => new Set(ctx.save.caught);
+  // open where the newest catch is, so a child finds the creature they just caught
+  const latest = ctx.save.caught[ctx.save.caught.length - 1];
+  if (latest !== undefined) {
+    const g = GENS.findIndex(([, lo, hi]) => latest >= lo && latest <= hi);
+    if (g >= 0) {
+      gen = g;
+      const idx = DEX.filter((m) => m.id >= GENS[g][1] && m.id <= GENS[g][2]).findIndex((m) => m.id === latest);
+      page = Math.max(0, Math.floor(idx / DEX_PAGE_SIZE));
+    }
+  }
 
   function draw(): void {
     const have = caught();
@@ -27,7 +38,7 @@ export const dex: ScreenFactory = (root, ctx) => {
     const cells = pg.items
       .map((m) => {
         const got = have.has(m.id);
-        return `<button class="dexcell ${got ? '' : 'unknown'}" data-id="${m.id}"><img loading="lazy" src="${spriteUrl(m.id)}" alt="" onerror="this.style.visibility='hidden'"><span class="n">${got ? esc(m.name) : '？？？'}</span></button>`;
+        return `<button class="dexcell ${got ? '' : 'unknown'}${m.id === latest ? ' latest' : ''}" data-id="${m.id}" aria-label="${got ? esc(m.name) : '還沒抓到'}"><img loading="lazy" src="${spriteUrl(m.id)}" alt="" onerror="this.style.visibility='hidden'"><span class="n">${got ? esc(m.name) : '？？？'}</span></button>`;
       })
       .join('');
     const gens = GENS.map((g, i) => {
@@ -38,9 +49,9 @@ export const dex: ScreenFactory = (root, ctx) => {
       <div class="seg">${gens}</div>
       <label class="onlycaught"><input type="checkbox" id="only" ${onlyCaught ? 'checked' : ''}> 只看已抓到的</label>
       <div class="scroll" id="dexarea"><div class="dexgrid">${cells || '<p class="muted dexempty">這一代還沒有抓到的寶可夢</p>'}</div></div>
-      <div class="pager"><button class="icon-btn" id="prev" aria-label="上一頁" ${pg.page === 0 ? 'disabled' : ''}>‹</button>
+      <div class="pager"><button class="icon-btn" id="prev" aria-label="上一頁" ${pg.page === 0 ? 'disabled' : ''}>${BACK_SVG}</button>
         <span id="pageinfo">第 ${pg.page + 1} 頁／共 ${pg.pages} 頁</span>
-        <button class="icon-btn" id="next" aria-label="下一頁" ${pg.page >= pg.pages - 1 ? 'disabled' : ''}>›</button></div></div>`;
+        <button class="icon-btn flip" id="next" aria-label="下一頁" ${pg.page >= pg.pages - 1 ? 'disabled' : ''}>${BACK_SVG}</button></div></div>`;
     root.querySelectorAll<HTMLElement>('[data-gen]').forEach((b) => b.addEventListener('click', () => { gen = Number(b.dataset.gen); page = 0; draw(); }));
     root.querySelectorAll<HTMLElement>('[data-id]').forEach((b) => b.addEventListener('click', () => sheet(MON_BY_ID.get(Number(b.dataset.id))!)));
     root.querySelector('#only')!.addEventListener('change', (e) => { onlyCaught = (e.target as HTMLInputElement).checked; page = 0; draw(); });
@@ -108,7 +119,7 @@ export const dex: ScreenFactory = (root, ctx) => {
     el.innerHTML = `<div style="--type:${t.color}">
       <img src="${artUrl(m.id)}" alt="" style="${got ? '' : 'filter:brightness(0) opacity(.2)'}">
       <div class="big">${got ? esc(m.name) : '？？？'}</div>
-      <div><span class="chip" style="background:${t.color}">${t.name}</span> <span class="stars">${'★'.repeat(m.rarity)}${'☆'.repeat(5 - m.rarity)}</span> <span class="muted">No.${m.id}</span></div>
+      <div>${typeChip(t)} <span class="stars" aria-label="${m.rarity} 星">${starsHtml(m.rarity)}</span> <span class="muted">No.${m.id}</span></div>
       ${evolution(m)}
       ${got ? `<div class="seg">${seats}</div>` : '<div class="muted">打倒牠就能收進圖鑑</div>'}
       <button class="btn ghost" data-close>關閉</button></div>`;

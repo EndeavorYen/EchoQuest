@@ -16,6 +16,8 @@ import { WordPanel } from '../battle-view';
 import { bar, esc, type ScreenFactory } from '../ctx';
 
 const MAX_TRIES = 3;
+/** unrecognised attempts before 我念對了 / 跳過這個字 appear (as in a fight) */
+const STUCK_AFTER = 3;
 
 /** Say words with no monster and no clock: a gentle place to get a hard word right. */
 export const practice: ScreenFactory = (root, ctx, params: { quiz?: boolean } | undefined) => {
@@ -26,6 +28,8 @@ export const practice: ScreenFactory = (root, ctx, params: { quiz?: boolean } | 
   let level = ctx.save.players[seat].level as Level;
   let word: Word | null = null;
   let tries = 0;
+  /** attempts that did not count as a hearing (wrong words and "heard nothing" alike) */
+  let attempts = 0;
   let heard: string[] = [];
   let typing = false;
   let busy = false;
@@ -56,8 +60,8 @@ export const practice: ScreenFactory = (root, ctx, params: { quiz?: boolean } | 
     const p = ctx.save.players[seat];
     word = pickPractice(p, level, Date.now(), ctx.rng, recent);
     recent = [...recent.slice(-8), word.id];
-    tries = 0; heard = []; typing = false;
-    show('說出這個單字');
+    tries = 0; attempts = 0; heard = []; typing = false;
+    show();
     sayWord(word.w, word.zh);
   }
 
@@ -74,14 +78,14 @@ export const practice: ScreenFactory = (root, ctx, params: { quiz?: boolean } | 
       townmap: s.townmap ? doneQuiz(s.townmap) : s.townmap,
     }));
     sfx.play(relic ? 'chest' : 'good');
-    (root.querySelector('#panel') as HTMLElement).innerHTML = `<div class="card" style="text-align:center" data-quiz-done>
+    (root.querySelector('#panel') as HTMLElement).innerHTML = `<div class="victory" data-quiz-done>
       ${relic ? `<div class="relic">${glyph(relic.icon)}</div><div class="big">答對 ${right} 個，送你${esc(relic.zh)}！</div>` : `<div class="big">謝謝你陪我練習！</div><div class="muted">答對 ${right} 個</div>`}
       <button class="btn" data-go="trek">回到地圖</button></div>`;
   }
 
   function show(note = ''): void {
     if (!word) return;
-    panel.showWord({ mode: 'speak', word, hint: '跟著念一念', note, showConfirm: tries >= 1, listening: speaker.listening, typing, micLabel: '按下去，說說看' });
+    panel.showWord({ mode: 'speak', word, hint: '跟著念一念', note, showConfirm: tries >= 1 || attempts >= 1, stuck: attempts >= STUCK_AFTER, listening: speaker.listening, typing, micLabel: '按下去，說說看' });
   }
 
   function mark(ok: boolean): void {
@@ -102,13 +106,23 @@ export const practice: ScreenFactory = (root, ctx, params: { quiz?: boolean } | 
 
   function answer(r: SpeakResult): void {
     if (!word || busy) return;
-    if (r.kind === 'fail') { show(r.reason === 'no-speech' ? '沒聽到，再按一次麥克風' : r.reason === 'denied' ? '麥克風被擋住了，請改用鍵盤' : '再試一次！'); return; }
+    if (r.kind === 'fail') {
+      if (r.reason === 'aborted') return;
+      // heard nothing still counts, or a quiet child could be stuck here forever
+      attempts += 1;
+      logHeard({ w: word.w, c: [r.reason], r: 'none', lv: level });
+      // no microphone at all: the typing box takes over
+      if (r.reason === 'denied' || r.reason === 'unsupported') typing = true;
+      show(r.reason === 'no-speech' ? '沒聽到，再按一次麥克風' : r.reason === 'denied' ? '麥克風被擋住了，可以用鍵盤打字' : r.reason === 'unsupported' ? '這裡不能用語音，可以用鍵盤打字' : '再試一次！');
+      return;
+    }
     const cand = r.kind === 'heard' ? r.candidates : [r.text];
     const j = judge(word.w, cand, level, knownHearings(ctx.save.aliases, word));
     logHeard({ w: word.w, c: cand, r: j.tier, lv: level });
     heard = cand; typing = false;
     if (j.tier !== 'miss') return pass();
     tries += 1;
+    attempts += 1;
     if (tries >= MAX_TRIES) {
       busy = true;
       mark(false);
@@ -123,11 +137,20 @@ export const practice: ScreenFactory = (root, ctx, params: { quiz?: boolean } | 
   }
 
   panel.onHear = () => { if (word) sayWord(word.w, word.zh); };
-  panel.onKeyboard = () => { speaker.cancel(); typing = true; show(); };
+  panel.onKeyboard = () => { speaker.cancel(); typing = !typing; show(); };
+  panel.onSkip = () => {
+    if (!word || busy) return;
+    busy = true;
+    logHeard({ w: word.w, c: heard, r: 'skipped', lv: level });
+    mark(false);
+    panel.showWait(`答案是「${word.w}」，下次再來！`);
+    sayWord(word.w, word.zh);
+    timer = window.setTimeout(after, 1400);
+  };
   panel.onSubmitTyped = (t) => answer({ kind: 'typed', text: t });
   panel.onConfirm = () => {
     if (!word || busy) return;
-    if (heard.length) { const w = word; ctx.update((s) => ({ ...s, aliases: learnHearing(s.aliases, w, heard) })); logHeard({ w: word.w, c: heard, r: 'confirmed', lv: level }); }
+    if (heard.length) { const w = word; ctx.update((s) => ({ ...s, aliases: learnHearing(s.aliases, w, heard, { strict: true }) })); logHeard({ w: word.w, c: heard, r: 'confirmed', lv: level }); }
     pass();
   };
   panel.onMic = () => {
@@ -135,12 +158,15 @@ export const practice: ScreenFactory = (root, ctx, params: { quiz?: boolean } | 
     stopSay();
     if (speaker.listening) { speaker.cancel(); show(); return; }
     speaker.listen(answer, [word.w, ...knownHearings(ctx.save.aliases, word)]);
+    // an engine that fails at once has already answered: don't paint 聽著… over its message
+    if (!speaker.listening) return;
     show('聽著…');
     const poll = (): void => { if (speaker.listening) { if (speaker.interim) panel.setNote(`“${speaker.interim}”`); window.setTimeout(poll, 150); } };
     poll();
   };
 
-  root.addEventListener('click', (e) => {
+  // on this screen's own element, so the listener goes away with the screen
+  root.querySelector('.app')!.addEventListener('click', (e) => {
     const t = e.target as HTMLElement;
     const s = t.closest('[data-seat]') as HTMLElement | null;
     const l = t.closest('[data-lv]') as HTMLElement | null;

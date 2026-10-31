@@ -36,11 +36,15 @@ function pickFrom(
  */
 export function dealCard(player: Player, now: number, rng: Rng, recent: string[] = [], lv: number = player.level): Card {
   const word =
+    // the youngest cannot read the card: a picture is what tells them the word
+    (player.level <= 1 ? pickFrom(player, lv, now, rng, new Set(recent), hasPicture) : null) ??
     pickFrom(player, lv, now, rng, new Set(recent)) ??
     pickFrom(player, 1, now, rng, new Set()) ??
     WORDS[0];
   return { word };
 }
+
+const hasPicture = (w: Word): boolean => !!w.icon;
 
 /** Letters only, for length checks ("ice cream" → 8). */
 const letters = (w: Word): number => w.w.replace(/[^a-z]/gi, '').length;
@@ -53,7 +57,7 @@ export function dealHardCard(player: Player, now: number, rng: Rng, recent: stri
   const avoid = new Set(recent);
   const word =
     player.level < 4
-      ? pickFrom(player, player.level + 1, now, rng, avoid)
+      ? (player.level <= 1 ? pickFrom(player, 2, now, rng, avoid, hasPicture) : null) ?? pickFrom(player, player.level + 1, now, rng, avoid)
       : pickFrom(player, 4, now, rng, avoid, (w) => letters(w) >= 8);
   return word ? { word, hard: true } : dealCard(player, now, rng, recent);
 }
@@ -82,13 +86,14 @@ export function pickDefenseWord(player: Player, now: number, rng: Rng, recent: s
   const lv = Math.max(1, player.level - 1);
   const avoid = new Set(recent);
   return (
+    (player.level <= 1 ? pickFrom(player, lv, now, rng, avoid, (w) => hasPicture(w) && w.w.length <= 7) : null) ??
     pickFrom(player, lv, now, rng, avoid, (w) => w.w.length <= 7) ??
     pickFrom(player, lv, now, rng, avoid) ??
     WORDS[0]
   );
 }
 
-/** Words for practice mode, weakest first. */
+/** Words for practice mode, weakest first (with a picture for the youngest). */
 export function pickPractice(player: Player, lv: number, now: number, rng: Rng, recent: string[]): Word {
-  return pickFrom(player, lv, now, rng, new Set(recent)) ?? WORDS[0];
+  return (lv <= 1 ? pickFrom(player, lv, now, rng, new Set(recent), hasPicture) : null) ?? pickFrom(player, lv, now, rng, new Set(recent)) ?? WORDS[0];
 }

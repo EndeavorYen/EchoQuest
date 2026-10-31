@@ -83,12 +83,15 @@ test.describe('scan and battle', () => {
     await open(p);
     await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
     await p.waitForFunction(() => (window as any).__v3?.battle);
-    await game.say('zzzz', 'zzzz');
+    // a near miss (same first letter): plausible, so it is learned
+    const near = `${(await p.locator('#theWord').innerText())[0]}qxzq`;
+    await game.say(near, near);
     for (let i = 0; i < 2; i++) {
       await p.click('[data-act=mic]');
       await expect(p.locator('#note')).toContainText('再試一次');
     }
     const before = await ctl(p, (c) => c.battle.monster.hp);
+    await expect(p.locator('.adultok')).toContainText('大人確認');
     await p.click('[data-act=ok]');
     await expect.poll(() => ctl(p, (c) => c.battle.monster.hp)).toBeLessThan(before);
     expect(await save(p, (s) => Object.keys(s.aliases).length)).toBe(1);
@@ -506,6 +509,9 @@ test.describe('co-op boss', () => {
     await go(p, 'battle', { foe: BOSS, boss: true });
     await p.waitForFunction(() => (window as any).__v3?.shield);
     await expect(p.locator('.pbtn .adult')).toHaveCount(1);
+    // the fight starts on the child (who can break the shield); mum taps her own chip to have a go
+    expect(await ctl(p, (c) => c.battle.turn)).toBe(1);
+    await p.click('.pbtn[data-i="0"]');
     await expect(p.locator('.panel .hint')).toContainText('彈開');
     const hp = await ctl(p, (c) => c.battle.monster.hp);
     const layers = await ctl(p, (c) => c.shield.layers);
@@ -644,14 +650,140 @@ test.describe('word card', () => {
   });
 });
 
+test.describe('robustness', () => {
+  test('the village quiz never traps a child the mic cannot hear: 我念對了 / 跳過 appear', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'practice', { quiz: true });
+    for (let i = 0; i < 3; i++) {
+      await p.click('[data-act=mic]');
+      await expect(p.locator('#note')).toContainText('沒聽到');
+    }
+    await expect(p.locator('.stuck [data-act=skip]')).toBeVisible();
+    await p.click('.stuck [data-act=skip]');
+    await expect(p.locator('#hint')).toBeVisible();
+  });
+
+  test('without a speech engine the typing box takes over (no endless 聽著…)', async ({ game }) => {
+    const p = game.page;
+    await p.addInitScript(() => { delete (window as any).SpeechRecognition; delete (window as any).webkitSpeechRecognition; });
+    await open(p);
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await p.click('[data-act=mic]');
+    await expect(p.locator('#typed')).toBeVisible();
+    await expect(p.locator('#note')).toContainText('不能用語音');
+    // the keyboard button is a toggle
+    await p.click('[data-act=kbd]');
+    await expect(p.locator('#typed')).toHaveCount(0);
+    await expect(p.locator('[data-act=mic]')).toBeVisible();
+  });
+
+  test('the second half of a double tap is dropped when the screen just changed under the finger', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => { (window as any).__app.update((s: any) => ({ ...s, caught: [] })); (window as any).__tapGuard = true; });
+    const tapNext = () => p.evaluate(() => {
+      const b = document.querySelector('#next') as HTMLElement;
+      b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      b.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    });
+    // a tap that lands right after the screen changed: ignored
+    await p.evaluate(() => (window as any).__app.go('dex'));
+    await tapNext();
+    await expect(p.locator('#pageinfo')).toContainText('第 1 頁');
+    // a deliberate tap a moment later works
+    await p.waitForTimeout(400);
+    await tapNext();
+    await expect(p.locator('#pageinfo')).toContainText('第 2 頁');
+  });
+
+  test('the phone back button goes back inside the app; in a fight it asks first', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.click('[data-go=dex]');
+    await p.goBack();
+    await expect(p.locator('[data-screen=home]')).toBeVisible();
+    await p.click('[data-go=trek]');
+    await walkToFight(p);
+    await startFight(p);
+    await p.goBack();
+    await expect(p.locator('.modal')).toContainText('要逃走嗎');
+    await p.click('.modal [data-act=stay]');
+    expect(await ctl(p, (c) => c.phase)).toBe('speak');
+  });
+
+  test('a second tab does not undo what the first one saved', async ({ game }) => {
+    const a = game.page;
+    await open(a);
+    const b = await a.context().newPage();
+    await open(b);
+    await go(b, 'party');
+    await a.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, caught: [153] })));
+    await expect.poll(() => b.evaluate(() => (window as any).__app.save.caught)).toEqual([153]);
+    await b.click('#mus');
+    expect(await a.evaluate(() => JSON.parse(localStorage.getItem('echoquest.v3')!).caught)).toEqual([153]);
+  });
+
+  test('a corrupt save still opens the game', async ({ game }) => {
+    const p = game.page;
+    await p.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('echoquest.v3', JSON.stringify({ v: 3, players: [{ name: 'X', level: 7 }, null], active: -1 })); } });
+    await open(p);
+    await expect(p.locator('[data-screen=home]')).toBeVisible();
+    await go(p, 'party');
+    await expect(p.locator('.pcard')).toHaveCount(1);
+  });
+
+  test('leaving a fight mid-catch and visiting practice twice cause no errors', async ({ game }) => {
+    const p = game.page;
+    const errors: string[] = [];
+    p.on('pageerror', (e) => errors.push(String(e)));
+    await open(p);
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => c.win());
+    await go(p, 'home');
+    await p.waitForTimeout(3200);
+    for (let i = 0; i < 2; i++) { await go(p, 'practice'); await go(p, 'home'); }
+    await go(p, 'party');
+    await p.click('[data-lv="0"][data-d="1"]');
+    expect(errors).toEqual([]);
+  });
+
+  test('a shielded boss fight starts on the child, and a grown-up\'s reflected hit bounces off the shield', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, active: 0, players: [{ ...s.players[0], name: '媽媽', adult: true, level: 2 }, { ...s.players[0], id: 'k', name: '小寶', adult: false, level: 1 }] })));
+    await go(p, 'battle', { foe: { id: 383, name: '固拉多', type: 'ground', rarity: 5, colors: ['#D11115'] }, boss: true });
+    await p.waitForFunction(() => (window as any).__v3?.shield);
+    expect(await ctl(p, (c) => c.battle.turn)).toBe(1);
+    await expect(p.locator('.pbtn .pname')).toHaveText(['媽媽', '小寶']);
+    // mum defends with a reflect while the shield is up: no damage gets through
+    await ctl(p, (c) => { c.statusEnabled = false; c.battle.select(0); c.startDefend(9); });
+    const hp = await ctl(p, (c) => c.battle.monster.hp);
+    await ctl(p, (c) => { c.rng.next = () => 0.5; c.resolveDefense(true, 'perfect'); });
+    await p.waitForTimeout(1500);
+    expect(await ctl(p, (c) => c.battle.monster.hp)).toBe(hp);
+  });
+});
+
 test.describe('what is new', () => {
+  test('a brand-new install has no red dot (nothing is new to them yet)', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await expect(p.locator('#infodot')).toBeHidden();
+  });
+
   test('the info button opens the update notes; the red dot goes once they were read', async ({ game }) => {
     const p = game.page;
+    // a family that played an earlier version
+    await p.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('echoquest.v3', JSON.stringify({ v: 3, players: [{ name: 'A', level: 1 }] })); localStorage.setItem('echoquest-seen-version', '2.4'); } });
     await open(p);
     await expect(p.locator('#infodot')).toBeVisible();
     await p.click('#info');
     await expect(p.locator('[data-screen=changelog]')).toContainText('城鎮地圖');
-    await expect(p.locator('.rel-list article.new')).toHaveCount(1);
+    // everything since the version they last read is marked new
+    expect(await p.locator('.rel-list article.new').count()).toBeGreaterThan(0);
     await p.click('[data-screen=changelog] [data-close]');
     await expect(p.locator('[data-screen=changelog]')).toHaveCount(0);
     await go(p, 'party');
@@ -666,8 +798,10 @@ test.describe('dex and party', () => {
   test('the dex marks caught creatures and a caught one can become the partner', async ({ game }) => {
     const p = game.page;
     await open(p);
-    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, caught: [6, 25] })));
+    // the dex opens where the newest catch is (#6 here: Kanto, page 1)
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, caught: [25, 6] })));
     await go(p, 'dex');
+    await expect(p.locator('.dexcell.latest[data-id="6"]')).toHaveCount(1);
     await expect(p.locator('.bar h1')).toContainText('2 /');
     await expect(p.locator('.dexcell')).toHaveCount(12);
     await expect(p.locator('.dexcell:not(.unknown)')).toHaveCount(1); // only #6 is on the first page
@@ -761,6 +895,12 @@ test.describe('dex and party', () => {
     await p.click('.choices [data-mon="4"]');
     expect(await save(p, (s) => s.players[0].mon)).toBe(4);
     await p.click('[data-del="1"]');
+    // removing a player asks first
+    await expect(p.locator('.modal')).toContainText('要移除');
+    await p.click('.modal [data-act=no]');
+    await expect(p.locator('.pcard')).toHaveCount(2);
+    await p.click('[data-del="1"]');
+    await p.click('.modal [data-act=yes]');
     await expect(p.locator('.pcard')).toHaveCount(1);
   });
 });
@@ -903,7 +1043,7 @@ test.describe('town map', () => {
     const id = await save(p, (s) => s.townmap.entering);
     expect(id).not.toBeNull();
     expect(await save(p, (s) => s.townmap.foes[s.townmap.entering])).toBeGreaterThan(0);
-    await expect(p.locator('[data-screen=reveal]')).toContainText(/出現了/);
+    await expect(p.locator('[data-screen=reveal]')).toContainText(/遇到了|館主|冠軍/);
   });
 
   test('a place already visited can be walked to from far away; only new places need a neighbour', async ({ game }) => {
@@ -977,6 +1117,7 @@ test.describe('town map', () => {
       await startFight(p);
       expect(types).toContain(await ctl(p, (c) => c.foe.type));
       await p.click('[data-act=leave]');
+      await p.click('.modal [data-act=yes]');
       await expect(p.locator('[data-screen=trek]')).toBeVisible();
     }
   });
@@ -990,6 +1131,13 @@ test.describe('town map', () => {
     await walkToFight(p);
     await startFight(p);
     await p.click('[data-act=leave]');
+    // a stray tap does not end the fight: it asks first
+    await expect(p.locator('.modal')).toContainText('要逃走嗎');
+    await p.click('.modal [data-act=stay]');
+    await expect(p.locator('.modal')).toHaveCount(0);
+    expect(await ctl(p, (c) => c.phase)).toBe('speak');
+    await p.click('[data-act=leave]');
+    await p.click('.modal [data-act=yes]');
     await expect(p.locator('[data-screen=trek]')).toBeVisible();
     expect(await snap()).toEqual(before);
     expect(await save(p, (s) => s.townmap.entering)).toBeNull();

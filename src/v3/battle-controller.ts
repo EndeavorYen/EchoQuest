@@ -124,7 +124,7 @@ export class BattleController {
     view.onSubmitTyped = (t) => this.answer({ kind: 'typed', text: t });
     view.onNext = () => this.onNextFoe();
     view.onLose = () => this.onLose();
-    view.onLeave = () => { this.stopTimer(); this.speaker.cancel(); stopSay(); this.onLeave(); };
+    view.onLeave = () => this.askLeave();
   }
 
   get players(): Player[] { return this.save.players; }
@@ -138,8 +138,11 @@ export class BattleController {
     this.speaker.cancel();
     this.foe = foe ?? this.foe;
     const maxHp = foeHp(this.players, this.foe.rarity, bossFoe);
-    this.battle = new Battle({ name: this.foe.name, hp: maxHp, maxHp, boss: bossFoe }, this.players, firstPlayer);
     const layers = shieldLayersFor(this.foe.rarity, bossFoe);
+    // a shielded creature bounces grown-ups' spells: start on a child, who can actually break it
+    const kid = this.players.findIndex((p) => !p.adult);
+    if (layers > 0 && this.players[firstPlayer]?.adult && kid >= 0) firstPlayer = kid;
+    this.battle = new Battle({ name: this.foe.name, hp: maxHp, maxHp, boss: bossFoe }, this.players, firstPlayer);
     this.shield = layers > 0 ? new Shield(layers) : null;
     this.maxHearts = heartsFor(this.foe.rarity, bossFoe);
     this.hearts = this.maxHearts;
@@ -171,7 +174,7 @@ export class BattleController {
     this.view.setParty(
       this.players.map((p, i) => {
         const m = this.partnerMon(p);
-        return { img: artUrl(m.id), color: typeOf(m).color, level: p.level, on: i === this.battle.turn, adult: !!p.adult };
+        return { img: artUrl(m.id), color: typeOf(m).color, level: p.level, on: i === this.battle.turn, adult: !!p.adult, name: p.name, mon: m.name };
       }),
     );
     this.view.setPartner(this.partnerMon(this.me));
@@ -198,6 +201,10 @@ export class BattleController {
       this.tries = 0;
       this.attempts = 0;
       this.lastHeard = [];
+      // the new defender gets their own amount of time (a little one taking over from a grown-up gets more)
+      this.defTotal = DEFENSE_TIME[this.me.level] ?? DEFENSE_TIME[1];
+      this.defLeft = Math.max(this.defLeft, this.defTotal);
+      this.lastTick = performance.now();
       this.showDefend();
     } else this.deal();
   }
@@ -235,7 +242,7 @@ export class BattleController {
     this.typing = false;
     this.setupRound();
     this.refreshParty();
-    this.render(this.round === 'speak' ? '說出這個英文單字，放出招式！' : '');
+    this.render();
     if (this.round === 'listen') window.setTimeout(() => { if (!this.dead && this.round === 'listen' && this.phase === 'speak') sayWord(this.word.w, ''); }, 350);
   }
 
@@ -285,7 +292,7 @@ export class BattleController {
       return this.view.showSpell({ word: this.word, hint: hint ?? '把缺的字母補上！', letters: s.letters, blanks: s.blanks, got: s.got, tiles: s.tiles, used: s.used, bad: s.bad, hard: this.hard, note });
     }
     if (this.round === 'memory' && this.memR) {
-      return this.view.showMemory({ hint: hint ?? '翻牌配對，找出一樣的！', cards: this.memR.cards, hard: this.hard, note });
+      return this.view.showMemory({ hint: hint ?? (this.me.level <= 1 ? '翻牌，找出一樣的兩張圖！' : '翻牌，把圖和英文配成一對！'), cards: this.memR.cards, hard: this.hard, note });
     }
     this.view.showWord({
       mode: 'speak',
@@ -333,6 +340,8 @@ export class BattleController {
     }
     const w = this.phase === 'defend' && this.defWord ? this.defWord : this.word;
     this.speaker.listen((r) => this.answer(r), [w.w, ...knownHearings(this.save.aliases, w)]);
+    // an engine that fails at once has already answered: don't paint 聽著… over its message
+    if (!this.speaker.listening) return;
     this.rerender('聽著…');
     this.pollInterim();
   }
@@ -343,9 +352,10 @@ export class BattleController {
     window.setTimeout(() => this.pollInterim(), 150);
   }
 
+  /** The keyboard button switches between typing and the microphone. */
   private openKeyboard(): void {
     this.speaker.cancel();
-    this.typing = true;
+    this.typing = !this.typing;
     this.rerender();
   }
 
@@ -365,6 +375,8 @@ export class BattleController {
       // nothing came back: that still counts as an attempt, or the round could never end
       logHeard({ w: w.w, c: [r.reason], r: 'none', lv, defend: defending });
       this.attempts += 1;
+      // no microphone at all: the typing box takes over
+      if (r.reason === 'denied' || r.reason === 'unsupported') this.typing = true;
       if (defending && this.attempts >= RESCUE_AFTER) return this.rescue(w);
       this.rerender(failText(r.reason));
       return;
@@ -413,7 +425,7 @@ export class BattleController {
     const defending = this.phase === 'defend';
     const w = defending && this.defWord ? this.defWord : this.word;
     if (this.lastHeard.length) {
-      this.save = { ...this.save, aliases: learnHearing(this.save.aliases, w, this.lastHeard) };
+      this.save = { ...this.save, aliases: learnHearing(this.save.aliases, w, this.lastHeard, { strict: true }) };
       this.onSave(this.save);
     }
     logHeard({ w: w.w, c: this.lastHeard, r: 'confirmed', lv: this.me.level, defend: defending });
@@ -787,7 +799,8 @@ export class BattleController {
 
   private tick(): void {
     const now = performance.now();
-    this.defLeft -= (now - this.lastTick) / 1000;
+    // a tab in the background (or a slow phone) must not eat the clock: at most a quarter second per tick
+    this.defLeft -= Math.min(0.25, (now - this.lastTick) / 1000);
     this.lastTick = now;
     this.view.setTimer(this.defLeft / this.defTotal);
     if (this.defLeft <= 0) {
@@ -809,7 +822,12 @@ export class BattleController {
     this.view.setCharging(false);
     const w = this.defWord;
     const kind: DefenseKind | null = ok ? force ?? rollDefense(tier, this.rng) : null;
-    const res = this.battle.defend(ok, kind ? DEFENSE[kind].mult : 1);
+    // while the shield is up a grown-up's reflected hit bounces off it too (the block itself still works)
+    const sh = this.shield;
+    const bounced = !!sh?.up && !!this.me.adult && this.hasKid();
+    const res = this.battle.defend(ok, kind ? (bounced ? 0 : DEFENSE[kind].mult) : 1);
+    // and nothing finishes a creature whose shield is still up
+    if (sh?.up && res.killed) { this.battle.monster.hp = 1; res.killed = false; }
     if (w && ok) this.mark(w, true, tier, res.reflect, true);
     this.view.showWait(kind ? DEFENSE[kind].zh : '糟糕…');
     const foeFx = typeOf(this.foe).fx;
@@ -896,9 +914,38 @@ export class BattleController {
     }, aim);
   }
 
+  /** 逃走 asks first (a stray tap must not throw away half a boss fight); the clock waits meanwhile. */
+  private askLeave(): void {
+    if (this.dead) return;
+    if (this.phase === 'victory' || this.phase === 'lost') return this.leaveNow();
+    const wasDefending = this.phase === 'defend' && this.timerId !== null;
+    this.stopTimer();
+    this.speaker.cancel();
+    stopSay();
+    this.view.confirmLeave(
+      () => this.leaveNow(),
+      () => {
+        if (this.dead) return;
+        if (wasDefending && this.phase === 'defend') {
+          this.lastTick = performance.now();
+          this.timerId = window.setInterval(() => this.tick(), 100);
+        }
+        this.rerender();
+      },
+    );
+  }
+
+  private leaveNow(): void {
+    this.stopTimer();
+    this.speaker.cancel();
+    stopSay();
+    this.onLeave();
+  }
+
   /** Leave the screen: stop timers and the microphone. */
   dispose(): void {
     this.dead = true;
+    this.view.dispose();
     this.stopTimer();
     this.speaker.cancel();
     stopSay();
@@ -924,6 +971,7 @@ export class BattleController {
     this.stopTimer();
     this.phase = 'victory';
     sfx.setMusic(null);
+    this.view.clearFoe();
     const seen = new Set<string>();
     const words = this.learned.filter((w) => !seen.has(w.id) && seen.add(w.id));
     // the win first (so "new to the dex" is judged before any evolution joins it), then growth;
