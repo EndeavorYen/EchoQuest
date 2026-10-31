@@ -2,10 +2,13 @@ import { WORDS, type Word } from '../data/words';
 import { priority } from './progress';
 import type { Player } from './model';
 import { Rng } from '../util/rng';
+import { hardChance } from '../mon/growth';
 
 /** The spell word a player is dealt. */
 export interface Card {
   word: Word;
+  /** a harder word than usual (a raised partner draws these); right = a critical hit */
+  hard?: boolean;
 }
 
 function pickFrom(
@@ -37,6 +40,32 @@ export function dealCard(player: Player, now: number, rng: Rng, recent: string[]
     pickFrom(player, 1, now, rng, new Set()) ??
     WORDS[0];
   return { word };
+}
+
+/** Letters only, for length checks ("ice cream" → 8). */
+const letters = (w: Word): number => w.w.replace(/[^a-z]/gi, '').length;
+
+/**
+ * A hard card: a word one level up; a level-4 player (there is no level 5) gets a long level-4 word.
+ * Falls back to an ordinary card when there is nothing suitable.
+ */
+export function dealHardCard(player: Player, now: number, rng: Rng, recent: string[] = []): Card {
+  const avoid = new Set(recent);
+  const word =
+    player.level < 4
+      ? pickFrom(player, player.level + 1, now, rng, avoid)
+      : pickFrom(player, 4, now, rng, avoid, (w) => letters(w) >= 8);
+  return word ? { word, hard: true } : dealCard(player, now, rng, recent);
+}
+
+/**
+ * Should the next card be a hard one? The chance grows with the partner's rank, and there is never
+ * more than one hard card in any three in a row (`history`: were the last cards hard, oldest first).
+ */
+export function rollHard(rank: number, history: readonly boolean[], rng: Rng): boolean {
+  if (history.slice(-2).some(Boolean)) return false;
+  const p = hardChance(rank);
+  return p > 0 && rng.next() < p;
 }
 
 /** A short, easy word for the shield spell (one level below, never long). */

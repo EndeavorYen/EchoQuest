@@ -2,6 +2,7 @@ import './battle.css';
 import './theme.css';
 import { load, persist, type Save } from '../game/save';
 import { haptics } from '../audio/haptics';
+import { forceRound } from './rounds';
 import { Recognizer } from '../speech/recognizer';
 import { sfx } from '../audio/sfx';
 import { Rng } from '../util/rng';
@@ -19,6 +20,11 @@ const SCREENS: Record<ScreenName, ScreenFactory> = { home, trek, scan, battle, d
 
 const root = document.getElementById('app') as HTMLElement;
 const query = new URLSearchParams(location.search);
+// tests (and anyone curious) can pin the kind of attack round: ?debug&rounds=listen
+{
+  const r = query.has('debug') ? query.get('rounds') : null;
+  if (r === 'speak' || r === 'listen' || r === 'spell' || r === 'memory') forceRound(r);
+}
 
 let current: Screen | void = undefined;
 let save: Save = load();

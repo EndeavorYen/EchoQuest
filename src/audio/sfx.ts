@@ -10,7 +10,7 @@ type Wave = 'square' | 'triangle' | 'sawtooth' | 'sine';
 export type SfxName =
   | 'tap' | 'select' | 'back' | 'listen' | 'hit' | 'perfect' | 'good' | 'miss' | 'combo'
   | 'appear' | 'monsterAttack' | 'warn' | 'shield' | 'block' | 'hurt' | 'win' | 'chest'
-  | 'step' | 'scan' | 'shutter' | 'heal' | 'boss' | 'rare' | 'catchSuck' | 'catchWobble' | 'catchLock'
+  | 'step' | 'scan' | 'shutter' | 'heal' | 'boss' | 'rare' | 'catchSuck' | 'catchWobble' | 'catchLock' | 'crit' | 'evoPulse' | 'evolveDone' | 'starUp'
   | 'dodge' | 'reflect' | 'shieldBreak' | 'status' | 'lose';
 
 const midiToHz = (m: number): number => 440 * Math.pow(2, (m - 69) / 12);
@@ -156,6 +156,27 @@ class Sfx {
         if (arg === 2) this.tone(n(40), 0.7, 'sawtooth', 0.22, 0, n(34));
         break;
       }
+      case 'crit':
+        // a hard word right: a heavy hit with a bright ring on top
+        this.noise(0.25, 0.6, 0, 5000);
+        this.tone(n(43), 0.35, 'sawtooth', 0.35, 0, n(31));
+        [84, 91, 96, 103].forEach((m, i) => this.tone(n(m), 0.12, 'square', 0.22, 0.05 + i * 0.05));
+        break;
+      case 'evoPulse':
+        // arg: which pulse; each one a little higher, the evolution winding up
+        this.tone(n(64 + Math.min(arg, 14) * 2), 0.09, 'triangle', 0.26);
+        break;
+      case 'evolveDone':
+        [72, 76, 79, 84].forEach((m, i) => this.tone(n(m), 0.16, 'square', 0.24, i * 0.1));
+        [84, 88, 91].forEach((m) => this.tone(n(m), 0.9, 'triangle', 0.26, 0.42));
+        this.tone(n(48), 0.9, 'triangle', 0.3, 0.42);
+        this.noise(0.5, 0.18, 0.42, 9000);
+        break;
+      case 'starUp':
+        // arg 0: the "ready to grow" chime; 1: the star itself
+        [88, 93, 100].forEach((m, i) => this.tone(n(m), arg ? 0.3 : 0.14, 'triangle', 0.26, i * 0.07));
+        if (arg) this.noise(0.35, 0.16, 0.2, 9000);
+        break;
       case 'catchSuck':
         // sucked into the ball: a falling whoosh and a little pop
         this.tone(n(88), 0.5, 'triangle', 0.3, 0, n(52));

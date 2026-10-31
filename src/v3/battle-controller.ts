@@ -6,7 +6,9 @@ import { ENTRANCE, gradeOf, heartsFor, shieldLayersFor, type Grade } from '../mo
 import { DEFENSE, rollDefense, type DefenseKind } from '../game/defense';
 import { Afflictions, STATUS, STATUS_ORDER, rollStatus } from '../game/status';
 import { foeHp, typicalHit, TIRED_ROUND } from './pacing';
-import { dealCard, pickDefenseWord } from '../game/deck';
+import { dealCard, dealHardCard, pickDefenseWord, rollHard } from '../game/deck';
+import { addXp, evolvesTo, growthOf, isReady, takeStep, xpFor, xpNeeded, type GrowStep } from '../mon/growth';
+import { chooseRound, listenChoices, memoryDeck, roundPrefs, spellPuzzle, type ListenRound, type MemoryCard, type RoundType, type SpellRound } from './rounds';
 import { Revenge, REVENGE_MULT } from '../game/revenge';
 import { record } from '../game/progress';
 import type { Player } from '../game/model';
@@ -19,7 +21,7 @@ import type { Recognizer } from '../speech/recognizer';
 import { sfx, sayWord, stopSay } from '../audio/sfx';
 import { Rng } from '../util/rng';
 import type { Word } from '../data/words';
-import { artUrl, typeOf, type Mon } from '../mon/dex';
+import { artUrl, MON_BY_ID, typeOf, type Mon } from '../mon/dex';
 import { partnerMon } from './partner';
 import { BattleView } from './battle-view';
 
@@ -30,6 +32,16 @@ export const RESCUE_AFTER = 2;
 export const STUCK_AFTER = 3;
 /** Seconds to raise a shield once the wild creature winds up. Even the youngest players get one, with plenty of time. */
 const DEFENSE_TIME: Record<number, number> = { 1: 14, 2: 9, 3: 7, 4: 6 };
+/** A hard word said right lands as a critical hit. */
+export const CRIT_MULT = 1.5;
+/** Memory match: this many wrong pairs or fewer still counts as perfect. */
+const MEMORY_PERFECT = 2;
+
+/** A partner that took a step (evolved or gained a star) after a win. */
+export interface Grown {
+  seat: number;
+  step: GrowStep;
+}
 
 export type Phase = 'speak' | 'strike' | 'defend' | 'resolve' | 'victory' | 'lost';
 
@@ -55,6 +67,16 @@ export class BattleController {
   defLeft = 0;
   defWord: Word | null = null;
   private recent: string[] = [];
+  /** what kind of attack round this is (say it, hear-and-pick, spell, memory) */
+  round: RoundType = 'speak';
+  /** this card is a hard one: right = a critical hit */
+  hard = false;
+  /** were the last attack cards hard (never more than one in three) */
+  private hardHist: boolean[] = [];
+  private memoryUsed = false;
+  listenR: (ListenRound & { wrong: string[] }) | null = null;
+  spellR: (SpellRound & { filled: number; used: boolean[]; mistakes: number }) | null = null;
+  memR: { cards: MemoryCard[]; open: number[]; matched: string[]; misses: number; lock: boolean } | null = null;
   private revenge = new Revenge();
   private revengeActive = false;
   private learned: Word[] = [];
@@ -93,6 +115,9 @@ export class BattleController {
     view.onKeyboard = () => this.openKeyboard();
     view.onConfirm = () => this.confirm();
     view.onSkip = () => this.skip();
+    view.onPick = (i) => this.pick(i);
+    view.onTile = (i) => this.tile(i);
+    view.onFlip = (i) => this.flip(i);
     view.onPartner = (i) => this.switchTo(i);
     view.onSubmitTyped = (t) => this.answer({ kind: 'typed', text: t });
     view.onNext = () => this.onNextFoe();
@@ -121,6 +146,8 @@ export class BattleController {
     this.view.setStatus(null);
     this.learned = [];
     this.recent = [];
+    this.hardHist = [];
+    this.memoryUsed = false;
     this.revenge = new Revenge();
     this.view.setFoe(this.foe, bossFoe);
     this.view.setFoeHp(maxHp, maxHp);
@@ -146,6 +173,14 @@ export class BattleController {
       }),
     );
     this.view.setPartner(this.partnerMon(this.me));
+    this.showXp();
+  }
+
+  /** The active partner's experience bar and rank. */
+  private showXp(id = this.partnerMon(this.me).id): void {
+    const g = growthOf(this.save.growth, id);
+    const need = xpNeeded(g);
+    this.view.setXp({ frac: need === null ? 1 : g.xp / need, rank: g.rank, stars: g.stars, ready: isReady(g), max: need === null });
   }
 
   private switchTo(i: number): void {
@@ -175,22 +210,82 @@ export class BattleController {
     const p = this.me;
     const due = this.revenge.take(p.id, this.battle.round);
     this.revengeActive = !!due;
-    this.word = due ?? dealCard(p, Date.now(), this.rng, this.recent).word;
+    let hard = false;
+    if (due) this.word = due;
+    else {
+      const rank = growthOf(this.save.growth, this.partnerMon(p).id).rank;
+      const card = rollHard(rank, this.hardHist, this.rng)
+        ? dealHardCard(p, Date.now(), this.rng, this.recent)
+        : dealCard(p, Date.now(), this.rng, this.recent);
+      this.word = card.word;
+      hard = !!card.hard;
+    }
+    this.hard = hard;
+    this.hardHist = [...this.hardHist.slice(-2), hard];
     this.recent = [...this.recent.slice(-6), this.word.id];
     this.tries = 0;
     this.attempts = 0;
     this.lastHeard = [];
     this.typing = false;
+    this.setupRound();
     this.refreshParty();
-    this.render('說出這個英文單字，放出招式！');
+    this.render(this.round === 'speak' ? '說出這個英文單字，放出招式！' : '');
+    if (this.round === 'listen') window.setTimeout(() => { if (this.round === 'listen' && this.phase === 'speak') sayWord(this.word.w, ''); }, 350);
+  }
+
+  /** Decide the kind of round and build its puzzle; anything that cannot be built is spoken. */
+  private setupRound(): void {
+    const p = this.me;
+    this.listenR = null;
+    this.spellR = null;
+    this.memR = null;
+    let kind = chooseRound({
+      rng: this.rng,
+      prefs: roundPrefs(this.save.rounds),
+      level: p.level,
+      word: this.word,
+      round: this.battle.round,
+      memoryUsed: this.memoryUsed,
+      revenge: this.revengeActive,
+    });
+    // listening needs a voice: with the sound off (or no speech synthesis) it is spoken instead
+    const audible = sfx.enabled && typeof speechSynthesis !== 'undefined';
+    if (kind === 'listen' && !audible) kind = 'speak';
+    if (kind === 'listen') {
+      const r = listenChoices(this.word, p.level, this.rng);
+      if (r) this.listenR = { ...r, wrong: [] };
+      else kind = 'speak';
+    } else if (kind === 'spell') {
+      const r = spellPuzzle(this.word, p.level, this.rng);
+      this.spellR = { ...r, filled: 0, used: r.tiles.map(() => false), mistakes: 0 };
+    } else if (kind === 'memory') {
+      const cards = memoryDeck(this.word, p.level, this.rng);
+      if (cards) {
+        this.memR = { cards, open: [], matched: [], misses: 0, lock: false };
+        this.memoryUsed = true;
+      } else kind = 'speak';
+    }
+    this.round = kind;
   }
 
   private render(note = ''): void {
+    const hint = this.bossHint();
+    if (this.round === 'listen' && this.listenR) {
+      return this.view.showListen({ word: this.word, hint: hint ?? '聽聽看，是哪一個？', mode: this.listenR.mode, options: this.listenR.options, wrong: this.listenR.wrong, hard: this.hard, note });
+    }
+    if (this.round === 'spell' && this.spellR) {
+      const s = this.spellR;
+      return this.view.showSpell({ word: this.word, hint: hint ?? '把缺的字母補上！', letters: s.letters, blanks: s.blanks, filled: s.filled, tiles: s.tiles, used: s.used, hard: this.hard, note });
+    }
+    if (this.round === 'memory' && this.memR) {
+      return this.view.showMemory({ hint: hint ?? '翻牌配對，找出一樣的！', cards: this.memR.cards, hard: this.hard, note });
+    }
     this.view.showWord({
       mode: 'speak',
       word: this.word,
-      hint: this.bossHint() ?? (this.revengeActive ? '再挑戰一次，傷害變大！' : '念出咒語攻擊！'),
+      hint: hint ?? (this.revengeActive ? '再挑戰一次，傷害變大！' : '念出咒語攻擊！'),
       revenge: this.revengeActive,
+      hard: this.hard,
       showConfirm: this.tries >= 1 || this.attempts >= 1,
       stuck: this.attempts >= STUCK_AFTER,
       listening: this.speaker.listening,
@@ -215,13 +310,15 @@ export class BattleController {
 
   private hear(): void {
     sfx.unlock();
-    { const w = this.phase === 'defend' && this.defWord ? this.defWord : this.word; sayWord(w.w, w.zh); }
+    const w = this.phase === 'defend' && this.defWord ? this.defWord : this.word;
+    sayWord(w.w, this.phase === 'speak' && this.round === 'listen' ? '' : w.zh);
   }
 
   private mic(): void {
     sfx.unlock();
     stopSay();
     if (this.phase !== 'speak' && this.phase !== 'defend') return;
+    if (this.phase === 'speak' && this.round !== 'speak') return;
     if (this.speaker.listening) {
       this.speaker.cancel();
       this.rerender();
@@ -252,6 +349,7 @@ export class BattleController {
 
   private answer(r: SpeakResult): void {
     if (this.phase !== 'speak' && this.phase !== 'defend') return;
+    if (this.phase === 'speak' && this.round !== 'speak') return;
     const defending = this.phase === 'defend';
     const w = defending && this.defWord ? this.defWord : this.word;
     const lv = this.me.level;
@@ -296,7 +394,7 @@ export class BattleController {
 
   /** Stuck on an attack word: let it go (a fizzle, like three wrong tries) and move on. */
   private skip(): void {
-    if (this.phase !== 'speak') return;
+    if (this.phase !== 'speak' || this.round !== 'speak') return;
     logHeard({ w: this.word.w, c: this.lastHeard, r: 'skipped', lv: this.me.level });
     this.fail(false);
   }
@@ -304,6 +402,7 @@ export class BattleController {
   /** A grown-up says "they said it right". The engine's transcript is remembered for next time. */
   private confirm(): void {
     if (this.phase !== 'speak' && this.phase !== 'defend') return;
+    if (this.phase === 'speak' && this.round !== 'speak') return;
     const defending = this.phase === 'defend';
     const w = defending && this.defWord ? this.defWord : this.word;
     if (this.lastHeard.length) {
@@ -312,6 +411,164 @@ export class BattleController {
     }
     logHeard({ w: w.w, c: this.lastHeard, r: 'confirmed', lv: this.me.level, defend: defending });
     this.succeed('good', defending);
+  }
+
+  // ---- the other kinds of round ------------------------------------------------
+
+  /** Hear it, pick it: the right picture (or meaning) attacks; running out of choices fizzles. */
+  private pick(i: number): void {
+    const r = this.listenR;
+    if (this.phase !== 'speak' || this.round !== 'listen' || !r) return;
+    sfx.unlock();
+    const o = r.options[i];
+    if (!o || r.wrong.includes(o.id)) return;
+    if (o.id === this.word.id) {
+      this.view.markChoice(i, true);
+      this.view.setNote(this.word.w);
+      sayWord(this.word.w, '');
+      window.setTimeout(() => this.succeed('good', false), 450);
+      this.phase = 'strike';
+      return;
+    }
+    r.wrong.push(o.id);
+    sfx.play('miss');
+    if (r.options.length - r.wrong.length <= 1) return this.fail(false);
+    this.render('不是這個，再聽一次！');
+    sayWord(this.word.w, '');
+  }
+
+  /** Fill in the letters, left to right. Three wrong letters fizzle. */
+  private tile(i: number): void {
+    const s = this.spellR;
+    if (this.phase !== 'speak' || this.round !== 'spell' || !s || s.used[i]) return;
+    sfx.unlock();
+    const want = s.letters[s.blanks[s.filled]];
+    if (s.tiles[i] === want) {
+      s.used[i] = true;
+      s.filled += 1;
+      sfx.play('select');
+      if (s.filled >= s.blanks.length) {
+        this.render('拼對了！');
+        sayWord(this.word.w, '');
+        this.phase = 'strike';
+        window.setTimeout(() => this.succeed(s.mistakes === 0 ? 'perfect' : 'good', false), 600);
+        return;
+      }
+      return this.render();
+    }
+    s.mistakes += 1;
+    sfx.play('miss');
+    this.view.shakeTile(i);
+    if (s.mistakes >= MAX_TRIES) return this.fail(false);
+    this.view.setNote('再想想看！');
+  }
+
+  /** Memory: flip two; a match stays up. All three pairs found = a strong attack. */
+  private flip(i: number): void {
+    const m = this.memR;
+    if (this.phase !== 'speak' || this.round !== 'memory' || !m || m.lock) return;
+    sfx.unlock();
+    const c = m.cards[i];
+    if (!c || m.open.includes(i) || m.matched.includes(c.word.id)) return;
+    m.open.push(i);
+    sayWord(c.word.w, '');
+    sfx.play('select');
+    this.view.memoryState(m.open, m.matched);
+    if (m.open.length < 2) return;
+    const [a, b] = m.open.map((k) => m.cards[k]);
+    if (a.word.id === b.word.id) {
+      m.matched.push(a.word.id);
+      m.open = [];
+      sfx.play('good');
+      this.view.memoryState(m.open, m.matched);
+      if (m.matched.length * 2 >= m.cards.length) {
+        this.phase = 'strike';
+        this.view.setNote('全部配對成功！');
+        window.setTimeout(() => this.succeed(m.misses <= MEMORY_PERFECT ? 'perfect' : 'good', false), 650);
+      }
+      return;
+    }
+    m.lock = true;
+    m.misses += 1;
+    window.setTimeout(() => {
+      if (this.memR !== m) return;
+      m.open = [];
+      m.lock = false;
+      this.view.memoryState(m.open, m.matched);
+    }, 900);
+  }
+
+  // ---- growing the partner --------------------------------------------------
+
+  /** A word right: experience for the active partner (none once it is at the top). */
+  private gainXp(tier: Tier, hard: boolean): void {
+    const m = this.partnerMon(this.me);
+    const before = growthOf(this.save.growth, m.id);
+    const gs = addXp(this.save.growth, m.id, xpFor(tier === 'perfect' ? 'perfect' : 'good', hard));
+    const after = growthOf(gs, m.id);
+    if (after.xp === before.xp) return;
+    this.save = { ...this.save, growth: gs };
+    this.onSave(this.save);
+    this.view.floatText('me', `+${after.xp - before.xp} 經驗`, '#7b4fd6', true, 34);
+    this.showXp();
+    if (isReady(after) && !isReady(before)) {
+      sfx.play('starUp', 0);
+      this.view.floatText('me', evolvesTo(m.id).length ? '可以進化了！' : '可以升星了！', '#c98600', true, 64);
+    }
+  }
+
+  /**
+   * After a win: every partner whose bar is full evolves (or gains a star). Applied to the save right
+   * away (the new form joins the dex and takes the old one's place); the animation follows the catch.
+   */
+  private growUp(): Grown[] {
+    const out: Grown[] = [];
+    let gs = this.save.growth ?? {};
+    const done = new Set<number>();
+    this.players.forEach((p, i) => {
+      const id = partnerMon(p, i).id;
+      if (done.has(id)) return;
+      done.add(id);
+      const r = takeStep(gs, id, this.rng);
+      if (!r) return;
+      gs = r.gs;
+      out.push({ seat: i, step: r.step });
+    });
+    if (!out.length) return out;
+    const evolved = new Map(out.filter((o) => o.step.kind === 'evolve').map((o) => [o.step.from, o.step.to]));
+    const players = this.players.map((p, i) => {
+      const to = evolved.get(partnerMon(p, i).id);
+      return to === undefined ? p : { ...p, mon: to };
+    });
+    const caught = [...new Set([...this.save.caught, ...evolved.values()])];
+    this.save = { ...this.save, growth: gs, players, caught };
+    this.battle.players = this.save.players;
+    this.onSave(this.save);
+    return out;
+  }
+
+  /** Play each evolution / star one after another, then carry on. */
+  private playGrowth(list: Grown[], done: () => void): void {
+    const next = list[0];
+    if (!next || this.dead) return done();
+    const from = MON_BY_ID.get(next.step.from);
+    const to = MON_BY_ID.get(next.step.to);
+    if (!from || !to) return this.playGrowth(list.slice(1), done);
+    const who = this.players[next.seat]?.name ?? '';
+    this.view.showWait(next.step.kind === 'evolve' ? `咦？${who} 的 ${from.name} 的樣子…` : `${who} 的 ${from.name} 在發光…`);
+    this.view.evolve(
+      { from, to, kind: next.step.kind, stars: next.step.rank },
+      (beat, n) => {
+        if (beat === 'pulse') { sfx.play('evoPulse', n); haptics.pulse(14); }
+        if (beat === 'done') {
+          this.showXp(next.step.to);
+          sfx.play(next.step.kind === 'evolve' ? 'evolveDone' : 'starUp', 1);
+          haptics.pulse(next.step.kind === 'evolve' ? [200, 80, 200, 80, 300] : [120, 60, 160]);
+          this.view.showWait(next.step.kind === 'evolve' ? `${from.name} 進化成 ${to.name} 了！` : `${from.name} 升星了！${'★'.repeat(next.step.rank)}`);
+        }
+      },
+      () => window.setTimeout(() => this.playGrowth(list.slice(1), done), 900),
+    );
   }
 
   private mark(word: Word, ok: boolean, tier?: Tier, dealt = 0, blocked = false): void {
@@ -334,6 +591,7 @@ export class BattleController {
 
   private succeed(tier: Tier, defending: boolean): void {
     this.speaker.cancel();
+    this.gainXp(tier, !defending && this.hard);
     if (defending) return this.resolveDefense(true, tier === 'perfect' ? 'perfect' : 'good');
     this.phase = 'strike';
     const sh = this.shield;
@@ -341,10 +599,16 @@ export class BattleController {
     const outcome = sh ? sh.resolve(!!this.me.adult, this.hasKid()) : 'hit';
     const partner = this.partnerMon(this.me);
     const fx = typeOf(partner).fx;
-    const power = tier === 'perfect' ? 2 : 1;
+    const crit = this.hard && outcome !== 'bounce';
+    const power = tier === 'perfect' || crit ? 2 : 1;
     this.learned.push(this.word);
-    this.view.showWait(outcome === 'bounce' ? '護盾擋住了！' : tier === 'perfect' ? '完美！' : '很好！');
+    this.view.showWait(outcome === 'bounce' ? '護盾擋住了！' : crit ? '必殺！' : tier === 'perfect' ? '完美！' : '很好！');
     sfx.play(tier === 'perfect' ? 'perfect' : 'good');
+    if (crit) {
+      this.view.crit();
+      sfx.play('crit');
+      haptics.pulse([40, 30, 90]);
+    }
 
     if (outcome === 'bounce') {
       this.mark(this.word, true, tier);
@@ -360,7 +624,7 @@ export class BattleController {
       return;
     }
 
-    const mult = this.revengeActive ? REVENGE_MULT : 1;
+    const mult = (this.revengeActive ? REVENGE_MULT : 1) * (crit ? CRIT_MULT : 1);
     const res = this.battle.attack(this.word, tier, mult);
     if (wasUp && this.battle.monster.hp <= 0) { this.battle.monster.hp = 1; res.killed = false; }
     this.mark(this.word, true, tier, res.damage);
@@ -368,7 +632,8 @@ export class BattleController {
     this.view.cast('me', fx.style, fx.colors, power, () => {
       sfx.play('hit', power === 2 ? 4 : 2);
       this.view.hurt('foe');
-      this.view.floatText('foe', `-${res.damage}`, '#ff5a5a');
+      if (crit) this.view.shake(12, 420);
+      this.view.floatText('foe', crit ? `必殺！ -${res.damage}` : `-${res.damage}`, crit ? '#e0701a' : '#ff5a5a');
       if (res.combo >= 2) this.view.floatText('foe', `${res.combo} 連擊！`, '#ffb300', true, 30);
       if (outcome === 'break' && sh) {
         this.view.setShields(sh.layers, sh.max);
@@ -385,6 +650,8 @@ export class BattleController {
     this.speaker.cancel();
     this.mark(defending && this.defWord ? this.defWord : this.word, false);
     if (defending) return this.resolveDefense(false);
+    // no more taps or answers while the fizzle plays out
+    this.phase = 'strike';
     this.battle.fizzle();
     this.revenge.miss(this.me.id, this.word, this.battle.round);
     this.view.showWait(`咒語是「${this.word.w}」，下次再來！`);
@@ -640,6 +907,8 @@ export class BattleController {
     sfx.setMusic(null);
     const seen = new Set<string>();
     const words = this.learned.filter((w) => !seen.has(w.id) && seen.add(w.id));
+    // evolutions are saved before the win itself, so the win builds on them
+    const grown = this.growUp();
     const r = this.onWin(this.foe, words);
     const g = this.grade;
     const gi = g === 'legend' ? 2 : g === 'rare' ? 1 : 0;
@@ -651,9 +920,19 @@ export class BattleController {
       },
       () => {
         if (this.dead) return;
-        sfx.play('win');
-        this.view.showVictory(this.foe, words, r ? { isNew: r.isNew, nextLabel: r.nextLabel } : {});
+        this.playGrowth(grown, () => {
+          if (this.dead) return;
+          if (grown.length) this.refreshParty();
+          sfx.play('win');
+          const lines = grown.map((x) => {
+            const from = MON_BY_ID.get(x.step.from)?.name ?? '';
+            const to = MON_BY_ID.get(x.step.to)?.name ?? '';
+            return x.step.kind === 'evolve' ? `${from} 進化成 ${to}` : `${from} 升到 ${'★'.repeat(x.step.rank)}`;
+          });
+          this.view.showVictory(this.foe, words, { ...(r ? { isNew: r.isNew, nextLabel: r.nextLabel } : {}), grown: lines });
+        });
       },
     );
   }
+
 }

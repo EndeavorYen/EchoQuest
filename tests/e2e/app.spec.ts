@@ -10,7 +10,8 @@ async function open(page: Page, query = ''): Promise<void> {
   // stay offline: tiny stand-in pictures, empty font css
   await page.route(/pokeapi|githubusercontent/, (r) => r.fulfill({ contentType: 'image/png', body: PNG }));
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ contentType: 'text/css', body: '' }));
-  await page.goto(`/?debug${query}`);
+  // ordinary tests get spoken rounds only; tests of the other kinds ask for them with &rounds=…
+  await page.goto(`/?debug${query.includes('rounds=') ? query : `${query}&rounds=speak`}`);
   await page.waitForFunction(() => (window as any).__app);
 }
 
@@ -256,6 +257,165 @@ test.describe('scan and battle', () => {
     await ctl(p, (c) => c.win());
     await expect(p.locator('[data-act=next]')).toBeVisible({ timeout: 5000 });
     expect(await p.evaluate(() => (window as any).__vib)).toEqual([]);
+  });
+
+  test('hear it, pick it: the right picture attacks; two wrong picks fizzle', async ({ game }) => {
+    const p = game.page;
+    await open(p, '&rounds=listen');
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, players: s.players.map((x: any) => ({ ...x, level: 2 })) })));
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => { c.statusEnabled = false; });
+    const until = () => ctl(p, (c) => { for (let i = 0; i < 80 && c.round !== 'listen'; i++) c.deal(); return c.round; });
+    expect(await until()).toBe('listen');
+    await expect(p.locator('.panel[data-mode=listen] .choice')).toHaveCount(3);
+    const hp = await ctl(p, (c) => c.battle.monster.hp);
+    const right = await ctl(p, (c) => c.word.id);
+    await p.locator(`.choice[data-id="${right}"]`).click();
+    await expect.poll(() => ctl(p, (c) => c.battle.monster.hp)).toBeLessThan(hp);
+    // a fresh listen round: miss twice
+    // let the counter-attack through (time runs out); the next attack card is dealt
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
+    await ctl(p, (c) => { c.defLeft = 0.05; });
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('speak');
+    expect(await until()).toBe('listen');
+    const hp2 = await ctl(p, (c) => c.battle.monster.hp);
+    const wrong = await ctl(p, (c) => c.listenR.options.filter((o: any) => o.id !== c.word.id).map((o: any) => o.id));
+    await p.locator(`.choice[data-id="${wrong[0]}"]`).click();
+    await expect(p.locator('.choice.x')).toHaveCount(1);
+    expect(await ctl(p, (c) => c.phase)).toBe('speak');
+    await p.locator(`.choice[data-id="${wrong[1]}"]`).click();
+    await expect.poll(() => ctl(p, (c) => c.phase)).not.toBe('speak');
+    expect(await ctl(p, (c) => c.battle.monster.hp)).toBe(hp2);
+  });
+
+  test('fill in the letters: tapping them in order attacks; three wrong letters fizzle', async ({ game }) => {
+    const p = game.page;
+    await open(p, '&rounds=spell');
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, players: s.players.map((x: any) => ({ ...x, level: 3 })) })));
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => { c.statusEnabled = false; });
+    const until = () => ctl(p, (c) => { for (let i = 0; i < 80 && c.round !== 'spell'; i++) c.deal(); return c.round; });
+    expect(await until()).toBe('spell');
+    const hp = await ctl(p, (c) => c.battle.monster.hp);
+    for (;;) {
+      const next = await ctl(p, (c) => {
+        const s = c.spellR;
+        if (s.filled >= s.blanks.length) return -1;
+        const want = s.letters[s.blanks[s.filled]];
+        return s.tiles.findIndex((x: string, i: number) => x === want && !s.used[i]);
+      });
+      if (next < 0) break;
+      await p.locator(`.tile[data-i="${next}"]`).click();
+    }
+    await expect.poll(() => ctl(p, (c) => c.battle.monster.hp)).toBeLessThan(hp);
+    // let the counter-attack through (time runs out); the next attack card is dealt
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('defend');
+    await ctl(p, (c) => { c.defLeft = 0.05; });
+    await expect.poll(() => ctl(p, (c) => c.phase), { timeout: 8000 }).toBe('speak');
+    expect(await until()).toBe('spell');
+    const hp2 = await ctl(p, (c) => c.battle.monster.hp);
+    const bad = await ctl(p, (c) => { const s = c.spellR; const want = s.letters[s.blanks[0]]; return s.tiles.findIndex((x: string) => x !== want); });
+    for (let i = 0; i < 3; i++) await p.locator(`.tile[data-i="${bad}"]`).click();
+    await expect.poll(() => ctl(p, (c) => c.phase)).not.toBe('speak');
+    expect(await ctl(p, (c) => c.battle.monster.hp)).toBe(hp2);
+  });
+
+  test('memory match: finding all three pairs is a perfect attack', async ({ game }) => {
+    const p = game.page;
+    await open(p, '&rounds=memory');
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, players: s.players.map((x: any) => ({ ...x, level: 2 })) })));
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    expect(await ctl(p, (c) => { for (let i = 0; i < 80 && c.round !== 'memory'; i++) c.deal(); return c.round; })).toBe('memory');
+    await expect(p.locator('.mcard')).toHaveCount(6);
+    // one wrong pair first: both flip back
+    const ids: string[] = await ctl(p, (c) => c.memR.cards.map((x: any) => x.word.id));
+    const first = 0;
+    const other = ids.findIndex((id) => id !== ids[first]);
+    await p.locator(`.mcard[data-i="${first}"]`).click();
+    await p.locator(`.mcard[data-i="${other}"]`).click();
+    await expect(p.locator('.mcard.up')).toHaveCount(0, { timeout: 3000 });
+    const hp = await ctl(p, (c) => c.battle.monster.hp);
+    for (const id of [...new Set(ids)]) {
+      const [a, b] = ids.map((x, i) => (x === id ? i : -1)).filter((i) => i >= 0);
+      await p.locator(`.mcard[data-i="${a}"]`).click();
+      await p.locator(`.mcard[data-i="${b}"]`).click();
+    }
+    await expect(p.locator('.mcard.done')).toHaveCount(6);
+    await expect.poll(() => ctl(p, (c) => c.battle.monster.hp)).toBeLessThan(hp);
+    // used once a fight
+    expect(await ctl(p, (c) => c.memoryUsed)).toBe(true);
+  });
+
+  test('a word said right gives the active partner experience', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    const id = await ctl(p, (c) => c.partnerMon(c.me).id);
+    await sayWord(game, p);
+    await expect.poll(() => save(p, (s) => s.growth?.[25]?.xp ?? 0)).toBeGreaterThan(0);
+    expect(id).toBe(25);
+    expect(await p.locator('#xpBar').evaluate((e) => parseFloat((e as HTMLElement).style.width))).toBeGreaterThan(0);
+  });
+
+  test('a raised partner draws hard words (one level up); one said right is a critical hit', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, growth: { 25: { xp: 0, rank: 3, stars: 1 } } })));
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => { c.statusEnabled = false; c.battle.monster.hp = c.battle.monster.maxHp = 999; });
+    expect(await ctl(p, (c) => { for (let i = 0; i < 200 && !c.hard; i++) c.deal(); return c.hard; })).toBe(true);
+    expect(await ctl(p, (c) => c.word.lv)).toBe(2); // the player is level 1
+    await expect(p.locator('.hardtag')).toBeVisible();
+    await sayWord(game, p);
+    await expect(p.locator('.banner.crit')).toBeVisible();
+    // perfect level-2 word ×1.5
+    await expect.poll(() => ctl(p, (c) => 999 - c.battle.monster.hp)).toBe(30);
+  });
+
+  test('a full bar evolves the partner after the win: Pikachu becomes Raichu, joins the dex and keeps fighting', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, growth: { 25: { xp: 30, rank: 0, stars: 0 } } })));
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await expect(p.locator('#xpline.ready')).toHaveCount(1);
+    await ctl(p, (c) => c.win());
+    await expect(p.locator('.victory .grown')).toContainText('皮卡丘 進化成 雷丘', { timeout: 15_000 });
+    const s = await save(p, (x) => ({ mon: x.players[0].mon, caught: x.caught, g26: x.growth[26], g25: x.growth[25] }));
+    expect(s.mon).toBe(26);
+    expect(s.caught).toContain(26);
+    expect(s.g26).toEqual({ xp: 0, rank: 1, stars: 0 });
+    expect(s.g25).toBeUndefined();
+    await expect(p.locator('#meName')).toHaveText('雷丘');
+    await expect(p.locator('#meRank')).toHaveText('★');
+  });
+
+  test('a creature that cannot evolve gains a star instead', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, players: s.players.map((x: any) => ({ ...x, mon: 383 })), growth: { 383: { xp: 30, rank: 0, stars: 0 } } })));
+    await go(p, 'battle', { foe: { id: 19, name: '小拉達', type: 'normal', rarity: 1, colors: ['#A179B1'] } });
+    await p.waitForFunction(() => (window as any).__v3?.battle);
+    await ctl(p, (c) => c.win());
+    await expect(p.locator('.victory .grown')).toContainText('固拉多 升到 ★', { timeout: 15_000 });
+    expect(await save(p, (x) => x.growth[383])).toEqual({ xp: 0, rank: 1, stars: 1 });
+  });
+
+  test('the party screen shows each partner\'s growth, and round kinds can be switched off', async ({ game }) => {
+    const p = game.page;
+    await open(p);
+    await p.evaluate(() => (window as any).__app.update((s: any) => ({ ...s, growth: { 25: { xp: 12, rank: 1, stars: 0 } } })));
+    await go(p, 'party');
+    await expect(p.locator('[data-grow="25"] .rank')).toHaveText('★');
+    await expect(p.locator('.pcard')).toContainText('再 38 經驗就進化');
+    await p.click('[data-round=spell]');
+    expect(await save(p, (s) => s.rounds)).toEqual({ listen: true, spell: false, memory: true });
+    await expect(p.locator('[data-round=spell]')).toContainText('關');
   });
 
   test('winning adds the creature to the dex and the trek moves on', async ({ game }) => {

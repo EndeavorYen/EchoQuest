@@ -5,6 +5,8 @@ import { LEDGER, BANK_REV } from '../data/ledger';
 import { reconcile } from './reconcile';
 import { isTownMap, type TownMap } from './townmap';
 import type { MonsterSpec } from '../gfx/monster';
+import type { Growths } from '../mon/growth';
+import type { RoundPrefs } from '../v3/rounds';
 
 export interface Save {
   v: 3;
@@ -34,6 +36,10 @@ export interface Save {
   music: boolean;
   /** phone vibration on a catch; absent (older saves) means on */
   haptics?: boolean;
+  /** how far each creature has been raised as a partner, by Pokémon id */
+  growth?: Growths;
+  /** which extra round kinds are switched on (absent = all on) */
+  rounds?: Partial<RoundPrefs>;
 }
 
 /** Saves live under a versioned key. Older keys are only ever read (never deleted), so an update can't lose anyone's progress. */
@@ -91,6 +97,19 @@ export function migrateV2(data: Raw): Raw {
   };
 }
 
+/** Keep only well-formed growth records (a hand-edited or half-written save must not break a fight). */
+function cleanGrowth(g: unknown): Growths {
+  const out: Growths = {};
+  if (!g || typeof g !== 'object') return out;
+  for (const [k, v] of Object.entries(g as Record<string, unknown>)) {
+    const r = v as { xp?: unknown; rank?: unknown; stars?: unknown } | null;
+    if (!r || !Number.isInteger(Number(k))) continue;
+    const num = (x: unknown): number => (Number.isFinite(x) && (x as number) >= 0 ? Math.floor(x as number) : 0);
+    out[k] = { xp: num(r.xp), rank: Math.min(3, num(r.rank)), stars: Math.min(3, num(r.stars)) };
+  }
+  return out;
+}
+
 function normalise(data: Raw): Save {
   const base = defaultSave();
   const players = data.players ?? [];
@@ -115,6 +134,7 @@ function normalise(data: Raw): Save {
     pals: Array.isArray(data.pals) ? data.pals.filter((n) => Number.isInteger(n)) : [],
     journeys: Array.isArray(data.journeys) ? data.journeys.filter((j) => j && typeof j.title === 'string').slice(-50) : [],
     bankRev: Number.isInteger(data.bankRev) ? data.bankRev : 0,
+    growth: cleanGrowth(data.growth),
   };
 }
 
